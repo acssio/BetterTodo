@@ -86,6 +86,10 @@ Observé dans ses autres projets (C++ embarqué, React/TypeScript). Écrire du c
     - pas de texte qui passe à la ligne : on coupe avec « … » ;
   - servi par nginx sur `localhost:8000`, qui transmet `/api` au conteneur `api`.
 - **2026-11-13 – Découpage de l'étape 3 :** 3a affichage, 3b modifications (overlay, glisser-déposer natif HTML5), 3c vue sections, vue scindée, paramètres.
+- **2026-11-13 – Étape 3c en trois morceaux**, livrés dans cet ordre, chacun avec son commit et son README :
+  - **3c-1** : vue sections (glisser-déposer commun aux deux vues), bascule Colonnes/Sections enregistrée sur la liste (`default_view`), overlay « Modifier une liste », renommer / supprimer un groupe de listes ;
+  - **3c-2** : écran Paramètres (niveaux d'urgence, tags, vue par défaut). La vue par défaut est une **préférence du compte** : migration 003 `users.default_view` + route `PATCH /me`, qui permet aussi de changer le nom affiché ;
+  - **3c-3** : vue scindée (glisser une liste à droite ou Cmd+clic), deux boards dans `Workspace`, **glisser une tâche d'une liste à l'autre** inclus.
 - **2026-11-13 – Maquette web validée** (Figma, page « Web – Maquette v2 »).
 
 ## Questions ouvertes

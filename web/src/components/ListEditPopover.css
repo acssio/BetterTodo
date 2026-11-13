@@ -1,0 +1,67 @@
+/* Réutilise la mise en forme de TaskPopover.css (pop-field, pop-input, pop-foot…) */
+
+.list-edit-title {
+    flex: 1;
+    font-size: 15px;
+    font-weight: 600;
+}
+
+/* Champ « Nom » : texte en noir (pop-input est gris par défaut, pour les icônes) */
+input.pop-input {
+    color: var(--text);
+}
+
+/* Liste déroulante avec un chevron à nous (celui du navigateur est caché) */
+.pop-select {
+    position: relative;
+    display: flex;
+}
+
+.pop-select select {
+    flex: 1;
+    appearance: none;
+    padding-right: 28px;
+}
+
+.pop-select svg {
+    position: absolute;
+    right: 10px;
+    top: 9px;
+    color: var(--muted);
+    pointer-events: none;
+}
+
+.list-colors {
+    display: flex;
+    gap: 8px;
+}
+
+.list-color {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+}
+
+/* Couleur choisie : anneau blanc puis anneau de la couleur (color = couleur du bouton) */
+.list-color.on {
+    box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px currentColor;
+}
+
+.list-icons {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 6px;
+}
+
+.list-icon {
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+}
+
+.list-icon:hover {
+    background: var(--hover);
+}

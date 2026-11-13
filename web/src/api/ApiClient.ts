@@ -1,4 +1,6 @@
-import type { Board, Folder, Group, Session, Task, TaskChanges, TodoList, UrgencyLevel, User } from './types'
+import type {
+    Board, Folder, Group, ListChanges, Session, Task, TaskChanges, TodoList, UrgencyLevel, User,
+} from './types'
 
 /** Erreur renvoyée par l'API : le code HTTP et le message de {"error": "..."} */
 export class ApiError extends Error {
@@ -55,12 +57,24 @@ export class ApiClient {
         return this.request('PATCH', `/folders/${id}`, changes)
     }
 
+    deleteFolder(id: string): Promise<void> {
+        return this.request('DELETE', `/folders/${id}`)
+    }
+
     getLists(): Promise<TodoList[]> {
         return this.request('GET', '/lists')
     }
 
     createList(name: string, folderId: string | null): Promise<TodoList> {
         return this.request('POST', '/lists', { name, folder_id: folderId })
+    }
+
+    updateList(id: string, changes: ListChanges): Promise<TodoList> {
+        return this.request('PATCH', `/lists/${id}`, changes)
+    }
+
+    deleteList(id: string): Promise<void> {
+        return this.request('DELETE', `/lists/${id}`)
     }
 
     getBoard(listId: string): Promise<Board> {

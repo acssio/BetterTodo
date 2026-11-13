@@ -1,0 +1,51 @@
+.SectionsView {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 24px;
+    overflow-y: auto;
+}
+
+/* Un groupe = une carte blanche */
+.section {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    transition: border-color 0.1s;
+}
+
+.section.drop-over {
+    border-color: var(--accent);
+}
+
+.section-head {
+    padding: 10px 12px 10px 16px;
+    background: var(--sidebar);
+    border-bottom: 1px solid var(--border);
+}
+
+.section-foot {
+    padding: 4px 12px;
+}
+
+.section-new {
+    padding: 10px;
+}
+
+/* La ligne de dépôt prend toute la largeur dans une section */
+.section .drop-indicator {
+    margin: -2px 0 -1px;
+}
+
+@container main (max-width: 640px) {
+    .SectionsView {
+        padding: 16px;
+        gap: 12px;
+    }
+}

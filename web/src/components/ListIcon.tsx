@@ -14,7 +14,7 @@ interface ListIconProps {
 export class ListIcon extends React.Component<ListIconProps> {
     render(): React.ReactNode {
         const { icon, color, size = 16, boxed = false } = this.props
-        const Icon = LIST_ICONS[icon] ?? List
+        const Icon = LIST_ICONS[icon]?.icon ?? List
         const svg = <Icon size={size} color={color} strokeWidth={2} />
 
         if (!boxed) {

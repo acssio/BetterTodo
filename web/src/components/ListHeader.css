@@ -9,6 +9,16 @@
     border-bottom: 1px solid var(--border);
 }
 
+.header-icon {
+    flex-shrink: 0;
+    display: flex;
+    border-radius: 9px;
+}
+
+.header-icon:hover {
+    box-shadow: 0 0 0 2px var(--border);
+}
+
 .header-title {
     flex: 1;
     min-width: 60px; /* Le titre garde toujours un peu de place */

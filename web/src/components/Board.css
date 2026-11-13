@@ -8,9 +8,10 @@
     overflow: auto; /* Défilement horizontal s'il y a beaucoup de colonnes */
 }
 
-.Board-empty {
+/* Message « pas encore de groupe » (aussi utilisé par la vue sections) */
+.view-empty {
     align-self: center;
-    margin: 0 auto;
+    margin: auto;
     color: var(--faint);
 }
 
@@ -26,103 +27,13 @@
     transition: background 0.1s;
 }
 
-/* Colonne survolée pendant un glisser-déposer */
-.board-column.drop-over {
-    background: #E6ECF8;
-}
-
-/* Ligne bleue : là où la carte sera déposée */
-.drop-indicator {
-    height: 3px;
-    margin: -3px 4px;
-    border-radius: 2px;
-    background: var(--accent);
-}
-
-.board-new-group {
-    width: 300px;
-    flex-shrink: 0;
-    padding: 10px;
-    border-radius: var(--radius-lg);
-    background: var(--column);
-}
-
-.column-head {
-    display: flex;
-    align-items: center;
-    gap: 8px;
+.board-column .GroupHeader {
     padding: 0 0 2px 4px;
 }
 
-.column-name {
-    font-size: 14px;
-    font-weight: 700;
-}
-
-.column-count {
-    padding: 1px 7px;
-    border-radius: 10px;
-    background: #E2E2DE;
-    color: var(--muted);
-    font-size: 11px;
-    font-weight: 600;
-    margin-right: auto; /* Pousse le bouton « … » tout à droite */
-}
-
-.column-add {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 6px 4px;
-    border-radius: var(--radius);
-    color: var(--faint);
-}
-
-.column-add:hover {
-    color: var(--text);
-}
-
-/* Menu « … » d'une colonne */
-.column-menu-anchor {
-    position: relative;
-}
-
-.menu-backdrop {
-    position: fixed;
-    inset: 0;
-    z-index: 20;
-}
-
-.column-menu {
-    position: absolute;
-    top: 30px;
-    right: 0;
-    z-index: 21;
-    min-width: 190px;
-    display: flex;
-    flex-direction: column;
-    padding: 4px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-md);
-    box-shadow: var(--shadow-pop);
-}
-
-.column-menu button {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 10px;
-    border-radius: var(--radius-sm);
-    text-align: left;
-}
-
-.column-menu button:hover {
-    background: var(--hover);
-}
-
-.column-menu button.danger {
-    color: var(--danger);
+/* Colonne survolée pendant un glisser-déposer */
+.board-column.drop-over {
+    background: #E6ECF8;
 }
 
 /* Petite zone : un peu moins de marge autour des colonnes */

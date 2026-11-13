@@ -83,16 +83,48 @@
     text-align: left;
 }
 
-/* Le « + » d'un groupe de listes n'apparaît qu'au survol */
-.sidebar-folder-add {
+/* Le « + » et le « … » d'un groupe de listes n'apparaissent qu'au survol (ou menu ouvert) */
+.sidebar-folder-add,
+.sidebar-folder-menu .icon-btn {
     width: 24px;
     height: 24px;
+}
+
+.sidebar-folder-add,
+.sidebar-folder-menu {
     opacity: 0;
 }
 
 .sidebar-folder-head:hover .sidebar-folder-add,
-.sidebar-folder-add:focus-visible {
+.sidebar-folder-head:hover .sidebar-folder-menu,
+.sidebar-folder-head.menu-open .sidebar-folder-menu,
+.sidebar-folder-add:focus-visible,
+.sidebar-folder-menu:focus-within {
     opacity: 1;
+}
+
+/* Une liste : le bouton crayon se superpose au nombre de tâches, au survol */
+.sidebar-row {
+    position: relative;
+}
+
+.sidebar-row-edit {
+    position: absolute;
+    right: 4px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 26px;
+    height: 26px;
+    opacity: 0;
+}
+
+.sidebar-row:hover .sidebar-row-edit,
+.sidebar-row-edit:focus-visible {
+    opacity: 1;
+}
+
+.sidebar-row:hover .sidebar-count {
+    visibility: hidden;
 }
 
 .sidebar-adding {
@@ -204,6 +236,7 @@
 .Sidebar.compact .sidebar-count,
 .Sidebar.compact .sidebar-folder-name,
 .Sidebar.compact .sidebar-folder-add,
+.Sidebar.compact .sidebar-folder-menu,
 .Sidebar.compact .sidebar-user-name {
     display: none;
 }

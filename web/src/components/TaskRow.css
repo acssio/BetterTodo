@@ -1,0 +1,88 @@
+/* Une ligne de la vue sections. Réutilise .card-check, .card-tag, .card-due,
+   .card-urgency de TaskCard.css pour garder exactement le même style. */
+.TaskRow {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border-light);
+    background: var(--surface);
+    cursor: pointer;
+    user-select: none;
+}
+
+.TaskRow:hover {
+    background: #FBFBFA;
+}
+
+.TaskRow:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+}
+
+.TaskRow.selected {
+    background: #EAF1FD;
+    box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.TaskRow.dragging {
+    opacity: 0.4;
+}
+
+.TaskRow .card-check {
+    margin-top: 0;
+}
+
+.row-title {
+    flex: 0 1 auto; /* Juste la place du texte : l'icône de note vient juste après */
+    min-width: 0;
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.TaskRow.done .row-title {
+    text-decoration: line-through;
+    color: var(--done);
+}
+
+/* Pousse les colonnes tags / échéance / urgence à droite */
+.row-spacer {
+    flex: 1;
+}
+
+/* Colonnes de droite, de largeur fixe pour qu'elles soient alignées d'une ligne à l'autre */
+.row-tags {
+    width: 170px;
+    display: flex;
+    gap: 6px;
+    overflow: hidden;
+}
+
+.row-due {
+    width: 110px;
+    display: flex;
+}
+
+.row-urgency {
+    width: 90px;
+    display: flex;
+}
+
+.row-none {
+    color: #C2C2BE;
+}
+
+/* Quand la place manque : on enlève les tags, puis l'échéance */
+@container main (max-width: 760px) {
+    .row-tags {
+        display: none;
+    }
+}
+
+@container main (max-width: 520px) {
+    .row-due {
+        display: none;
+    }
+}

@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { Calendar, Check, Plus, Trash2, X } from 'lucide-react'
 import type { Group, Task, TaskChanges, UrgencyLevel } from '../api/types'
+import { DismissListener, popoverPosition } from '../utils/popover'
 import './TaskPopover.css'
 
 const POPOVER_WIDTH = 360
@@ -34,6 +35,8 @@ class TaskPopoverState {
 export class TaskPopover extends React.Component<TaskPopoverProps, TaskPopoverState> {
     private rootRef = React.createRef<HTMLDivElement>()
     private notesTimer: number | undefined
+    // Échap ou clic en dehors → fermer (sauf clic sur sa propre carte)
+    private dismiss = new DismissListener(this.rootRef, () => this.props.onClose(), `[data-task-id="${this.props.task.id}"]`)
 
     constructor(props: TaskPopoverProps) {
         super(props)
@@ -41,30 +44,15 @@ export class TaskPopover extends React.Component<TaskPopoverProps, TaskPopoverSt
     }
 
     componentDidMount(): void {
-        document.addEventListener('mousedown', this.onDocumentMouseDown)
-        document.addEventListener('keydown', this.onDocumentKeyDown)
+        this.dismiss.start()
     }
 
     componentWillUnmount(): void {
-        document.removeEventListener('mousedown', this.onDocumentMouseDown)
-        document.removeEventListener('keydown', this.onDocumentKeyDown)
+        this.dismiss.stop()
         // Enregistre ce qui n'est pas encore parti (fermeture pendant la frappe)
         window.clearTimeout(this.notesTimer)
         this.saveTitle()
         this.saveNotes()
-    }
-
-    // --- Fermeture -------------------------------------------------------------
-
-    onDocumentMouseDown = (event: MouseEvent): void => {
-        const target = event.target as Element
-        if (this.rootRef.current?.contains(target)) return
-        if (target.closest(`[data-task-id="${this.props.task.id}"]`)) return // Clic sur sa propre carte
-        this.props.onClose()
-    }
-
-    onDocumentKeyDown = (event: KeyboardEvent): void => {
-        if (event.key === 'Escape') this.props.onClose()
     }
 
     // --- Enregistrement --------------------------------------------------------
@@ -152,26 +140,11 @@ export class TaskPopover extends React.Component<TaskPopoverProps, TaskPopoverSt
 
     // --- Rendu -----------------------------------------------------------------
 
-    /** À droite de la carte s'il y a la place, sinon à gauche ; toujours dans la fenêtre. */
-    private position(): React.CSSProperties {
-        const { anchor } = this.props
-        const margin = 12
-
-        let left = anchor.right + margin
-        if (left + POPOVER_WIDTH > window.innerWidth - 8) {
-            left = anchor.left - margin - POPOVER_WIDTH
-        }
-        left = Math.max(8, left)
-
-        const top = Math.max(8, Math.min(anchor.top - 8, window.innerHeight - 540))
-        return { left, top, width: POPOVER_WIDTH }
-    }
-
     render(): React.ReactNode {
         const { task, groups, urgencyLevels } = this.props
 
         return (
-            <div className="TaskPopover" ref={this.rootRef} style={this.position()}>
+            <div className="TaskPopover" ref={this.rootRef} style={popoverPosition(this.props.anchor, POPOVER_WIDTH, 540)}>
                 <div className="pop-title">
                     <button
                         className={task.done ? 'pop-check checked' : 'pop-check'}

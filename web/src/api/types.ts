@@ -39,6 +39,16 @@ export interface TodoList {
     open_tasks: number       // Tâches pas encore faites
 }
 
+/** Champs modifiables d'une liste (PATCH /lists/{id}). folder_id: null = hors groupe de listes. */
+export interface ListChanges {
+    name?: string
+    folder_id?: string | null
+    color?: string
+    icon?: string
+    default_view?: ListView
+    position?: number
+}
+
 /** Groupe de tâches dans une liste (une colonne). */
 export interface Group {
     id: string

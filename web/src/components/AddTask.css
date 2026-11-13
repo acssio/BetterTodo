@@ -1,0 +1,12 @@
+.AddTask {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 4px;
+    border-radius: var(--radius);
+    color: var(--faint);
+}
+
+.AddTask:hover {
+    color: var(--text);
+}

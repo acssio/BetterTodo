@@ -77,7 +77,7 @@ export class TaskCard extends React.Component<TaskCardProps> {
 
                 {hasMeta && (
                     <div className="card-meta">
-                        {task.due_date && this.renderDueDate(task.due_date)}
+                        {task.due_date && <DueDate dueDate={task.due_date} done={task.done} />}
                         {task.tags.map(tag => <span key={tag} className="card-tag">#{tag}</span>)}
                         {task.notes !== '' && (
                             <span className="card-note" title={task.notes}><StickyNote size={12} /></span>
@@ -85,17 +85,6 @@ export class TaskCard extends React.Component<TaskCardProps> {
                     </div>
                 )}
             </div>
-        )
-    }
-
-    /** Échéance, en rouge si c'est aujourd'hui ou en retard (sauf si la tâche est faite). */
-    private renderDueDate(dueDate: string): React.ReactNode {
-        const late = !this.props.task.done && isDueOrLate(dueDate)
-        return (
-            <span className={late ? 'card-due late' : 'card-due'}>
-                <Calendar size={12} />
-                {formatDueDate(dueDate)}
-            </span>
         )
     }
 }
@@ -108,6 +97,20 @@ export class UrgencyPill extends React.Component<{ urgency: UrgencyLevel }> {
             <span className="card-urgency" style={{ color: urgency.color, background: urgency.color + '1F' }}>
                 <span className="card-urgency-dot" style={{ background: urgency.color }} />
                 {urgency.name}
+            </span>
+        )
+    }
+}
+
+/** Échéance, en rouge si c'est aujourd'hui ou en retard (sauf si la tâche est faite). */
+export class DueDate extends React.Component<{ dueDate: string, done: boolean }> {
+    render(): React.ReactNode {
+        const { dueDate, done } = this.props
+        const late = !done && isDueOrLate(dueDate)
+        return (
+            <span className={late ? 'card-due late' : 'card-due'}>
+                <Calendar size={12} />
+                {formatDueDate(dueDate)}
             </span>
         )
     }

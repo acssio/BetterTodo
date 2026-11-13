@@ -1,10 +1,12 @@
 import * as React from 'react'
 import {
-    Check, ChevronDown, ChevronRight, FolderPlus, LogOut, PanelLeftClose, PanelLeftOpen, Plus, Settings,
+    Check, ChevronDown, ChevronRight, Ellipsis, FolderPlus, LogOut, PanelLeftClose, PanelLeftOpen,
+    Pencil, Plus, Settings, Trash2,
 } from 'lucide-react'
 import type { Folder, TodoList, User } from '../api/types'
 import { InlineInput } from './InlineInput'
 import { ListIcon } from './ListIcon'
+import { Menu } from './Menu'
 import './Sidebar.css'
 
 interface SidebarProps {
@@ -21,6 +23,9 @@ interface SidebarProps {
     onToggleFolder: (folder: Folder) => void
     onCreateList: (name: string, folderId: string | null) => Promise<void>
     onCreateFolder: (name: string) => Promise<void>
+    onRenameFolder: (folderId: string, name: string) => Promise<void>
+    onDeleteFolder: (folder: Folder) => void
+    onEditList: (list: TodoList, anchor: DOMRect) => void
     onLogout: () => void
 }
 
@@ -32,6 +37,8 @@ type Adding =
 
 class SidebarState {
     adding: Adding = null
+    folderMenuId: string | null = null // Groupe de listes dont le menu « … » est ouvert
+    renamingFolderId: string | null = null
 }
 
 /**
@@ -153,9 +160,28 @@ export class Sidebar extends React.Component<SidebarProps, SidebarState> {
         const { adding } = this.state
         const addingHere = !this.props.compact && adding?.kind === 'list' && adding.folderId === folder.id
 
+        if (this.state.renamingFolderId === folder.id) {
+            return (
+                <div key={folder.id} className="sidebar-folder">
+                    <div className="sidebar-adding">
+                        <InlineInput
+                            placeholder="Nom du groupe de listes"
+                            initialValue={folder.name}
+                            onSubmit={async name => {
+                                await this.props.onRenameFolder(folder.id, name)
+                                this.setState({ renamingFolderId: null })
+                            }}
+                            onCancel={() => this.setState({ renamingFolderId: null })}
+                        />
+                    </div>
+                    {!folder.collapsed && folderLists.map(list => this.renderList(list, true))}
+                </div>
+            )
+        }
+
         return (
             <div key={folder.id} className="sidebar-folder">
-                <div className="sidebar-folder-head">
+                <div className={this.state.folderMenuId === folder.id ? 'sidebar-folder-head menu-open' : 'sidebar-folder-head'}>
                     <button
                         className="sidebar-folder-toggle"
                         title={folder.name}
@@ -179,6 +205,24 @@ export class Sidebar extends React.Component<SidebarProps, SidebarState> {
                     >
                         <Plus size={13} />
                     </button>
+                    <div className="menu-anchor sidebar-folder-menu">
+                        <button
+                            className="icon-btn"
+                            title={`Options de « ${folder.name} »`}
+                            onClick={() => this.setState({ folderMenuId: folder.id })}
+                        >
+                            <Ellipsis size={14} />
+                        </button>
+                        {this.state.folderMenuId === folder.id && (
+                            <Menu
+                                onClose={() => this.setState({ folderMenuId: null })}
+                                items={[
+                                    { label: 'Renommer', icon: Pencil, onSelect: () => this.setState({ renamingFolderId: folder.id }) },
+                                    { label: 'Supprimer le groupe', icon: Trash2, danger: true, onSelect: () => this.props.onDeleteFolder(folder) },
+                                ]}
+                            />
+                        )}
+                    </div>
                 </div>
 
                 {!folder.collapsed && folderLists.map(list => this.renderList(list, true))}
@@ -202,23 +246,37 @@ export class Sidebar extends React.Component<SidebarProps, SidebarState> {
         )
     }
 
-    /** Une liste : icône, nom, nombre de tâches à faire (nom en info-bulle en mode compact). */
+    /**
+     * Une liste : icône, nom, nombre de tâches à faire (nom en info-bulle en mode compact).
+     * Au survol, un crayon remplace le nombre : il ouvre « Modifier la liste ».
+     */
     private renderList(list: TodoList, indented: boolean): React.ReactNode {
         const classes = ['sidebar-item']
         if (indented) classes.push('indented')
         if (list.id === this.props.selectedListId) classes.push('active')
 
         return (
-            <button
-                key={list.id}
-                className={classes.join(' ')}
-                title={this.props.compact ? list.name : undefined}
-                onClick={() => this.props.onSelectList(list.id)}
-            >
-                <ListIcon icon={list.icon} color={list.color} />
-                <span className="sidebar-item-name">{list.name}</span>
-                {list.open_tasks > 0 && <span className="sidebar-count">{list.open_tasks}</span>}
-            </button>
+            <div key={list.id} className="sidebar-row">
+                <button
+                    className={classes.join(' ')}
+                    title={this.props.compact ? list.name : undefined}
+                    onClick={() => this.props.onSelectList(list.id)}
+                >
+                    <ListIcon icon={list.icon} color={list.color} />
+                    <span className="sidebar-item-name">{list.name}</span>
+                    {list.open_tasks > 0 && <span className="sidebar-count">{list.open_tasks}</span>}
+                </button>
+                {!this.props.compact && (
+                    <button
+                        className="icon-btn sidebar-row-edit"
+                        title={`Modifier « ${list.name} »`}
+                        data-list-edit
+                        onClick={event => this.props.onEditList(list, event.currentTarget.parentElement!.getBoundingClientRect())}
+                    >
+                        <Pencil size={13} />
+                    </button>
+                )}
+            </div>
         )
     }
 }

@@ -10,6 +10,7 @@ Voir [docs/etapes](docs/etapes) : un document par étape du développement, qui 
 3. [Serveur API : listes, groupes et tâches](docs/etapes/02b-api-donnees.md)
 4. [Page web : affichage](docs/etapes/03a-web-affichage.md)
 5. [Page web : modifications](docs/etapes/03b-web-modifications.md)
+6. [Page web : vue sections et gestion des listes](docs/etapes/03c1-web-sections-listes.md)
 
 En bref :
 

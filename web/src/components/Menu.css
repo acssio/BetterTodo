@@ -1,0 +1,45 @@
+.menu-anchor {
+    position: relative;
+    display: flex;
+}
+
+.menu-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 20;
+}
+
+.Menu {
+    position: absolute;
+    top: 30px;
+    right: 0;
+    z-index: 21;
+    min-width: 190px;
+    display: flex;
+    flex-direction: column;
+    padding: 4px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-pop);
+}
+
+.Menu button {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border-radius: var(--radius-sm);
+    text-align: left;
+    font-weight: 400;
+    color: var(--text);
+    white-space: nowrap;
+}
+
+.Menu button:hover {
+    background: var(--hover);
+}
+
+.Menu button.danger {
+    color: var(--danger);
+}

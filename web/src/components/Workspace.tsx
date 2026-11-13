@@ -1,14 +1,18 @@
 import * as React from 'react'
 import { api, ApiError } from '../api/ApiClient'
 import type {
-    Board as BoardData, BoardGroup, Folder, Task, TaskChanges, TodoList, UrgencyLevel, User,
+    Board as BoardData, BoardGroup, Folder, ListChanges, ListView, Task, TaskChanges, TodoList, UrgencyLevel, User,
 } from '../api/types'
 import {
     appendTask, countOpenTasks, findTask, indexInGroup, moveTask, removeTask, replaceTask,
 } from '../utils/board'
+import type { DragState, DropTarget } from '../utils/dragDrop'
 import { SIDEBAR, sidebarMode } from '../utils/sidebarLayout'
-import { Board, type BoardActions } from './Board'
+import type { TaskViewActions, TaskViewProps } from './actions'
+import { Board } from './Board'
+import { ListEditPopover } from './ListEditPopover'
 import { ListHeader } from './ListHeader'
+import { SectionsView } from './SectionsView'
 import { Sidebar } from './Sidebar'
 import { SidebarResizer } from './SidebarResizer'
 import { TaskPopover } from './TaskPopover'
@@ -24,8 +28,8 @@ interface WorkspaceProps {
     onSessionExpired: () => void
 }
 
-/** Overlay ouvert : quelle tâche, et où était sa carte à l'écran. */
-interface OpenTask {
+/** Overlay ouvert : quel élément (tâche ou liste), et où il était à l'écran. */
+interface OpenPopover {
     id: string
     anchor: DOMRect
 }
@@ -36,7 +40,9 @@ class WorkspaceState {
     urgencyLevels: UrgencyLevel[] = []
     selectedListId: string | null = null
     board: BoardData | null = null // Contenu de la liste sélectionnée
-    openTask: OpenTask | null = null
+    openTask: OpenPopover | null = null    // Overlay d'une tâche
+    editingList: OpenPopover | null = null // Overlay « Modifier une liste »
+    drag: DragState | null = null          // Glisser-déposer d'une tâche en cours
     addingGroup: boolean = false
     loading: boolean = true        // Premier chargement
     error: string = ''
@@ -58,7 +64,7 @@ class WorkspaceState {
  *   3. la réponse du serveur remplace la version locale ;
  *      en cas d'erreur, on recharge le board pour revenir à la vérité du serveur.
  */
-export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> implements BoardActions {
+export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> implements TaskViewActions {
     constructor(props: WorkspaceProps) {
         super(props)
         this.state = new WorkspaceState()
@@ -222,8 +228,83 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
         }
     }
 
+    onRenameFolder = async (folderId: string, name: string): Promise<void> => {
+        this.setState(state => ({ folders: state.folders.map(f => (f.id === folderId ? { ...f, name } : f)) }))
+        try {
+            await api.updateFolder(folderId, { name })
+        } catch (error) {
+            this.handleError(error)
+        }
+    }
+
+    /** Supprime un groupe de listes : ses listes ne sont pas supprimées, elles passent hors groupe. */
+    onDeleteFolder = async (folder: Folder): Promise<void> => {
+        if (!window.confirm(`Supprimer le groupe de listes « ${folder.name} » ? Ses listes sont gardées, hors groupe.`)) return
+
+        this.setState(state => ({
+            folders: state.folders.filter(f => f.id !== folder.id),
+            lists: state.lists.map(l => (l.folder_id === folder.id ? { ...l, folder_id: null } : l)),
+        }))
+        try {
+            await api.deleteFolder(folder.id)
+        } catch (error) {
+            this.handleError(error)
+        }
+        void this.refreshLists()
+    }
+
+    onEditList = (list: TodoList, anchor: DOMRect): void => {
+        this.setState({ editingList: { id: list.id, anchor }, openTask: null })
+    }
+
+    /** Modifie une liste (nom, couleur, icône, groupe de listes, vue). */
+    updateList = async (listId: string, changes: ListChanges): Promise<void> => {
+        const apply = (list: TodoList): TodoList => (list.id === listId ? { ...list, ...changes } : list)
+        this.setState(state => ({
+            lists: state.lists.map(apply),
+            board: state.board ? { ...state.board, list: apply(state.board.list) } : null,
+        }))
+
+        try {
+            await api.updateList(listId, changes)
+        } catch (error) {
+            this.handleError(error)
+        }
+        // Changer de groupe de listes change l'ordre de la barre latérale
+        if (changes.folder_id !== undefined) void this.refreshLists()
+    }
+
+    /** Bascule Colonnes / Sections : enregistrée sur la liste (retrouvée sur tous les appareils). */
+    onChangeView = (view: ListView): void => {
+        const listId = this.state.selectedListId
+        if (listId && this.state.board?.list.default_view !== view) {
+            void this.updateList(listId, { default_view: view })
+        }
+    }
+
+    deleteList = async (list: TodoList): Promise<void> => {
+        const remaining = this.state.lists.filter(l => l.id !== list.id)
+        this.setState({ editingList: null, lists: remaining })
+
+        // Si c'était la liste affichée, on ouvre la première qui reste
+        if (this.state.selectedListId === list.id) {
+            if (remaining.length > 0) {
+                void this.selectList(remaining[0].id)
+            } else {
+                this.setState({ selectedListId: null, board: null })
+            }
+        }
+
+        try {
+            await api.deleteList(list.id)
+        } catch (error) {
+            this.handleError(error)
+            void this.refreshLists()
+        }
+    }
+
     // =========================================================================
-    // Board (BoardActions) : appelées par Board et TaskCard
+    // Vues d'une liste (TaskViewActions) : appelées par Board, SectionsView, TaskCard, TaskRow
     // =========================================================================
 
     toggleTask = async (task: Task): Promise<void> => {
@@ -252,8 +333,31 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
         }
     }
 
-    /** Glisser-déposer : index compté sans la tâche déplacée (comme l'API). */
-    moveTask = async (taskId: string, groupId: string, index: number): Promise<void> => {
+    // --- Glisser-déposer : l'état est ici, au-dessus de toutes les vues -------------
+
+    startTaskDrag = (task: Task): void => {
+        // setTimeout : laisse le navigateur faire sa « photo » de la carte avant de la griser
+        window.setTimeout(() => this.setState({ drag: { taskId: task.id, target: null }, openTask: null }), 0)
+    }
+
+    endTaskDrag = (): void => {
+        this.setState({ drag: null })
+    }
+
+    setDropTarget = (target: DropTarget | null): void => {
+        this.setState(state => (state.drag ? { drag: { ...state.drag, target } } : null))
+    }
+
+    dropTask = (): void => {
+        const drag = this.state.drag
+        this.setState({ drag: null })
+        if (drag?.target) {
+            void this.moveTask(drag.taskId, drag.target.groupId, drag.target.index)
+        }
+    }
+
+    /** Déplace une tâche : index compté sans la tâche déplacée (comme l'API). */
+    private async moveTask(taskId: string, groupId: string, index: number): Promise<void> {
         const board = this.state.board
         const task = board ? findTask(board, taskId) : undefined
         if (!board || !task) return
@@ -363,7 +467,7 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
     }
 
     render(): React.ReactNode {
-        const { lists, selectedListId, board, urgencyLevels, error, loading } = this.state
+        const { lists, selectedListId, board, error, loading } = this.state
         const showBoard = board !== null && board.list.id === selectedListId
 
         return (
@@ -384,15 +488,10 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
                                 list={board.list}
                                 openTasks={countOpenTasks(board)}
                                 onNewGroup={() => this.setState({ addingGroup: true })}
+                                onChangeView={this.onChangeView}
+                                onEditList={anchor => this.onEditList(board.list, anchor)}
                             />
-                            <Board
-                                board={board}
-                                urgencyLevels={urgencyLevels}
-                                actions={this}
-                                openTaskId={this.state.openTask?.id ?? null}
-                                addingGroup={this.state.addingGroup}
-                                onAddingGroupDone={() => this.setState({ addingGroup: false })}
-                            />
+                            {this.renderView(board)}
                         </>
                     )}
 
@@ -402,6 +501,7 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
                 </main>
 
                 {showBoard && this.renderPopover(board)}
+                {this.renderListEditor()}
             </div>
         )
     }
@@ -436,6 +536,9 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
                 onToggleFolder={this.onToggleFolder}
                 onCreateList={this.onCreateList}
                 onCreateFolder={this.onCreateFolder}
+                onRenameFolder={this.onRenameFolder}
+                onDeleteFolder={this.onDeleteFolder}
+                onEditList={this.onEditList}
                 onLogout={this.props.onLogout}
             />
         )
@@ -462,6 +565,38 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
                     />
                 )}
             </>
+        )
+    }
+
+    /** Vue colonnes ou sections, selon le choix enregistré sur la liste. */
+    private renderView(board: BoardData): React.ReactNode {
+        const props: TaskViewProps = {
+            board,
+            urgencyLevels: this.state.urgencyLevels,
+            actions: this,
+            openTaskId: this.state.openTask?.id ?? null,
+            drag: this.state.drag,
+            addingGroup: this.state.addingGroup,
+            onAddingGroupDone: () => this.setState({ addingGroup: false }),
+        }
+        return board.list.default_view === 'sections' ? <SectionsView {...props} /> : <Board {...props} />
+    }
+
+    private renderListEditor(): React.ReactNode {
+        const editing = this.state.editingList
+        const list = editing ? this.state.lists.find(l => l.id === editing.id) : undefined
+        if (!editing || !list) return null
+
+        return (
+            <ListEditPopover
+                key={list.id}
+                list={list}
+                folders={this.state.folders}
+                anchor={editing.anchor}
+                onUpdate={changes => void this.updateList(list.id, changes)}
+                onDelete={() => void this.deleteList(list)}
+                onClose={() => this.setState({ editingList: null })}
+            />
         )
     }
 
