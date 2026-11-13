@@ -73,6 +73,13 @@ Observé dans ses autres projets (C++ embarqué, React/TypeScript). Écrire du c
   - ordre géré par `ordering.move` (positions renumérotées 0, 1, 2…) ;
   - appartenance vérifiée à chaque requête : 404 pour une ressource de l'URL, 400 pour un id envoyé dans le corps.
 - **2026-11-13 – Tests API :** tests Go (`go test ./...`) et collection Postman `api/tests/`, lancée avec le Postman CLI.
+- **2026-11-13 – Web :**
+  - composants classe (`interface XxxProps`, `class XxxState`), CSS simple avec un fichier par composant ;
+  - classe `ApiClient` pour tous les appels ; seuls `App` et `Workspace` ont un état ;
+  - `lucide-react` avec une liste fixe d'icônes (`listIcons.ts`) ;
+  - linter : oxlint (installé par Vite) ;
+  - servi par nginx sur `localhost:8000`, qui transmet `/api` au conteneur `api`.
+- **2026-11-13 – Découpage de l'étape 3 :** 3a affichage, 3b modifications (overlay, glisser-déposer natif HTML5), 3c vue sections, vue scindée, paramètres.
 - **2026-11-13 – Maquette web validée** (Figma, page « Web – Maquette v2 »).
 
 ## Questions ouvertes

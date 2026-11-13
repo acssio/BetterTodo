@@ -1,0 +1,105 @@
+/* =============================================================================
+   BetterTodo : thème global (couleurs et tailles de la maquette Figma)
+   Chaque composant a son propre fichier .css, qui utilise ces variables.
+   ============================================================================= */
+
+:root {
+    /* Surfaces */
+    --bg: #F7F7F5;            /* Fond de la zone principale */
+    --surface: #FFFFFF;       /* Cartes, en-tête, overlays */
+    --sidebar: #FBFBFA;       /* Barre latérale */
+    --column: #EFEFEC;        /* Fond d'une colonne */
+    --hover: #EDEDEA;         /* Survol / élément actif */
+    --border: #E6E6E3;
+    --border-light: #F0F0EE;
+
+    /* Texte */
+    --text: #1F1F1F;
+    --text-soft: #3A3A3A;
+    --muted: #6B6B6B;
+    --faint: #8A8A87;
+    --done: #A3A3A0;          /* Tâche cochée */
+
+    /* Couleurs d'action */
+    --accent: #2F6FEB;
+    --danger: #E5484D;
+    --success: #3FA66B;
+
+    /* Formes */
+    --radius-sm: 6px;
+    --radius: 8px;
+    --radius-md: 10px;
+    --radius-lg: 12px;
+    --shadow-card: 0 1px 1px rgba(0, 0, 0, 0.03);
+    --shadow-pop: 0 18px 40px rgba(0, 0, 0, 0.16);
+
+    font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: 13px;
+    line-height: 1.4;
+    color: var(--text);
+    background: var(--bg);
+    -webkit-font-smoothing: antialiased;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+html, body, #root {
+    height: 100%;
+}
+
+button, input {
+    font: inherit;
+    color: inherit;
+}
+
+button {
+    background: none;
+    border: none;
+    cursor: pointer;
+}
+
+button:disabled {
+    cursor: default;
+}
+
+/* Bouton principal (noir) */
+.btn-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    height: 34px;
+    padding: 0 12px;
+    border-radius: var(--radius);
+    background: var(--text);
+    color: #FFFFFF;
+    font-weight: 600;
+}
+
+.btn-primary:disabled {
+    opacity: 0.45;
+}
+
+/* Petit bouton icône (sans fond) */
+.icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: var(--radius);
+    color: var(--faint);
+}
+
+.icon-btn:hover:not(:disabled) {
+    background: var(--hover);
+    color: var(--text);
+}
+
+.icon-btn:disabled {
+    opacity: 0.5;
+}

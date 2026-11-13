@@ -2,7 +2,9 @@
 #
 #   db  : PostgreSQL (étape 1)
 #   api : serveur API en Go (étape 2)
-#   web : page web (étape 3, à venir)
+#   web : page web servie par nginx, qui transmet /api au serveur (étape 3)
+#
+# Ouvrir http://localhost:8000 une fois les conteneurs démarrés.
 #
 # Les valeurs ${...} sont lues dans le fichier .env (copie de .env.example).
 
@@ -40,6 +42,20 @@ services:
       - "127.0.0.1:8080:8080"   # Pour tester l'API depuis cette machine (Postman, curl)
     healthcheck:
       test: ["CMD", "/bettertodo-api", "healthcheck"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build: ./web
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8000:80"   # La page web (pour l'ouvrir depuis le réseau : enlever "127.0.0.1:")
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/"]
       interval: 10s
       timeout: 5s
       retries: 5

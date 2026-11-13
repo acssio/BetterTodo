@@ -1,0 +1,28 @@
+.Workspace {
+    height: 100%;
+    display: flex;
+}
+
+.workspace-main {
+    flex: 1;
+    min-width: 0; /* Permet au board de défiler au lieu d'élargir la page */
+    display: flex;
+    flex-direction: column;
+}
+
+.workspace-error {
+    margin: 12px 24px 0;
+    padding: 8px 12px;
+    border-radius: var(--radius);
+    background: #FDE8E8;
+    color: var(--danger);
+    font-weight: 500;
+}
+
+.workspace-empty {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--faint);
+}

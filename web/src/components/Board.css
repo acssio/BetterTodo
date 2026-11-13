@@ -1,0 +1,57 @@
+.Board {
+    flex: 1;
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    padding: 24px;
+    overflow: auto; /* Défilement horizontal s'il y a beaucoup de colonnes */
+}
+
+.Board-empty {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--faint);
+}
+
+.board-column {
+    width: 300px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px;
+    border-radius: var(--radius-lg);
+    background: var(--column);
+}
+
+.column-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 0 2px 4px;
+}
+
+.column-name {
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.column-count {
+    padding: 1px 7px;
+    border-radius: 10px;
+    background: #E2E2DE;
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 600;
+    margin-right: auto; /* Pousse le bouton « … » tout à droite */
+}
+
+.column-add {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 4px;
+    color: var(--faint);
+}

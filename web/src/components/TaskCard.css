@@ -1,0 +1,97 @@
+.TaskCard {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-card);
+}
+
+.card-top {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+}
+
+/* Case à cocher ronde */
+.card-check {
+    width: 16px;
+    height: 16px;
+    margin-top: 1px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    border: 1.5px solid #B5B5B1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.card-check.checked {
+    background: var(--success);
+    border-color: var(--success);
+}
+
+.card-title {
+    flex: 1;
+    font-weight: 500;
+    line-height: 18px;
+    overflow-wrap: anywhere; /* Un mot très long ne casse pas la colonne */
+}
+
+.TaskCard.done .card-title {
+    text-decoration: line-through;
+    color: var(--done);
+}
+
+.card-urgency {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    flex-shrink: 0;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.card-urgency-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+}
+
+.card-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    padding-left: 26px; /* Aligné sous le titre */
+}
+
+.card-due {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    color: var(--muted);
+}
+
+.card-due.late {
+    color: var(--danger);
+    font-weight: 600;
+}
+
+.card-tag {
+    padding: 2px 6px;
+    border-radius: 5px;
+    background: #F0F0EE;
+    color: #55554F;
+    font-size: 11px;
+}
+
+.card-note {
+    display: flex;
+    color: var(--muted);
+}
