@@ -64,6 +64,15 @@ Observé dans ses autres projets (C++ embarqué, React/TypeScript). Écrire du c
 - **2026-11-13 – Page web en React + TypeScript (Vite)**, servie par un conteneur nginx qui redirige aussi `/api` vers le serveur API.
 - **2026-11-13 – Plusieurs comptes utilisateurs dès le départ.** Chaque utilisateur a ses propres listes, tags et niveaux d'urgence.
 - **2026-11-13 – Découpage :** étape 1 = Docker + PostgreSQL + modèle de données ; étape 2 = API ; étape 3 = page web (vue colonnes). Chaque étape est validée avant la suivante.
+- **2026-11-13 – API Go : `net/http` standard (pas de framework), `pgx` sans ORM (SQL écrit à la main), bcrypt pour les mots de passe.**
+- **2026-11-13 – Migrations maison** dans `api/migrations/NNN_nom.sql`, incluses dans le binaire et appliquées au démarrage. Ne jamais modifier une migration déjà appliquée : en ajouter une nouvelle.
+- **2026-11-13 – Sessions :** jeton aléatoire, seul son hash SHA-256 est en base. Envoyé en cookie `HttpOnly` (web) ou en `Authorization: Bearer` (apps natives).
+- **2026-11-13 – Conventions de l'API :**
+  - un `XxxHandler` par ressource dans `api/internal/handlers/` ;
+  - PATCH partiels avec `Optional[T]` (absent / null / valeur) ;
+  - ordre géré par `ordering.move` (positions renumérotées 0, 1, 2…) ;
+  - appartenance vérifiée à chaque requête : 404 pour une ressource de l'URL, 400 pour un id envoyé dans le corps.
+- **2026-11-13 – Tests API :** tests Go (`go test ./...`) et collection Postman `api/tests/`, lancée avec le Postman CLI.
 - **2026-11-13 – Maquette web validée** (Figma, page « Web – Maquette v2 »).
 
 ## Questions ouvertes

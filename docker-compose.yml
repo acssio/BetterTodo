@@ -1,7 +1,8 @@
 # BetterTodo : services Docker
 #
-# Étape 1 : seulement la base de données.
-# Les services "api" (étape 2) et "web" (étape 3) viendront s'ajouter ici.
+#   db  : PostgreSQL (étape 1)
+#   api : serveur API en Go (étape 2)
+#   web : page web (étape 3, à venir)
 #
 # Les valeurs ${...} sont lues dans le fichier .env (copie de .env.example).
 
@@ -15,7 +16,6 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - db-data:/var/lib/postgresql/data      # Les données survivent à l'arrêt du conteneur
-      - ./db/init:/docker-entrypoint-initdb.d:ro  # Scripts lancés au PREMIER démarrage seulement
     ports:
       - "127.0.0.1:5432:5432"   # Accessible uniquement depuis cette machine (pour le dev)
     healthcheck:
@@ -23,6 +23,26 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+
+  api:
+    build: ./api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy   # Attend que PostgreSQL soit prêt
+    environment:
+      # "db" est le nom du service ci-dessus : Docker le résout vers le conteneur PostgreSQL
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?sslmode=disable
+      LISTEN_ADDR: ":8080"
+      SESSION_DAYS: ${SESSION_DAYS:-30}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+    ports:
+      - "127.0.0.1:8080:8080"   # Pour tester l'API depuis cette machine (Postman, curl)
+    healthcheck:
+      test: ["CMD", "/bettertodo-api", "healthcheck"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
 volumes:
   db-data:

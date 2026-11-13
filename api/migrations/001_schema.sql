@@ -3,8 +3,9 @@
 --
 -- Hiérarchie : utilisateur → groupe de listes → liste → groupe → tâche
 --
--- Ce script est lancé automatiquement par PostgreSQL au PREMIER démarrage du
--- conteneur (dossier /docker-entrypoint-initdb.d). Voir docs/etapes/01-base-de-donnees.md
+-- Migration 001 : appliquée une seule fois par le serveur API au démarrage
+-- (voir internal/database/migrator.go et docs/etapes/02a-api-fondations.md).
+-- Ne jamais modifier une migration déjà appliquée : en ajouter une nouvelle.
 --
 -- Conventions :
 --   - id en UUID, générés par gen_random_uuid() (intégré à PostgreSQL 13+)

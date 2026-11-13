@@ -1,5 +1,7 @@
 # Étape 1 : base de données PostgreSQL
 
+> **Mis à jour à l'étape 2a :** le schéma n'est plus dans `db/init/01-schema.sql`, mais dans `api/migrations/001_schema.sql`. C'est le serveur API qui le crée au démarrage. Voir [02a-api-fondations.md](02a-api-fondations.md). Le reste de ce document (modèle de données, choix, exploration avec psql) reste valable.
+
 ## Objectif
 
 Mettre en place la base de données de BetterTodo dans Docker, avec toutes les tables nécessaires pour la maquette : comptes, groupes de listes, listes, groupes de tâches, tâches, niveaux d'urgence et tags.
