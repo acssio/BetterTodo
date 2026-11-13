@@ -72,6 +72,21 @@ export interface Board {
     groups: BoardGroup[]
 }
 
+/**
+ * Champs modifiables d'une tâche (PATCH /tasks/{id}).
+ * Un champ absent n'est pas modifié ; null efface l'échéance ou l'urgence.
+ */
+export interface TaskChanges {
+    title?: string
+    notes?: string
+    due_date?: string | null
+    urgency_id?: string | null
+    done?: boolean
+    group_id?: string
+    position?: number
+    tags?: string[] // Remplace tous les tags
+}
+
 export interface UrgencyLevel {
     id: string
     name: string

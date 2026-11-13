@@ -1,0 +1,76 @@
+import { describe, expect, it } from 'vitest'
+import type { Board, Task } from '../api/types'
+import { appendTask, countOpenTasks, findTask, indexInGroup, moveTask, removeTask, replaceTask } from './board'
+
+/** Crée une tâche minimale pour les tests. */
+function task(id: string, groupId: string, done = false): Task {
+    return {
+        id, group_id: groupId, title: id, notes: '', due_date: null, urgency_id: null,
+        done, done_at: null, position: 0, tags: [], created_at: '', updated_at: '',
+    }
+}
+
+/** Board de test : groupe g1 = [a, b, c], groupe g2 = [d] */
+function makeBoard(): Board {
+    return {
+        list: {
+            id: 'l', folder_id: null, name: 'L', color: '#000000', icon: 'list',
+            default_view: 'columns', position: 0, open_tasks: 4,
+        },
+        groups: [
+            { id: 'g1', list_id: 'l', name: 'G1', position: 0, tasks: [task('a', 'g1'), task('b', 'g1'), task('c', 'g1')] },
+            { id: 'g2', list_id: 'l', name: 'G2', position: 1, tasks: [task('d', 'g2', true)] },
+        ],
+    }
+}
+
+const ids = (board: Board, groupIndex: number) => board.groups[groupIndex].tasks.map(t => t.id)
+
+describe('moveTask', () => {
+    it('déplace vers le bas dans le même groupe', () => {
+        // a en position 2 : sans a → [b, c], insertion en 2 → [b, c, a]
+        expect(ids(moveTask(makeBoard(), 'a', 'g1', 2), 0)).toEqual(['b', 'c', 'a'])
+    })
+
+    it('déplace vers le haut dans le même groupe', () => {
+        expect(ids(moveTask(makeBoard(), 'c', 'g1', 0), 0)).toEqual(['c', 'a', 'b'])
+    })
+
+    it('déplace dans un autre groupe et met à jour group_id', () => {
+        const board = moveTask(makeBoard(), 'b', 'g2', 0)
+        expect(ids(board, 0)).toEqual(['a', 'c'])
+        expect(ids(board, 1)).toEqual(['b', 'd'])
+        expect(findTask(board, 'b')?.group_id).toBe('g2')
+    })
+
+    it('un index trop grand met à la fin', () => {
+        expect(ids(moveTask(makeBoard(), 'a', 'g2', 99), 1)).toEqual(['d', 'a'])
+    })
+
+    it('ne modifie pas le board de départ', () => {
+        const board = makeBoard()
+        moveTask(board, 'a', 'g2', 0)
+        expect(ids(board, 0)).toEqual(['a', 'b', 'c'])
+    })
+})
+
+describe('autres fonctions', () => {
+    it('replaceTask garde la place', () => {
+        const board = replaceTask(makeBoard(), { ...task('b', 'g1'), title: 'B modifié' })
+        expect(board.groups[0].tasks[1].title).toBe('B modifié')
+    })
+
+    it('removeTask et appendTask', () => {
+        expect(ids(removeTask(makeBoard(), 'b'), 0)).toEqual(['a', 'c'])
+        expect(ids(appendTask(makeBoard(), task('e', 'g2')), 1)).toEqual(['d', 'e'])
+    })
+
+    it('indexInGroup', () => {
+        expect(indexInGroup(makeBoard(), 'c')).toBe(2)
+        expect(indexInGroup(makeBoard(), 'inconnue')).toBe(-1)
+    })
+
+    it('countOpenTasks ignore les tâches faites', () => {
+        expect(countOpenTasks(makeBoard())).toBe(3)
+    })
+})

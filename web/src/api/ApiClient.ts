@@ -1,4 +1,4 @@
-import type { Board, Folder, Session, TodoList, UrgencyLevel, User } from './types'
+import type { Board, Folder, Group, Session, Task, TaskChanges, TodoList, UrgencyLevel, User } from './types'
 
 /** Erreur renvoyée par l'API : le code HTTP et le message de {"error": "..."} */
 export class ApiError extends Error {
@@ -47,6 +47,10 @@ export class ApiClient {
         return this.request('GET', '/folders')
     }
 
+    createFolder(name: string): Promise<Folder> {
+        return this.request('POST', '/folders', { name })
+    }
+
     updateFolder(id: string, changes: Partial<Pick<Folder, 'name' | 'position' | 'collapsed'>>): Promise<Folder> {
         return this.request('PATCH', `/folders/${id}`, changes)
     }
@@ -55,8 +59,36 @@ export class ApiClient {
         return this.request('GET', '/lists')
     }
 
+    createList(name: string, folderId: string | null): Promise<TodoList> {
+        return this.request('POST', '/lists', { name, folder_id: folderId })
+    }
+
     getBoard(listId: string): Promise<Board> {
         return this.request('GET', `/lists/${listId}/board`)
+    }
+
+    createGroup(listId: string, name: string): Promise<Group> {
+        return this.request('POST', `/lists/${listId}/groups`, { name })
+    }
+
+    renameGroup(groupId: string, name: string): Promise<Group> {
+        return this.request('PATCH', `/groups/${groupId}`, { name })
+    }
+
+    deleteGroup(groupId: string): Promise<void> {
+        return this.request('DELETE', `/groups/${groupId}`)
+    }
+
+    createTask(groupId: string, title: string): Promise<Task> {
+        return this.request('POST', `/groups/${groupId}/tasks`, { title })
+    }
+
+    updateTask(taskId: string, changes: TaskChanges): Promise<Task> {
+        return this.request('PATCH', `/tasks/${taskId}`, changes)
+    }
+
+    deleteTask(taskId: string): Promise<void> {
+        return this.request('DELETE', `/tasks/${taskId}`)
     }
 
     getUrgencyLevels(): Promise<UrgencyLevel[]> {

@@ -77,7 +77,13 @@ Observé dans ses autres projets (C++ embarqué, React/TypeScript). Écrire du c
   - composants classe (`interface XxxProps`, `class XxxState`), CSS simple avec un fichier par composant ;
   - classe `ApiClient` pour tous les appels ; seuls `App` et `Workspace` ont un état ;
   - `lucide-react` avec une liste fixe d'icônes (`listIcons.ts`) ;
-  - linter : oxlint (installé par Vite) ;
+  - linter : oxlint (installé par Vite) ; tests : Vitest (`npm test`), surtout sur les fonctions pures de `utils/` ;
+  - modifications « optimistes » dans `Workspace` : l'écran d'abord, puis l'API, et rechargement du board en cas d'erreur ;
+  - ne jamais relire `this.state` juste après `setState` : passer la valeur en paramètre ;
+  - l'interface doit rester lisible en fenêtre étroite (demande de l'utilisateur) :
+    - barre latérale redimensionnable, avec un mode icônes (`utils/sidebarLayout.ts`) ;
+    - en-tête en icônes seules via `@container main` ;
+    - pas de texte qui passe à la ligne : on coupe avec « … » ;
   - servi par nginx sur `localhost:8000`, qui transmet `/api` au conteneur `api`.
 - **2026-11-13 – Découpage de l'étape 3 :** 3a affichage, 3b modifications (overlay, glisser-déposer natif HTML5), 3c vue sections, vue scindée, paramètres.
 - **2026-11-13 – Maquette web validée** (Figma, page « Web – Maquette v2 »).

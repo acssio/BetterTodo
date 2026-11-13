@@ -9,6 +9,7 @@ Voir [docs/etapes](docs/etapes) : un document par étape du développement, qui 
 2. [Serveur API : fondations, migrations et comptes](docs/etapes/02a-api-fondations.md)
 3. [Serveur API : listes, groupes et tâches](docs/etapes/02b-api-donnees.md)
 4. [Page web : affichage](docs/etapes/03a-web-affichage.md)
+5. [Page web : modifications](docs/etapes/03b-web-modifications.md)
 
 En bref :
 

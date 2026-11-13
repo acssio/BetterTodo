@@ -1,0 +1,38 @@
+/* Zone d'accroche de 8 px, à cheval sur la bordure de la barre latérale */
+.SidebarResizer {
+    width: 8px;
+    margin-left: -4px;
+    margin-right: -4px;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 5;
+    cursor: col-resize;
+}
+
+/* Trait bleu visible au survol, pendant le redimensionnement, ou au clavier */
+.SidebarResizer::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 3px;
+    width: 2px;
+    background: transparent;
+    transition: background 0.15s;
+}
+
+.SidebarResizer:hover::after,
+.SidebarResizer:focus-visible::after,
+body.is-resizing .SidebarResizer::after {
+    background: var(--accent);
+}
+
+.SidebarResizer:focus-visible {
+    outline: none;
+}
+
+/* Pendant le redimensionnement : curseur ↔ partout, pas de sélection de texte */
+body.is-resizing {
+    cursor: col-resize;
+    user-select: none;
+}

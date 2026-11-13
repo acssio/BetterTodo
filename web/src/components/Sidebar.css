@@ -1,6 +1,5 @@
 .Sidebar {
-    width: 240px;
-    flex-shrink: 0;
+    flex-shrink: 0;           /* La largeur est donnée par Workspace (style="width: …") */
     display: flex;
     flex-direction: column;
     padding: 16px 12px;
@@ -13,12 +12,20 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 4px 8px 20px;
+    padding: 0 0 16px 8px;
+    min-height: 44px;
     font-size: 15px;
     font-weight: 700;
 }
 
+.sidebar-brand-name {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+}
+
 .sidebar-logo {
+    flex-shrink: 0;
     width: 24px;
     height: 24px;
     border-radius: 7px;
@@ -60,12 +67,40 @@
 .sidebar-folder-head {
     display: flex;
     align-items: center;
+    padding-top: 6px;
+}
+
+.sidebar-folder-toggle {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
     gap: 6px;
-    padding: 10px 8px 4px;
+    padding: 4px 8px;
     font-size: 12px;
     font-weight: 600;
     color: var(--muted);
     text-align: left;
+}
+
+/* Le « + » d'un groupe de listes n'apparaît qu'au survol */
+.sidebar-folder-add {
+    width: 24px;
+    height: 24px;
+    opacity: 0;
+}
+
+.sidebar-folder-head:hover .sidebar-folder-add,
+.sidebar-folder-add:focus-visible {
+    opacity: 1;
+}
+
+.sidebar-adding {
+    padding: 2px 0;
+}
+
+.sidebar-adding.indented {
+    padding-left: 20px;
 }
 
 .sidebar-folder-name {
@@ -143,4 +178,62 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+/* =============================================================================
+   Mode compact : icônes seules (barre rétrécie, ou fenêtre étroite)
+   ============================================================================= */
+
+.Sidebar.compact {
+    padding: 16px 8px;
+    overflow-x: hidden;
+}
+
+.Sidebar.compact .sidebar-brand {
+    justify-content: center;
+    padding-left: 0;
+}
+
+.Sidebar.compact .sidebar-label {
+    justify-content: center;
+    padding-left: 0;
+}
+
+.Sidebar.compact .sidebar-brand-name,
+.Sidebar.compact .sidebar-item-name,
+.Sidebar.compact .sidebar-count,
+.Sidebar.compact .sidebar-folder-name,
+.Sidebar.compact .sidebar-folder-add,
+.Sidebar.compact .sidebar-user-name {
+    display: none;
+}
+
+.Sidebar.compact .sidebar-item,
+.Sidebar.compact .sidebar-item.indented {
+    justify-content: center;
+    padding: 9px 0;
+}
+
+/* L'en-tête d'un groupe de listes devient un petit chevron centré */
+.Sidebar.compact .sidebar-folder-toggle {
+    justify-content: center;
+    padding: 6px 0 2px;
+}
+
+.Sidebar.compact .sidebar-user {
+    justify-content: center;
+    padding-left: 0;
+}
+
+/* =============================================================================
+   Fenêtre étroite : la barre s'ouvre PAR-DESSUS le contenu
+   ============================================================================= */
+
+.Sidebar.peek {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 30;
+    box-shadow: var(--shadow-pop);
 }

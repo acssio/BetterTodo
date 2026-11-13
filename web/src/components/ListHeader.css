@@ -11,7 +11,7 @@
 
 .header-title {
     flex: 1;
-    min-width: 0;
+    min-width: 60px; /* Le titre garde toujours un peu de place */
 }
 
 .header-title h1 {
@@ -23,8 +23,12 @@
 }
 
 .header-title span {
+    display: block;
     font-size: 12px;
     color: var(--faint);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .header-search {
@@ -58,6 +62,7 @@
 
 .header-views button {
     display: flex;
+    white-space: nowrap;
     align-items: center;
     gap: 6px;
     padding: 5px 10px;
@@ -76,9 +81,39 @@
     opacity: 0.6;
 }
 
-/* Sur un écran étroit, on garde l'essentiel */
-@media (max-width: 900px) {
+.header-new-group {
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+/* =============================================================================
+   Quand la place manque. Ce sont des « container queries » : elles regardent la
+   largeur de la zone principale (.workspace-main), pas celle de la fenêtre. Elles
+   réagissent donc aussi quand on élargit la barre latérale.
+   ============================================================================= */
+
+@container main (max-width: 860px) {
     .header-search {
         display: none;
+    }
+}
+
+@container main (max-width: 640px) {
+    .ListHeader {
+        gap: 8px;
+        padding: 0 16px;
+    }
+
+    .btn-label {
+        display: none; /* Icônes seules (le texte reste en info-bulle) */
+    }
+
+    .header-views button {
+        padding: 5px 8px;
+    }
+
+    .header-new-group {
+        width: 34px;
+        padding: 0;
     }
 }

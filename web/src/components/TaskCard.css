@@ -7,6 +7,28 @@
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
     box-shadow: var(--shadow-card);
+    cursor: pointer;
+    user-select: none;
+}
+
+.TaskCard:hover {
+    border-color: #D4D4D0;
+}
+
+.TaskCard:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+}
+
+/* Overlay ouvert : bordure bleue de 2 px (padding réduit d'1 px pour ne pas bouger) */
+.TaskCard.selected {
+    border: 2px solid var(--accent);
+    padding: 9px 11px;
+}
+
+/* Carte en train d'être glissée : on voit encore sa place d'origine */
+.TaskCard.dragging {
+    opacity: 0.4;
 }
 
 .card-top {
@@ -26,6 +48,11 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    padding: 0;
+}
+
+.card-check:hover {
+    border-color: var(--success);
 }
 
 .card-check.checked {

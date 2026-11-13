@@ -1,6 +1,9 @@
 import * as React from 'react'
-import { Check, ChevronDown, ChevronRight, FolderPlus, LogOut, Plus, Settings } from 'lucide-react'
+import {
+    Check, ChevronDown, ChevronRight, FolderPlus, LogOut, PanelLeftClose, PanelLeftOpen, Plus, Settings,
+} from 'lucide-react'
 import type { Folder, TodoList, User } from '../api/types'
+import { InlineInput } from './InlineInput'
 import { ListIcon } from './ListIcon'
 import './Sidebar.css'
 
@@ -9,47 +12,122 @@ interface SidebarProps {
     folders: Folder[]
     lists: TodoList[]
     selectedListId: string | null
+    width: number     // Largeur en pixels
+    compact: boolean  // true = icônes seules
+    peek: boolean     // true = ouverte par-dessus le contenu (fenêtre étroite)
+    onExpand: () => void
+    onCollapse: () => void
     onSelectList: (listId: string) => void
     onToggleFolder: (folder: Folder) => void
+    onCreateList: (name: string, folderId: string | null) => Promise<void>
+    onCreateFolder: (name: string) => Promise<void>
     onLogout: () => void
+}
+
+/** Ce qu'on est en train d'ajouter : une liste (hors groupe ou dans un groupe de listes), ou un groupe de listes. */
+type Adding =
+    | { kind: 'list', folderId: string | null }
+    | { kind: 'folder' }
+    | null
+
+class SidebarState {
+    adding: Adding = null
 }
 
 /**
  * Barre latérale : les listes hors groupe en haut, puis chaque groupe de listes
  * (repliable) avec ses listes.
+ *
+ * En mode compact (classe CSS "compact"), les textes sont cachés : il reste les icônes,
+ * avec le nom en info-bulle. Pour ajouter une liste, on repasse d'abord en mode normal.
  */
-export class Sidebar extends React.Component<SidebarProps> {
+export class Sidebar extends React.Component<SidebarProps, SidebarState> {
+    constructor(props: SidebarProps) {
+        super(props)
+        this.state = new SidebarState()
+    }
+
+    onAddingDone = (): void => {
+        this.setState({ adding: null })
+    }
+
+    /** Ouvre un champ d'ajout (en élargissant la barre si elle est en icônes). */
+    private startAdding(adding: Adding): void {
+        if (this.props.compact) this.props.onExpand()
+        this.setState({ adding })
+    }
+
     render(): React.ReactNode {
-        const { folders, lists, user } = this.props
+        const { folders, lists, user, compact, peek, width } = this.props
+        const { adding } = this.state
         const ungrouped = lists.filter(list => list.folder_id === null)
 
+        const classes = ['Sidebar']
+        if (compact) classes.push('compact')
+        if (peek) classes.push('peek')
+
         return (
-            <aside className="Sidebar">
+            <aside className={classes.join(' ')} style={{ width }}>
                 <div className="sidebar-brand">
                     <span className="sidebar-logo"><Check size={14} color="#FFFFFF" strokeWidth={3} /></span>
-                    BetterTodo
+                    <span className="sidebar-brand-name">BetterTodo</span>
+                    {!compact && (
+                        <button className="icon-btn" title="Réduire la barre (icônes seules)" onClick={this.props.onCollapse}>
+                            <PanelLeftClose size={16} />
+                        </button>
+                    )}
                 </div>
 
-                <div className="sidebar-label">
-                    <span>Listes</span>
-                    <button className="icon-btn" title="Nouveau groupe de listes (étape 3b)" disabled>
-                        <FolderPlus size={14} />
-                    </button>
-                    <button className="icon-btn" title="Nouvelle liste (étape 3b)" disabled>
-                        <Plus size={14} />
-                    </button>
-                </div>
+                {compact ? (
+                    <div className="sidebar-label">
+                        <button className="icon-btn" title="Agrandir la barre" onClick={this.props.onExpand}>
+                            <PanelLeftOpen size={16} />
+                        </button>
+                    </div>
+                ) : (
+                    <div className="sidebar-label">
+                        <span>Listes</span>
+                        <button
+                            className="icon-btn"
+                            title="Nouveau groupe de listes"
+                            onClick={() => this.startAdding({ kind: 'folder' })}
+                        >
+                            <FolderPlus size={14} />
+                        </button>
+                        <button
+                            className="icon-btn"
+                            title="Nouvelle liste"
+                            onClick={() => this.startAdding({ kind: 'list', folderId: null })}
+                        >
+                            <Plus size={14} />
+                        </button>
+                    </div>
+                )}
 
                 <nav className="sidebar-lists">
+                    {!compact && adding?.kind === 'folder' && (
+                        <div className="sidebar-adding">
+                            <InlineInput
+                                placeholder="Nom du groupe de listes"
+                                onSubmit={async name => {
+                                    await this.props.onCreateFolder(name)
+                                    this.onAddingDone()
+                                }}
+                                onCancel={this.onAddingDone}
+                            />
+                        </div>
+                    )}
+
                     {ungrouped.map(list => this.renderList(list, false))}
+                    {!compact && adding?.kind === 'list' && adding.folderId === null && this.renderNewList(null)}
 
                     {folders.map(folder => this.renderFolder(
                         folder,
                         lists.filter(list => list.folder_id === folder.id),
                     ))}
 
-                    {lists.length === 0 && (
-                        <p className="sidebar-empty">Aucune liste pour l'instant.</p>
+                    {!compact && lists.length === 0 && adding === null && (
+                        <p className="sidebar-empty">Aucune liste : clique sur + pour en créer une.</p>
                     )}
                 </nav>
 
@@ -60,7 +138,7 @@ export class Sidebar extends React.Component<SidebarProps> {
                     </button>
                     <div className="sidebar-user">
                         <span className="sidebar-user-name" title={user.email}>{user.display_name}</span>
-                        <button className="icon-btn" title="Se déconnecter" onClick={this.props.onLogout}>
+                        <button className="icon-btn" title={`Se déconnecter (${user.display_name})`} onClick={this.props.onLogout}>
                             <LogOut size={14} />
                         </button>
                     </div>
@@ -69,35 +147,74 @@ export class Sidebar extends React.Component<SidebarProps> {
         )
     }
 
-    /** Un groupe de listes : son en-tête cliquable, puis ses listes s'il est ouvert. */
+    /** Un groupe de listes : son en-tête (cliquable pour replier), puis ses listes s'il est ouvert. */
     private renderFolder(folder: Folder, folderLists: TodoList[]): React.ReactNode {
         const Chevron = folder.collapsed ? ChevronRight : ChevronDown
+        const { adding } = this.state
+        const addingHere = !this.props.compact && adding?.kind === 'list' && adding.folderId === folder.id
 
         return (
             <div key={folder.id} className="sidebar-folder">
-                <button className="sidebar-folder-head" onClick={() => this.props.onToggleFolder(folder)}>
-                    <Chevron size={14} />
-                    <span className="sidebar-folder-name">{folder.name}</span>
-                    {folder.collapsed && (
-                        <span className="sidebar-count">
-                            {folderLists.length} {folderLists.length > 1 ? 'listes' : 'liste'}
-                        </span>
-                    )}
-                </button>
+                <div className="sidebar-folder-head">
+                    <button
+                        className="sidebar-folder-toggle"
+                        title={folder.name}
+                        onClick={() => this.props.onToggleFolder(folder)}
+                    >
+                        <Chevron size={14} />
+                        <span className="sidebar-folder-name">{folder.name}</span>
+                        {folder.collapsed && (
+                            <span className="sidebar-count">
+                                {folderLists.length} {folderLists.length > 1 ? 'listes' : 'liste'}
+                            </span>
+                        )}
+                    </button>
+                    <button
+                        className="icon-btn sidebar-folder-add"
+                        title={`Nouvelle liste dans « ${folder.name} »`}
+                        onClick={() => {
+                            if (folder.collapsed) this.props.onToggleFolder(folder) // On l'ouvre pour voir le champ
+                            this.startAdding({ kind: 'list', folderId: folder.id })
+                        }}
+                    >
+                        <Plus size={13} />
+                    </button>
+                </div>
 
                 {!folder.collapsed && folderLists.map(list => this.renderList(list, true))}
+                {addingHere && this.renderNewList(folder.id)}
             </div>
         )
     }
 
-    /** Une liste : icône, nom, nombre de tâches à faire. */
+    private renderNewList(folderId: string | null): React.ReactNode {
+        return (
+            <div className={folderId ? 'sidebar-adding indented' : 'sidebar-adding'}>
+                <InlineInput
+                    placeholder="Nom de la liste"
+                    onSubmit={async name => {
+                        await this.props.onCreateList(name, folderId)
+                        this.onAddingDone()
+                    }}
+                    onCancel={this.onAddingDone}
+                />
+            </div>
+        )
+    }
+
+    /** Une liste : icône, nom, nombre de tâches à faire (nom en info-bulle en mode compact). */
     private renderList(list: TodoList, indented: boolean): React.ReactNode {
         const classes = ['sidebar-item']
         if (indented) classes.push('indented')
         if (list.id === this.props.selectedListId) classes.push('active')
 
         return (
-            <button key={list.id} className={classes.join(' ')} onClick={() => this.props.onSelectList(list.id)}>
+            <button
+                key={list.id}
+                className={classes.join(' ')}
+                title={this.props.compact ? list.name : undefined}
+                onClick={() => this.props.onSelectList(list.id)}
+            >
                 <ListIcon icon={list.icon} color={list.color} />
                 <span className="sidebar-item-name">{list.name}</span>
                 {list.open_tasks > 0 && <span className="sidebar-count">{list.open_tasks}</span>}
