@@ -1,0 +1,28 @@
+# BetterTodo : services Docker
+#
+# Étape 1 : seulement la base de données.
+# Les services "api" (étape 2) et "web" (étape 3) viendront s'ajouter ici.
+#
+# Les valeurs ${...} sont lues dans le fichier .env (copie de .env.example).
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - db-data:/var/lib/postgresql/data      # Les données survivent à l'arrêt du conteneur
+      - ./db/init:/docker-entrypoint-initdb.d:ro  # Scripts lancés au PREMIER démarrage seulement
+    ports:
+      - "127.0.0.1:5432:5432"   # Accessible uniquement depuis cette machine (pour le dev)
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  db-data:
