@@ -17,12 +17,14 @@ export interface DragState {
 }
 
 /**
- * Index de dépôt dans un conteneur : avant le premier élément [data-task-id]
- * dont le milieu est sous la souris. La tâche glissée elle-même est ignorée.
+ * Index de dépôt dans un conteneur : avant le premier élément portant attribute
+ * (par défaut data-task-id) dont le milieu est sous la souris. L'élément glissé est ignoré.
  */
-export function computeDropIndex(container: HTMLElement, mouseY: number, dragTaskId: string): number {
-    const items = Array.from(container.querySelectorAll<HTMLElement>('[data-task-id]'))
-        .filter(item => item.dataset.taskId !== dragTaskId)
+export function computeDropIndex(
+    container: HTMLElement, mouseY: number, dragId: string, attribute: string = 'data-task-id',
+): number {
+    const items = Array.from(container.querySelectorAll<HTMLElement>(`[${attribute}]`))
+        .filter(item => item.getAttribute(attribute) !== dragId)
 
     for (let i = 0; i < items.length; i++) {
         const rect = items[i].getBoundingClientRect()

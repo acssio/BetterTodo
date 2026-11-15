@@ -26,6 +26,7 @@ interface SidebarProps {
     onRenameFolder: (folderId: string, name: string) => Promise<void>
     onDeleteFolder: (folder: Folder) => void
     onEditList: (list: TodoList, anchor: DOMRect) => void
+    onOpenSettings: () => void
     onLogout: () => void
 }
 
@@ -139,7 +140,7 @@ export class Sidebar extends React.Component<SidebarProps, SidebarState> {
                 </nav>
 
                 <div className="sidebar-footer">
-                    <button className="sidebar-item" title="Paramètres (étape 3c)" disabled>
+                    <button className="sidebar-item" title="Paramètres" onClick={this.props.onOpenSettings}>
                         <Settings size={16} />
                         <span className="sidebar-item-name">Paramètres</span>
                     </button>

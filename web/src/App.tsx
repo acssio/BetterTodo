@@ -53,6 +53,11 @@ export class App extends React.Component<object, AppState> {
         }
     }
 
+    /** Nom affiché ou vue par défaut changés dans les Paramètres. */
+    onUserChanged = (user: User): void => {
+        this.setState({ user })
+    }
+
     onSessionExpired = (): void => {
         this.setState({ status: 'loggedOut', user: null, error: 'Ta session a expiré, reconnecte-toi.' })
     }
@@ -70,6 +75,7 @@ export class App extends React.Component<object, AppState> {
                     <Workspace
                         user={this.state.user!}
                         onLogout={this.onLogout}
+                        onUserChanged={this.onUserChanged}
                         onSessionExpired={this.onSessionExpired}
                     />
                 )

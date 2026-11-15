@@ -1,5 +1,6 @@
 import type {
-    Board, Folder, Group, ListChanges, Session, Task, TaskChanges, TodoList, UrgencyLevel, User,
+    Board, Folder, Group, ListChanges, Session, Tag, Task, TaskChanges, TodoList,
+    UrgencyChanges, UrgencyLevel, User, UserChanges,
 } from './types'
 
 /** Erreur renvoyée par l'API : le code HTTP et le message de {"error": "..."} */
@@ -41,6 +42,10 @@ export class ApiClient {
 
     logout(): Promise<void> {
         return this.request('POST', '/auth/logout')
+    }
+
+    updateMe(changes: UserChanges): Promise<User> {
+        return this.request('PATCH', '/me', changes)
     }
 
     // --- Données -------------------------------------------------------------
@@ -107,6 +112,34 @@ export class ApiClient {
 
     getUrgencyLevels(): Promise<UrgencyLevel[]> {
         return this.request('GET', '/urgency-levels')
+    }
+
+    createUrgencyLevel(name: string, color: string): Promise<UrgencyLevel> {
+        return this.request('POST', '/urgency-levels', { name, color })
+    }
+
+    updateUrgencyLevel(id: string, changes: UrgencyChanges): Promise<UrgencyLevel> {
+        return this.request('PATCH', `/urgency-levels/${id}`, changes)
+    }
+
+    deleteUrgencyLevel(id: string): Promise<void> {
+        return this.request('DELETE', `/urgency-levels/${id}`)
+    }
+
+    getTags(): Promise<Tag[]> {
+        return this.request('GET', '/tags')
+    }
+
+    createTag(name: string): Promise<Tag> {
+        return this.request('POST', '/tags', { name })
+    }
+
+    renameTag(id: string, name: string): Promise<Tag> {
+        return this.request('PATCH', `/tags/${id}`, { name })
+    }
+
+    deleteTag(id: string): Promise<void> {
+        return this.request('DELETE', `/tags/${id}`)
     }
 
     // --- Requête générique ---------------------------------------------------

@@ -60,6 +60,7 @@ export class DismissListener {
     }
 
     private onKeyDown = (event: KeyboardEvent): void => {
-        if (event.key === 'Escape') this.onDismiss()
+        // defaultPrevented : un champ (InlineInput) a déjà utilisé Échap pour s'annuler
+        if (event.key === 'Escape' && !event.defaultPrevented) this.onDismiss()
     }
 }

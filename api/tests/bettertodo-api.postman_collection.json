@@ -1,6 +1,6 @@
 {
   "info": {
-    "name": "BetterTodo API – étape 2a (comptes)",
+    "name": "BetterTodo API – comptes (étapes 2a et 3c-2)",
     "description": "Tests de bout en bout : santé, inscription, connexion, déconnexion. À lancer dans l'ordre (voir docs/etapes/02a-api-fondations.md).",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
@@ -226,7 +226,198 @@
       ]
     },
     {
-      "name": "08 Profil – jeton inventé",
+      "name": "08 Profil – vue par défaut initiale",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/me",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ]
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('default_view = columns', () => pm.expect(pm.response.json().default_view).to.eql('columns'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "09 Profil – modifier nom et vue par défaut",
+      "request": {
+        "method": "PATCH",
+        "url": "{{baseUrl}}/me",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"display_name\": \"  Testeur modifié \",\n  \"default_view\": \"sections\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const b = pm.response.json();",
+              "pm.test('200, nom nettoyé, vue changée', () => {",
+              "    pm.response.to.have.status(200);",
+              "    pm.expect(b.display_name).to.eql('Testeur modifié');",
+              "    pm.expect(b.default_view).to.eql('sections');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "10 Profil – vue invalide",
+      "request": {
+        "method": "PATCH",
+        "url": "{{baseUrl}}/me",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"default_view\": \"grille\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('400', () => pm.response.to.have.status(400));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "11 Profil – nom vide",
+      "request": {
+        "method": "PATCH",
+        "url": "{{baseUrl}}/me",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"display_name\": \"   \"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('400', () => pm.response.to.have.status(400));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "12 Nouvelle liste sans vue → vue du compte",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/lists",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Liste de test\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const b = pm.response.json();",
+              "pm.test('201 et default_view = sections', () => { pm.response.to.have.status(201); pm.expect(b.default_view).to.eql('sections'); });",
+              "pm.collectionVariables.set('listTest', b.id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "13 Nouvelle liste avec vue explicite",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/lists",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Liste colonnes\",\n  \"default_view\": \"columns\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('la vue demandée gagne', () => pm.expect(pm.response.json().default_view).to.eql('columns'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "14 Profil – jeton inventé",
       "request": {
         "method": "GET",
         "url": "{{baseUrl}}/me",
@@ -250,7 +441,7 @@
       ]
     },
     {
-      "name": "09 Connexion – mauvais mot de passe",
+      "name": "15 Connexion – mauvais mot de passe",
       "request": {
         "method": "POST",
         "url": "{{baseUrl}}/auth/login",
@@ -281,7 +472,7 @@
       ]
     },
     {
-      "name": "10 Connexion – email inconnu",
+      "name": "16 Connexion – email inconnu",
       "request": {
         "method": "POST",
         "url": "{{baseUrl}}/auth/login",
@@ -312,7 +503,7 @@
       ]
     },
     {
-      "name": "11 Connexion – OK (2e session)",
+      "name": "17 Connexion – OK (2e session)",
       "request": {
         "method": "POST",
         "url": "{{baseUrl}}/auth/login",
@@ -345,7 +536,7 @@
       ]
     },
     {
-      "name": "12 Déconnexion (2e session)",
+      "name": "18 Déconnexion (2e session)",
       "request": {
         "method": "POST",
         "url": "{{baseUrl}}/auth/logout",
@@ -369,7 +560,7 @@
       ]
     },
     {
-      "name": "13 Profil – session fermée",
+      "name": "19 Profil – session fermée",
       "request": {
         "method": "GET",
         "url": "{{baseUrl}}/me",
@@ -393,7 +584,7 @@
       ]
     },
     {
-      "name": "14 Profil – 1re session toujours valide",
+      "name": "20 Profil – 1re session toujours valide",
       "request": {
         "method": "GET",
         "url": "{{baseUrl}}/me",

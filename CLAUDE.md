@@ -75,7 +75,7 @@ Observé dans ses autres projets (C++ embarqué, React/TypeScript). Écrire du c
 - **2026-11-13 – Tests API :** tests Go (`go test ./...`) et collection Postman `api/tests/`, lancée avec le Postman CLI.
 - **2026-11-13 – Web :**
   - composants classe (`interface XxxProps`, `class XxxState`), CSS simple avec un fichier par composant ;
-  - classe `ApiClient` pour tous les appels ; seuls `App` et `Workspace` ont un état ;
+  - classe `ApiClient` pour tous les appels ; seuls `App` et `Workspace` parlent à l'API, sauf `SettingsDialog` (écran à part avec ses propres données, il prévient Workspace par des callbacks) ;
   - `lucide-react` avec une liste fixe d'icônes (`listIcons.ts`) ;
   - linter : oxlint (installé par Vite) ; tests : Vitest (`npm test`), surtout sur les fonctions pures de `utils/` ;
   - modifications « optimistes » dans `Workspace` : l'écran d'abord, puis l'API, et rechargement du board en cas d'erreur ;

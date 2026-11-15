@@ -109,6 +109,7 @@ func (h *ListHandler) Create(w http.ResponseWriter, r *http.Request) {
 	if req.Icon != nil {
 		icon = *req.Icon
 	}
+	// Sans default_view, la nouvelle liste prend la vue par défaut du compte (voir INSERT plus bas)
 	view := defaultListView
 	if req.DefaultView != nil {
 		view = *req.DefaultView
@@ -130,11 +131,12 @@ func (h *ListHandler) Create(w http.ResponseWriter, r *http.Request) {
 		var id string
 		err := tx.QueryRow(ctx,
 			`INSERT INTO lists (user_id, folder_id, name, color, icon, default_view, position)
-			 VALUES ($1, $2, $3, $4, $5, $6,
+			 VALUES ($1, $2, $3, $4, $5,
+			         COALESCE($6, (SELECT default_view FROM users WHERE id = $1)),
 			         (SELECT COALESCE(MAX(position) + 1, 0) FROM lists
 			          WHERE user_id = $1 AND folder_id IS NOT DISTINCT FROM $2))
 			 RETURNING id`,
-			userID, req.FolderID, name, color, icon, view).Scan(&id)
+			userID, req.FolderID, name, color, icon, req.DefaultView).Scan(&id)
 		if err != nil {
 			return err
 		}

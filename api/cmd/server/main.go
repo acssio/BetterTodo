@@ -81,6 +81,7 @@ func main() {
 
 	private("POST /api/v1/auth/logout", authHandler.Logout)
 	private("GET /api/v1/me", authHandler.Me)
+	private("PATCH /api/v1/me", authHandler.UpdateMe)
 
 	private("GET /api/v1/folders", folderHandler.List)
 	private("POST /api/v1/folders", folderHandler.Create)

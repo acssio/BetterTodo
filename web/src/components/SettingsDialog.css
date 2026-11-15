@@ -1,0 +1,214 @@
+/* Réutilise : .pop-tag / .pop-tag-add (TaskPopover.css), .list-color (ListEditPopover.css),
+   .header-views (ListHeader.css), .menu-anchor / .menu-backdrop (Menu.css), .drop-indicator */
+
+.SettingsDialog-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 64px 16px 16px;
+    background: rgba(20, 20, 20, 0.35);
+}
+
+.SettingsDialog {
+    width: 100%;
+    max-width: 640px;
+    max-height: calc(100vh - 80px);
+    display: flex;
+    flex-direction: column;
+    background: var(--surface);
+    border-radius: 16px;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.25);
+}
+
+.settings-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 20px;
+    border-bottom: 1px solid var(--border);
+}
+
+.settings-head h2 {
+    font-size: 16px;
+    font-weight: 700;
+}
+
+.settings-body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 26px;
+    padding: 20px;
+}
+
+.settings-body h3 {
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.settings-desc {
+    margin: 2px 0 10px;
+    font-size: 12px;
+    color: var(--faint);
+}
+
+.settings-error {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 12px;
+    border-radius: var(--radius);
+    background: #FDE8E8;
+    color: var(--danger);
+    font-weight: 500;
+}
+
+.settings-error button {
+    color: var(--danger);
+    text-decoration: underline;
+}
+
+.settings-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-width: 320px;
+}
+
+.settings-field span {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--faint);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.settings-field input,
+.settings-level-name {
+    height: 32px;
+    padding: 0 10px;
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    background: var(--sidebar);
+    outline: none;
+}
+
+.settings-field input:focus,
+.settings-level-name:focus {
+    border-color: var(--accent);
+    background: var(--surface);
+}
+
+/* --- Niveaux d'urgence --- */
+
+.settings-levels {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.settings-level {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--surface);
+}
+
+.settings-level.dragging {
+    opacity: 0.4;
+}
+
+.settings-grip {
+    flex-shrink: 0;
+    color: #B5B5B1;
+    cursor: grab;
+}
+
+.settings-swatch {
+    width: 22px;
+    height: 22px;
+    border-radius: 6px;
+}
+
+.settings-palette {
+    position: absolute;
+    top: 30px;
+    left: 0;
+    z-index: 21;
+    display: grid;
+    grid-template-columns: repeat(4, 22px);
+    gap: 8px;
+    padding: 10px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-pop);
+}
+
+.settings-level-name {
+    flex: 1;
+    min-width: 0;
+}
+
+.settings-add {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 2px;
+    color: var(--accent);
+    font-weight: 600;
+}
+
+/* --- Tags --- */
+
+.settings-tags {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+}
+
+.settings-tag-name {
+    font-size: 12px;
+}
+
+.settings-tag-input {
+    width: 160px;
+}
+
+.settings-tag-input .InlineInput {
+    height: 28px;
+}
+
+/* --- Vue par défaut --- */
+
+.settings-views {
+    display: inline-flex;
+}
+
+.settings-foot {
+    display: flex;
+    justify-content: flex-end;
+    padding: 14px 20px;
+    border-top: 1px solid var(--border);
+}
+
+.btn-ghost {
+    height: 34px;
+    padding: 0 14px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-weight: 600;
+}
+
+.btn-ghost:hover {
+    background: var(--hover);
+}

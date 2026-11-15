@@ -13,6 +13,7 @@ import { Board } from './Board'
 import { ListEditPopover } from './ListEditPopover'
 import { ListHeader } from './ListHeader'
 import { SectionsView } from './SectionsView'
+import { SettingsDialog } from './SettingsDialog'
 import { Sidebar } from './Sidebar'
 import { SidebarResizer } from './SidebarResizer'
 import { TaskPopover } from './TaskPopover'
@@ -25,6 +26,7 @@ const SIDEBAR_WIDTH_KEY = 'bettertodo.sidebarWidth'
 interface WorkspaceProps {
     user: User
     onLogout: () => void
+    onUserChanged: (user: User) => void
     onSessionExpired: () => void
 }
 
@@ -43,6 +45,7 @@ class WorkspaceState {
     openTask: OpenPopover | null = null    // Overlay d'une tâche
     editingList: OpenPopover | null = null // Overlay « Modifier une liste »
     drag: DragState | null = null          // Glisser-déposer d'une tâche en cours
+    settingsOpen: boolean = false
     addingGroup: boolean = false
     loading: boolean = true        // Premier chargement
     error: string = ''
@@ -251,6 +254,16 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
             this.handleError(error)
         }
         void this.refreshLists()
+    }
+
+    onOpenSettings = (): void => {
+        this.setState({ settingsOpen: true, openTask: null, editingList: null, sidebarPeek: false })
+    }
+
+    /** À la fermeture : la liste affichée peut contenir un tag renommé ou supprimé. */
+    onCloseSettings = (): void => {
+        this.setState({ settingsOpen: false })
+        void this.reloadBoard()
     }
 
     onEditList = (list: TodoList, anchor: DOMRect): void => {
@@ -502,6 +515,15 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
 
                 {showBoard && this.renderPopover(board)}
                 {this.renderListEditor()}
+                {this.state.settingsOpen && (
+                    <SettingsDialog
+                        user={this.props.user}
+                        urgencyLevels={this.state.urgencyLevels}
+                        onUserChanged={this.props.onUserChanged}
+                        onUrgencyLevelsChanged={urgencyLevels => this.setState({ urgencyLevels })}
+                        onClose={this.onCloseSettings}
+                    />
+                )}
             </div>
         )
     }
@@ -539,6 +561,7 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
                 onRenameFolder={this.onRenameFolder}
                 onDeleteFolder={this.onDeleteFolder}
                 onEditList={this.onEditList}
+                onOpenSettings={this.onOpenSettings}
                 onLogout={this.props.onLogout}
             />
         )

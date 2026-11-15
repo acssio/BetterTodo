@@ -7,7 +7,14 @@ export interface User {
     id: string
     email: string
     display_name: string
+    default_view: ListView // Vue des nouvelles listes (Paramètres)
     created_at: string
+}
+
+/** Champs modifiables du compte (PATCH /me). */
+export interface UserChanges {
+    display_name?: string
+    default_view?: ListView
 }
 
 /** Réponse à une connexion ou une inscription. */
@@ -102,4 +109,18 @@ export interface UrgencyLevel {
     name: string
     color: string
     rank: number // 0 = le moins urgent
+}
+
+/** Champs modifiables d'un niveau d'urgence (PATCH /urgency-levels/{id}). */
+export interface UrgencyChanges {
+    name?: string
+    color?: string
+    rank?: number
+}
+
+/** Un tag et le nombre de tâches qui l'utilisent. */
+export interface Tag {
+    id: string
+    name: string
+    task_count: number
 }

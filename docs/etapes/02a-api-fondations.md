@@ -50,6 +50,7 @@ Toutes les routes sont sous `/api/v1`. Corps et réponses sont en JSON. Les erre
 | POST | `/auth/login` | non | connecte (200), ou 401 si email ou mot de passe incorrect |
 | POST | `/auth/logout` | oui | ferme **cette** session (204) |
 | GET | `/me` | oui | l'utilisateur connecté |
+| PATCH | `/me` | oui | nom affiché et vue par défaut (ajouté à l'étape 3c-2) |
 
 Exemple d'inscription :
 

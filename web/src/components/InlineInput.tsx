@@ -34,6 +34,7 @@ export class InlineInput extends React.Component<InlineInputProps, InlineInputSt
             event.preventDefault()
             void this.submit()
         } else if (event.key === 'Escape') {
+            event.preventDefault() // Signale à DismissListener que cette touche est déjà traitée
             this.props.onCancel()
         }
     }

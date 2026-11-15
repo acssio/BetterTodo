@@ -45,7 +45,16 @@ type userResponse struct {
 	ID          string    `json:"id"`
 	Email       string    `json:"email"`
 	DisplayName string    `json:"display_name"`
+	DefaultView string    `json:"default_view"` // Vue des nouvelles listes : "columns" ou "sections"
 	CreatedAt   time.Time `json:"created_at"`
+}
+
+// userColumns : colonnes lues pour construire un userResponse (dans l'ordre de scanTargets).
+const userColumns = `id, email, display_name, default_view, created_at`
+
+// scanTargets : les champs de u, dans l'ordre de userColumns.
+func (u *userResponse) scanTargets() []any {
+	return []any{&u.ID, &u.Email, &u.DisplayName, &u.DefaultView, &u.CreatedAt}
 }
 
 // sessionResponse : réponse à une inscription ou une connexion réussie.
@@ -109,8 +118,8 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	var user userResponse
 	var hash string
 	err := h.pool.QueryRow(r.Context(),
-		`SELECT id, email, display_name, created_at, password_hash FROM users WHERE email = $1`,
-		normalizeEmail(req.Email)).Scan(&user.ID, &user.Email, &user.DisplayName, &user.CreatedAt, &hash)
+		`SELECT `+userColumns+`, password_hash FROM users WHERE email = $1`,
+		normalizeEmail(req.Email)).Scan(append(user.scanTargets(), &hash)...)
 
 	if errors.Is(err, pgx.ErrNoRows) {
 		auth.CheckPassword(dummyHash, req.Password) // Même durée qu'avec un vrai compte
@@ -149,13 +158,61 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 	var user userResponse
 	err := h.pool.QueryRow(r.Context(),
-		`SELECT id, email, display_name, created_at FROM users WHERE id = $1`,
-		auth.UserID(r.Context())).Scan(&user.ID, &user.Email, &user.DisplayName, &user.CreatedAt)
+		`SELECT `+userColumns+` FROM users WHERE id = $1`,
+		auth.UserID(r.Context())).Scan(user.scanTargets()...)
 	if err != nil {
 		httpjson.ServerError(w, err)
 		return
 	}
 
+	httpjson.Write(w, http.StatusOK, user)
+}
+
+type updateMeRequest struct {
+	DisplayName Optional[string] `json:"display_name"`
+	DefaultView Optional[string] `json:"default_view"`
+}
+
+// UpdateMe : PATCH /api/v1/me (connexion requise) → modifie le nom affiché et/ou la vue par défaut
+func (h *AuthHandler) UpdateMe(w http.ResponseWriter, r *http.Request) {
+	var req updateMeRequest
+	if !httpjson.Read(w, r, &req) {
+		return
+	}
+	if req.DisplayName.IsNull() || req.DefaultView.IsNull() {
+		badRequest(w, "display_name et default_view ne peuvent pas être null")
+		return
+	}
+
+	changes := newUpdate("users")
+	if req.DisplayName.Set {
+		name := strings.TrimSpace(*req.DisplayName.Value)
+		if name == "" || utf8.RuneCountInString(name) > 100 {
+			badRequest(w, "Le nom affiché doit faire entre 1 et 100 caractères")
+			return
+		}
+		changes.set("display_name", name)
+	}
+	if req.DefaultView.Set {
+		if !validView(*req.DefaultView.Value) {
+			badRequest(w, "default_view doit valoir columns ou sections")
+			return
+		}
+		changes.set("default_view", *req.DefaultView.Value)
+	}
+
+	ctx := r.Context()
+	userID := auth.UserID(ctx)
+	if err := changes.exec(ctx, h.pool, userID); err != nil {
+		httpjson.ServerError(w, err)
+		return
+	}
+
+	var user userResponse
+	if err := h.pool.QueryRow(ctx, `SELECT `+userColumns+` FROM users WHERE id = $1`, userID).Scan(user.scanTargets()...); err != nil {
+		httpjson.ServerError(w, err)
+		return
+	}
 	httpjson.Write(w, http.StatusOK, user)
 }
 
@@ -171,8 +228,8 @@ func (h *AuthHandler) createUser(ctx context.Context, email, name, hash string) 
 
 	err = tx.QueryRow(ctx,
 		`INSERT INTO users (email, display_name, password_hash) VALUES ($1, $2, $3)
-		 RETURNING id, email, display_name, created_at`,
-		email, name, hash).Scan(&user.ID, &user.Email, &user.DisplayName, &user.CreatedAt)
+		 RETURNING `+userColumns,
+		email, name, hash).Scan(user.scanTargets()...)
 	if err != nil {
 		return user, err
 	}
