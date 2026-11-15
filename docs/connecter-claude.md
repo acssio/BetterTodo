@@ -6,7 +6,7 @@ Ce tuto branche **Claude Code** et/ou **Claude Desktop** sur **ton instance Bett
 > « Ajoute *Appeler le garage* dans Perso pour vendredi, urgence haute, tag #voiture. »
 > « Coche *Acheter du pain*. »
 
-Comment ça marche : sur ton Mac, Claude lance un petit programme, `bettertodo-mcp`. Ce programme appelle l'API de ton serveur avec un **jeton d'accès**, sans ton mot de passe. Claude peut lire, créer, modifier et cocher des tâches, mais **jamais en supprimer**. Les détails techniques sont dans [etapes/04-integration-mcp.md](etapes/04-integration-mcp.md).
+Comment ça marche : sur ton Mac, Claude lance un petit programme, `bettertodo-mcp`. Ce programme appelle l'API de ton serveur avec un **jeton d'accès**, sans ton mot de passe. Claude peut lire, créer, modifier et cocher des tâches, et créer ou renommer des groupes de listes, des listes et des groupes, mais **jamais rien supprimer**. Les détails techniques sont dans [etapes/04-integration-mcp.md](etapes/04-integration-mcp.md).
 
 ## Ce qu'il te faut
 
@@ -111,7 +111,7 @@ Pour le retirer : `claude mcp remove bettertodo --scope user`.
    S'il contient déjà d'autres serveurs, ajoute seulement le bloc `"bettertodo": { … }` à côté d'eux, séparé par une virgule.
 
 3. **Quitte complètement** Claude Desktop (Cmd+Q) et relance-le.
-4. Dans une conversation, le menu des outils (sous la zone de saisie) doit afficher **bettertodo** avec ses 6 outils.
+4. Dans une conversation, le menu des outils (sous la zone de saisie) doit afficher **bettertodo** avec ses 13 outils.
 
 ## 5. Essayer
 
@@ -120,6 +120,7 @@ Quelques demandes pour commencer :
 - « Qu'est-ce que j'ai à faire aujourd'hui dans BetterTodo ? »
 - « Montre-moi toutes mes échéances de la semaine. »
 - « Ajoute *Réserver le restaurant* dans la liste Perso pour samedi. »
+- « Crée une liste *Vacances* verte avec une icône de valise dans le groupe Perso, avec les groupes *À réserver* et *À emporter*. »
 - « Passe *Réserver le restaurant* en urgence haute et ajoute la note *4 personnes*. »
 - « Coche *Réserver le restaurant*. »
 

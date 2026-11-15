@@ -16,7 +16,7 @@ Puis ouvrir http://localhost:8000.
 
 ## Connecter Claude (MCP)
 
-Claude (Claude Code, Claude Desktop) peut lire, créer, modifier et cocher tes tâches, mais pas les supprimer. Il passe par un jeton d'accès créé dans les Paramètres. Tuto : **[Connecter Claude à BetterTodo](docs/connecter-claude.md)**.
+Claude (Claude Code, Claude Desktop) peut lire, créer, modifier et cocher tes tâches, et créer ou renommer des listes et des groupes, mais rien supprimer. Il passe par un jeton d'accès créé dans les Paramètres. Tuto : **[Connecter Claude à BetterTodo](docs/connecter-claude.md)**.
 
 ## Comprendre le code
 

@@ -54,9 +54,11 @@ web/src/
 mcp/                                 → module Go séparé (son propre go.mod)
   main.go                            → lit la config, crée le serveur MCP, transport stdio
   apiclient.go                       → ApiClient : appels HTTP avec "Authorization: Bearer btd_…"
-  tools.go                           → Tools : les 6 outils et leurs descriptions
+  tools.go                           → Tools : outils des tâches (lecture, création, modification)
+  tools_structure.go                 → outils des groupes de listes, listes et groupes (créer, renommer)
+  palette.go                         → couleurs et icônes des listes, copiées de web/src/components/listIcons.ts
   types.go                           → réponses de l'API (champs utiles seulement)
-  tools_test.go                      → tests des fonctions pures
+  tools_test.go, palette_test.go     → tests des fonctions pures + synchro de la palette avec la page web
 ```
 
 ## 4a : jetons d'accès personnels
@@ -114,14 +116,24 @@ Il y a une nouvelle partie **Jetons d'accès**, en bas des Paramètres :
 
 | Outil | Lecture / écriture | Ce qu'il fait |
 |---|---|---|
-| `list_lists` | lecture | Listes, groupe de listes, nombre de tâches à faire |
+| `list_lists` | lecture | Groupes de listes (même vides) et listes, avec le nombre de tâches à faire |
 | `get_list` | lecture | Groupes et tâches d'une liste (tâches faites seulement avec `include_done`) |
 | `get_due_tasks` | lecture | Échéances toutes listes confondues : `until` = `"today"`, une date, ou vide |
 | `list_tags_and_urgency_levels` | lecture | Tags existants et noms des niveaux d'urgence |
 | `create_task` | écriture | Crée une tâche (groupe par son nom, sinon le premier), avec échéance, urgence, tags et notes |
 | `update_task` | écriture | Change seulement les champs donnés ; `done: true` coche la tâche |
+| `list_colors_and_icons` | lecture | Les 8 couleurs (nommées : rouge, bleu…) et les 136 icônes de liste, avec leurs mots-clés |
+| `create_folder` / `rename_folder` | écriture | Créer / renommer un groupe de listes (barre latérale) |
+| `create_list` / `rename_list` | écriture | Créer une liste (groupe de listes par son nom, couleur, icône) / la renommer |
+| `create_group` / `rename_group` | écriture | Créer un groupe de tâches à la fin d'une liste / le renommer |
 
-**Aucun outil ne supprime** : c'était la demande. Claude peut cocher une tâche, pas l'effacer. Il ne peut pas non plus créer ou supprimer de liste.
+**Aucun outil ne supprime** : c'était la demande. Claude peut cocher une tâche, créer ou renommer une liste ou un groupe, mais rien effacer. Il ne déplace ni ne réordonne rien non plus.
+
+### Couleur et icône d'une liste
+
+Claude ne peut choisir que dans la palette de la page web. Une icône hors de la liste fixe (`listIcons.ts`) s'afficherait comme « list ». Le serveur MCP ne peut pas lire le code de la page web : `palette.go` en est une **copie**, avec un nom français pour chaque couleur. `TestPaletteSynchroniseeAvecLaPageWeb` relit `listIcons.ts` et échoue si les deux ne correspondent plus. **Quand tu ajoutes une icône dans la page web, ajoute-la aussi dans `palette.go`.**
+
+`create_list` vérifie la couleur, l'icône et le groupe de listes **avant** de créer la liste. En cas d'erreur, le message donne les choix possibles.
 
 Quelques choix :
 - **Claude manipule des noms, l'API des identifiants.** Claude écrit `"urgency": "Haute"`, et `findUrgency` le traduit en `urgency_id`, sans tenir compte des majuscules. Si le nom est inconnu, l'erreur liste les niveaux possibles, et Claude se corrige seul.
@@ -183,6 +195,7 @@ BETTERTODO_URL=http://localhost:8000 BETTERTODO_TOKEN=btd_… npx @modelcontextp
 - les deux collections Postman passent, contre une pile Docker locale neuve (62 et 80 requêtes) ;
 - les routes avec curl : avec un jeton, `/lists` et `/me` répondent 200 ; `/me/tokens`, `/me/password` et `/admin/users` répondent 403 ; un faux jeton reçoit 401 ;
 - les outils, en parlant au binaire en JSON-RPC comme le fait Claude : création avec échéance, urgence (« haute » en minuscules), tags et notes ; `get_due_tasks` avec `today` et sans date ; cocher une tâche en enlevant l'échéance et l'urgence ; erreurs pour un groupe inconnu, une urgence inconnue (sans créer de tâche), une tâche introuvable ou une modification vide ; jeton révoqué → 401 ;
+- les outils d'organisation : créer et renommer un groupe de listes, une liste (avec groupe de listes en minuscules, couleur « Vert », icône `shopping-cart`) et un groupe ; créer une tâche dans le nouveau groupe ; erreurs pour une couleur hors palette, une icône inconnue, un groupe de listes inconnu (ou aucun), un nom vide, un groupe introuvable ;
 - la page web, avec de vrais clics dans le navigateur : créer un jeton, l'encadré, Copier (le repli Cmd+C quand le presse-papiers est refusé), « Jamais utilisé » / « Utilisé le … », révoquer avec la boîte de confirmation.
 
 **Pas vérifié** : le branchement dans Claude Code ou Claude Desktop sur ton vrai serveur. C'est le tuto [connecter-claude.md](../connecter-claude.md).
@@ -197,7 +210,8 @@ BETTERTODO_URL=http://localhost:8000 BETTERTODO_TOKEN=btd_… npx @modelcontextp
 | « impossible de joindre BetterTodo » | `BETTERTODO_URL` : l'adresse de la **page web**, sans `/api` (`NewApiClient` ajoute `/api/v1`) |
 | Réponse 404 sur tout | URL avec `/api` en trop, ou mauvais port |
 | Claude ne voit pas les outils | Chemin du binaire pas absolu, ou application non relancée. Logs de Claude Desktop : `~/Library/Logs/Claude/mcp-server-bettertodo.log` |
-| Ajouter un outil | Une méthode sur `Tools` + un `mcp.AddTool` dans `Register` (`mcp/tools.go`), puis rebuild du binaire et relance de Claude |
+| Ajouter un outil | Une méthode sur `Tools` + un `mcp.AddTool` dans `Register` (`mcp/tools.go`) ou `registerStructure` (`mcp/tools_structure.go`), puis rebuild du binaire et relance de Claude |
+| `go test` échoue sur la palette | Une icône ou une couleur a changé dans `listIcons.ts` : reporte-la dans `mcp/palette.go` |
 | Voir les jetons en base | `docker compose exec db psql -U bettertodo -c "SELECT name, created_at, last_used_at FROM api_tokens"` |
 
 ## Plus tard

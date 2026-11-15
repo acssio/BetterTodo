@@ -12,8 +12,10 @@ import (
 
 // Tools : les outils que Claude peut appeler. Chaque méthode publique est un outil,
 // enregistré dans Register avec son nom et sa description.
+// Les outils des groupes de listes, listes et groupes sont dans tools_structure.go.
 //
-// Volontairement, aucun outil ne supprime quoi que ce soit : Claude peut cocher une tâche, pas l'effacer.
+// Volontairement, aucun outil ne supprime quoi que ce soit : Claude peut cocher une tâche,
+// créer ou renommer une liste, mais rien effacer.
 type Tools struct {
 	api *ApiClient
 }
@@ -32,7 +34,7 @@ func (t *Tools) Register(server *mcp.Server) {
 
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "list_lists",
-		Description: "Liste toutes les listes de tâches BetterTodo de l'utilisateur, avec leur groupe de listes et le nombre de tâches à faire. À appeler d'abord pour connaître les list_id.",
+		Description: "Liste les groupes de listes (dossiers de la barre latérale) et toutes les listes de tâches BetterTodo de l'utilisateur, avec le nombre de tâches à faire. À appeler d'abord pour connaître les list_id et folder_id.",
 		Annotations: readOnly,
 	}, t.ListLists)
 
@@ -65,6 +67,8 @@ func (t *Tools) Register(server *mcp.Server) {
 		Description: "Modifie une tâche : seuls les champs donnés changent. done = true pour la cocher (faite), false pour la décocher. Il est impossible de supprimer une tâche.",
 		Annotations: write,
 	}, t.UpdateTask)
+
+	t.registerStructure(server, readOnly, write)
 }
 
 // =============================================================================
@@ -127,19 +131,17 @@ func (t *Tools) ListLists(ctx context.Context, _ *mcp.CallToolRequest, _ noInput
 		folderNames[f.ID] = f.Name
 	}
 
-	type listOut struct {
-		ID        string `json:"id"`
-		Name      string `json:"name"`
-		Folder    string `json:"folder,omitempty"`
-		OpenTasks int    `json:"open_tasks"`
-	}
-	out := []listOut{}
+	out := struct {
+		Folders []apiFolder `json:"folders"` // Groupes de listes, même vides
+		Lists   []listOut   `json:"lists"`
+	}{Folders: folders, Lists: []listOut{}}
+
 	for _, l := range lists {
 		item := listOut{ID: l.ID, Name: l.Name, OpenTasks: l.OpenTasks}
 		if l.FolderID != nil {
 			item.Folder = folderNames[*l.FolderID]
 		}
-		out = append(out, item)
+		out.Lists = append(out.Lists, item)
 	}
 	return jsonResult(out)
 }
