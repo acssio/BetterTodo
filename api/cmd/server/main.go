@@ -55,7 +55,9 @@ func main() {
 
 	// Objets de l'application --------------------------------------------------
 	sessions := auth.NewSessionStore(pool, cfg.SessionDuration)
-	requireUser := auth.NewMiddleware(sessions).RequireUser
+	authMiddleware := auth.NewMiddleware(sessions, auth.NewAPITokenStore(pool))
+	requireUser := authMiddleware.RequireUser       // Session ou jeton d'accès personnel
+	requireSession := authMiddleware.RequireSession // Session seulement (routes sensibles)
 
 	healthHandler := handlers.NewHealthHandler(pool)
 	authHandler := handlers.NewAuthHandler(pool, sessions, cfg.CookieSecure)
@@ -67,6 +69,7 @@ func main() {
 	tagHandler := handlers.NewTagHandler(pool)
 	dueHandler := handlers.NewDueHandler(pool)
 	adminHandler := handlers.NewAdminHandler(pool)
+	tokenHandler := handlers.NewTokenHandler(pool)
 
 	// Routes -------------------------------------------------------------------
 	mux := http.NewServeMux()
@@ -77,15 +80,25 @@ func main() {
 	mux.HandleFunc("POST /api/v1/auth/setup", authHandler.Setup)      // Crée le premier compte (admin)
 	mux.HandleFunc("POST /api/v1/auth/login", authHandler.Login)
 
-	// Connexion requise : private(route, handler) passe d'abord par requireUser
+	// Connexion requise : private(route, handler) passe d'abord par requireUser.
+	// Session ou jeton d'accès personnel (serveur MCP, scripts…).
 	private := func(route string, handler http.HandlerFunc) {
 		mux.Handle(route, requireUser(handler))
 	}
 
-	private("POST /api/v1/auth/logout", authHandler.Logout)
+	// Routes sensibles : session seulement, un jeton d'accès est refusé (403)
+	sessionOnly := func(route string, handler http.HandlerFunc) {
+		mux.Handle(route, requireSession(handler))
+	}
+
+	sessionOnly("POST /api/v1/auth/logout", authHandler.Logout)
 	private("GET /api/v1/me", authHandler.Me)
 	private("PATCH /api/v1/me", authHandler.UpdateMe)
-	private("POST /api/v1/me/password", authHandler.ChangePassword)
+	sessionOnly("POST /api/v1/me/password", authHandler.ChangePassword)
+
+	sessionOnly("GET /api/v1/me/tokens", tokenHandler.List)
+	sessionOnly("POST /api/v1/me/tokens", tokenHandler.Create)
+	sessionOnly("DELETE /api/v1/me/tokens/{id}", tokenHandler.Delete)
 
 	private("GET /api/v1/folders", folderHandler.List)
 	private("POST /api/v1/folders", folderHandler.Create)
@@ -121,9 +134,9 @@ func main() {
 	private("PATCH /api/v1/tags/{id}", tagHandler.Update)
 	private("DELETE /api/v1/tags/{id}", tagHandler.Delete)
 
-	// Console admin : connexion requise, puis compte admin requis
+	// Console admin : session requise (pas de jeton d'accès), puis compte admin requis
 	admin := func(route string, handler http.HandlerFunc) {
-		mux.Handle(route, requireUser(adminHandler.RequireAdmin(handler)))
+		mux.Handle(route, requireSession(adminHandler.RequireAdmin(handler)))
 	}
 
 	admin("GET /api/v1/admin/users", adminHandler.ListUsers)

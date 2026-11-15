@@ -1210,7 +1210,344 @@
       ]
     },
     {
-      "name": "41 Admin – liste des comptes",
+      "name": "41 Jetons d'accès – liste vide",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/me/tokens",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ]
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 et aucun jeton', () => {",
+              "    pm.response.to.have.status(200);",
+              "    pm.expect(pm.response.json()).to.eql([]);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "42 Jetons d'accès – nom vide",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/me/tokens",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"  \"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('400', () => pm.response.to.have.status(400));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "43 Jetons d'accès – créer",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/me/tokens",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Claude (test Postman)\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const body = pm.response.json();",
+              "pm.test('201 et le jeton en clair, une seule fois', () => {",
+              "    pm.response.to.have.status(201);",
+              "    pm.expect(body.token).to.match(/^btd_/);",
+              "    pm.expect(body.last_used_at).to.eql(null);",
+              "});",
+              "pm.collectionVariables.set('apiToken', body.token);",
+              "pm.collectionVariables.set('apiTokenId', body.id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "44 Jeton d'accès – lire les listes",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/lists",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{apiToken}}"
+          }
+        ]
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200', () => pm.response.to.have.status(200));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "45 Jetons d'accès – date d'utilisation notée, jeton jamais renvoyé",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/me/tokens",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ]
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const body = pm.response.json();",
+              "pm.test('200, utilisé, sans le jeton', () => {",
+              "    pm.response.to.have.status(200);",
+              "    pm.expect(body).to.have.length(1);",
+              "    pm.expect(body[0].last_used_at).to.not.eql(null);",
+              "    pm.expect(body[0]).to.not.have.property('token');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "46 Jeton d'accès – refusé pour gérer les jetons",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/me/tokens",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{apiToken}}"
+          }
+        ]
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('403', () => pm.response.to.have.status(403));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "47 Jeton d'accès – refusé pour le mot de passe",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/me/password",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{apiToken}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"current_password\": \"x\",\n  \"new_password\": \"y\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('403', () => pm.response.to.have.status(403));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "48 Jeton d'accès – refusé pour la déconnexion",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/auth/logout",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{apiToken}}"
+          }
+        ]
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('403', () => pm.response.to.have.status(403));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "49 Jetons d'accès – révoquer",
+      "request": {
+        "method": "DELETE",
+        "url": "{{baseUrl}}/me/tokens/{{apiTokenId}}",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ]
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('204', () => pm.response.to.have.status(204));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "50 Jeton d'accès révoqué – refusé",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/lists",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{apiToken}}"
+          }
+        ]
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('401', () => pm.response.to.have.status(401));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "51 Jetons d'accès – déjà révoqué",
+      "request": {
+        "method": "DELETE",
+        "url": "{{baseUrl}}/me/tokens/{{apiTokenId}}",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ]
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('404', () => pm.response.to.have.status(404));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "52 Jetons d'accès – en créer un autre",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/me/tokens",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Jeton du compte supprimé\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('201', () => pm.response.to.have.status(201));",
+              "pm.collectionVariables.set('apiToken', pm.response.json().token);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "53 Admin – liste des comptes",
       "request": {
         "method": "GET",
         "url": "{{baseUrl}}/admin/users",
@@ -1239,7 +1576,7 @@
       ]
     },
     {
-      "name": "42 Admin – mot de passe trop court",
+      "name": "54 Admin – mot de passe trop court",
       "request": {
         "method": "PATCH",
         "url": "{{baseUrl}}/admin/users/{{userId}}",
@@ -1271,7 +1608,7 @@
       ]
     },
     {
-      "name": "43 Admin – réinitialise le mot de passe",
+      "name": "55 Admin – réinitialise le mot de passe",
       "request": {
         "method": "PATCH",
         "url": "{{baseUrl}}/admin/users/{{userId}}",
@@ -1303,7 +1640,7 @@
       ]
     },
     {
-      "name": "44 Les sessions du compte sont fermées",
+      "name": "56 Les sessions du compte sont fermées",
       "request": {
         "method": "GET",
         "url": "{{baseUrl}}/me",
@@ -1327,7 +1664,7 @@
       ]
     },
     {
-      "name": "45 Connexion avec le nouveau mot de passe",
+      "name": "57 Connexion avec le nouveau mot de passe",
       "request": {
         "method": "POST",
         "url": "{{baseUrl}}/auth/login",
@@ -1356,7 +1693,7 @@
       ]
     },
     {
-      "name": "46 Admin – ne peut pas se supprimer",
+      "name": "58 Admin – ne peut pas se supprimer",
       "request": {
         "method": "DELETE",
         "url": "{{baseUrl}}/admin/users/{{adminId}}",
@@ -1380,7 +1717,7 @@
       ]
     },
     {
-      "name": "47 Admin – supprime le compte de test",
+      "name": "59 Admin – supprime le compte de test",
       "request": {
         "method": "DELETE",
         "url": "{{baseUrl}}/admin/users/{{userId}}",
@@ -1404,7 +1741,7 @@
       ]
     },
     {
-      "name": "48 Le compte supprimé ne peut plus se connecter",
+      "name": "60 Le compte supprimé ne peut plus se connecter",
       "request": {
         "method": "POST",
         "url": "{{baseUrl}}/auth/login",
@@ -1432,7 +1769,31 @@
       ]
     },
     {
-      "name": "49 Admin – compte déjà supprimé",
+      "name": "61 Le jeton d'accès du compte supprimé est refusé",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/lists",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{apiToken}}"
+          }
+        ]
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('401', () => pm.response.to.have.status(401));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "62 Admin – compte déjà supprimé",
       "request": {
         "method": "DELETE",
         "url": "{{baseUrl}}/admin/users/{{userId}}",

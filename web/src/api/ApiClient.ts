@@ -1,6 +1,6 @@
 import type {
-    Board, DueCounts, DueTask, Folder, Group, ListChanges, NewUser, Session, Tag, Task, TaskChanges, TodoList,
-    UrgencyChanges, UrgencyLevel, User, UserChanges,
+    ApiToken, Board, CreatedApiToken, DueCounts, DueTask, Folder, Group, ListChanges, NewUser, Session, Tag, Task,
+    TaskChanges, TodoList, UrgencyChanges, UrgencyLevel, User, UserChanges,
 } from './types'
 
 /** Erreur renvoyée par l'API : le code HTTP et le message de {"error": "..."} */
@@ -58,6 +58,22 @@ export class ApiClient {
     /** Change son mot de passe (il faut l'actuel). Les autres sessions du compte sont fermées. */
     changePassword(currentPassword: string, newPassword: string): Promise<User> {
         return this.request('POST', '/me/password', { current_password: currentPassword, new_password: newPassword })
+    }
+
+    // --- Jetons d'accès personnels (Claude via MCP, scripts…) ---------------------
+
+    getApiTokens(): Promise<ApiToken[]> {
+        return this.request('GET', '/me/tokens')
+    }
+
+    /** Crée un jeton. La réponse contient le jeton en clair, qui ne sera plus jamais renvoyé. */
+    createApiToken(name: string): Promise<CreatedApiToken> {
+        return this.request('POST', '/me/tokens', { name })
+    }
+
+    /** Révoque le jeton : il est refusé dès la requête suivante. */
+    deleteApiToken(id: string): Promise<void> {
+        return this.request('DELETE', `/me/tokens/${id}`)
     }
 
     // --- Console admin (réservée à l'admin) ------------------------------------
