@@ -1,7 +1,20 @@
 # BetterTodo
 A self hosted, cross platform, open source Todo List
 
-## Démarrer
+## Installer
+
+Pas encore Docker sur ta machine ? Suivre le tuto **[Installer BetterTodo avec Docker](docs/installation.md)** : Docker sur macOS, Windows ou Linux, premier démarrage, sauvegardes et dépannage.
+
+En bref, si Docker est déjà là :
+
+```bash
+cp .env.example .env          # puis changer le mot de passe
+docker compose up -d --build --wait
+```
+
+Puis ouvrir http://localhost:8000.
+
+## Comprendre le code
 
 Voir [docs/etapes](docs/etapes) : un document par étape du développement, qui explique ce qui a été fait et comment le lancer.
 
@@ -15,12 +28,3 @@ Voir [docs/etapes](docs/etapes) : un document par étape du développement, qui 
 8. [Tâches faites, groupe par défaut, langue](docs/etapes/03c2b-web-taches-faites-langue.md)
 9. [Vue scindée](docs/etapes/03c3-web-vue-scindee.md)
 10. [Listes intelligentes : Aujourd'hui et Planifié](docs/etapes/03d-listes-intelligentes.md)
-
-En bref :
-
-```bash
-cp .env.example .env          # puis changer le mot de passe
-docker compose up -d --build --wait
-```
-
-Puis ouvrir http://localhost:8000.
