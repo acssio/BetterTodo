@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { Columns3, GripVertical, Plus, Rows2, Trash2, X } from 'lucide-react'
+import { Check, Columns3, GripVertical, Plus, Rows2, Trash2, X } from 'lucide-react'
 import { api, ApiError } from '../api/ApiClient'
 import type { Language, ListView, Tag, UrgencyLevel, User, UserChanges } from '../api/types'
 import { computeDropIndex } from '../utils/dragDrop'
@@ -33,6 +33,11 @@ class SettingsDialogState {
     renamingTagId: string | null = null
     dragLevelId: string | null = null     // Niveau en train d'être glissé
     dropIndex: number | null = null
+    currentPassword: string = ''  // Partie « Mot de passe »
+    newPassword: string = ''
+    confirmPassword: string = ''
+    passwordDone: boolean = false // true = « Mot de passe changé » affiché
+    passwordError: string = ''    // Affichée sous le formulaire (l'erreur générale est en haut, hors de vue)
     error: string = ''
 }
 
@@ -94,6 +99,27 @@ export class SettingsDialog extends React.Component<SettingsDialogProps, Setting
     onDefaultViewClick = (view: ListView): void => {
         if (view !== this.props.user.default_view) {
             void this.updateUser({ default_view: view })
+        }
+    }
+
+    // =========================================================================
+    // Mot de passe
+    // =========================================================================
+
+    onPasswordSubmit = async (event: React.FormEvent<HTMLFormElement>): Promise<void> => {
+        event.preventDefault() // Empêche le navigateur de recharger la page
+
+        const { currentPassword, newPassword, confirmPassword } = this.state
+        if (newPassword !== confirmPassword) {
+            this.setState({ passwordError: 'Les deux nouveaux mots de passe ne sont pas identiques.', passwordDone: false })
+            return
+        }
+        try {
+            this.props.onUserChanged(await api.changePassword(currentPassword, newPassword))
+            this.setState({ currentPassword: '', newPassword: '', confirmPassword: '', passwordDone: true, passwordError: '' })
+        } catch (error) {
+            const message = error instanceof ApiError ? error.message : 'Impossible de joindre le serveur.'
+            this.setState({ passwordError: message, passwordDone: false })
         }
     }
 
@@ -229,6 +255,7 @@ export class SettingsDialog extends React.Component<SettingsDialogProps, Setting
                             </div>
                         )}
                         {this.renderAccount()}
+                        {this.renderPassword()}
                         {this.renderLevels()}
                         {this.renderTags()}
                         {this.renderDefaultView()}
@@ -270,6 +297,56 @@ export class SettingsDialog extends React.Component<SettingsDialogProps, Setting
                     La traduction de l'interface arrivera plus tard. La langue sert déjà à nommer
                     le groupe créé avec chaque nouvelle liste (« Tâches » / « Tasks »).
                 </p>
+            </section>
+        )
+    }
+
+    private renderPassword(): React.ReactNode {
+        return (
+            <section>
+                <h3>Mot de passe</h3>
+                <p className="settings-desc">Tes autres sessions (autres navigateurs, appareils) seront fermées.</p>
+                <form className="settings-password" onSubmit={this.onPasswordSubmit}>
+                    <label className="settings-field">
+                        <span>Mot de passe actuel</span>
+                        <input
+                            type="password"
+                            value={this.state.currentPassword}
+                            onChange={event => this.setState({ currentPassword: event.target.value, passwordDone: false })}
+                            autoComplete="current-password"
+                            required
+                        />
+                    </label>
+                    <label className="settings-field">
+                        <span>Nouveau mot de passe</span>
+                        <input
+                            type="password"
+                            value={this.state.newPassword}
+                            onChange={event => this.setState({ newPassword: event.target.value, passwordDone: false })}
+                            autoComplete="new-password"
+                            minLength={8}
+                            required
+                        />
+                    </label>
+                    <label className="settings-field">
+                        <span>Confirmer le nouveau mot de passe</span>
+                        <input
+                            type="password"
+                            value={this.state.confirmPassword}
+                            onChange={event => this.setState({ confirmPassword: event.target.value, passwordDone: false })}
+                            autoComplete="new-password"
+                            minLength={8}
+                            required
+                        />
+                    </label>
+                    {this.state.passwordError && <div className="settings-error">{this.state.passwordError}</div>}
+                    <div className="settings-password-foot">
+                        <button type="submit" className="btn-ghost">Changer le mot de passe</button>
+                        {this.state.passwordDone && (
+                            <span className="settings-password-done"><Check size={14} />Mot de passe changé</span>
+                        )}
+                    </div>
+                </form>
             </section>
         )
     }

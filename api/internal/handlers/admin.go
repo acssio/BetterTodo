@@ -96,7 +96,8 @@ type resetPasswordRequest struct {
 }
 
 // ResetPassword : PATCH /api/v1/admin/users/{id} → nouveau mot de passe.
-// Les sessions ouvertes du compte sont fermées (sauf si l'admin change le sien).
+// Les sessions ouvertes du compte sont fermées, et la personne devra choisir son propre
+// mot de passe à la prochaine connexion. Sauf si l'admin change le sien : rien de tout ça.
 func (h *AdminHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathID(w, r)
 	if !ok {
@@ -118,7 +119,10 @@ func (h *AdminHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := r.Context()
-	tag, err := h.pool.Exec(ctx, `UPDATE users SET password_hash = $1, updated_at = now() WHERE id = $2`, hash, id)
+	isMe := strings.EqualFold(id, auth.UserID(ctx))
+	tag, err := h.pool.Exec(ctx,
+		`UPDATE users SET password_hash = $1, must_change_password = $2, updated_at = now() WHERE id = $3`,
+		hash, !isMe, id)
 	if err != nil {
 		httpjson.ServerError(w, err)
 		return
@@ -128,7 +132,7 @@ func (h *AdminHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !strings.EqualFold(id, auth.UserID(ctx)) { // L'admin qui change son propre mot de passe reste connecté
+	if !isMe { // L'admin qui change son propre mot de passe reste connecté
 		if _, err := h.pool.Exec(ctx, `DELETE FROM sessions WHERE user_id = $1`, id); err != nil {
 			httpjson.ServerError(w, err)
 			return

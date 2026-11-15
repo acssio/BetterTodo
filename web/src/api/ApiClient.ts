@@ -55,6 +55,11 @@ export class ApiClient {
         return this.request('PATCH', '/me', changes)
     }
 
+    /** Change son mot de passe (il faut l'actuel). Les autres sessions du compte sont fermées. */
+    changePassword(currentPassword: string, newPassword: string): Promise<User> {
+        return this.request('POST', '/me/password', { current_password: currentPassword, new_password: newPassword })
+    }
+
     // --- Console admin (réservée à l'admin) ------------------------------------
 
     getUsers(): Promise<User[]> {

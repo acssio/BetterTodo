@@ -13,6 +13,7 @@ export interface User {
     default_view: ListView // Vue des nouvelles listes (Paramètres)
     language: Language
     is_admin: boolean // Accès à la console admin (premier compte créé)
+    must_change_password: boolean // Mot de passe donné par l'admin : à changer avant d'ouvrir les listes
     created_at: string
 }
 

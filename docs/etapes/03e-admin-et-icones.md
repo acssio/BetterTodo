@@ -159,4 +159,4 @@ Sur une pile Docker de test à part (autres ports, volume à part) :
 ## Limites
 
 - Un seul rôle : admin ou non. Pas d'écran pour nommer un autre admin (SQL ci-dessus).
-- Chacun ne peut pas encore changer **son** mot de passe lui-même. L'admin le fait pour lui, et pour lui-même avec la clé sur sa propre ligne.
+- Changer **son** mot de passe soi-même : ajouté à l'étape 3f ([03f-mot-de-passe.md](03f-mot-de-passe.md)).

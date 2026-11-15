@@ -123,7 +123,7 @@ Les trois lignes doivent afficher **healthy**.
 2. Au premier lancement, la page affiche **« Créer le compte administrateur »**.
 3. Nom, email, mot de passe (8 caractères minimum).
 
-Ce premier compte est l'**admin**. Il n'y a pas d'inscription libre : pour les autres personnes, l'admin ouvre **Console admin** (en bas de la barre latérale, au-dessus de « Paramètres »). Il y crée leur compte, puis leur donne l'email et le mot de passe. Chaque compte a ses propres listes, tags et niveaux d'urgence.
+Ce premier compte est l'**admin**. Il n'y a pas d'inscription libre : pour les autres personnes, l'admin ouvre **Console admin** (en bas de la barre latérale, au-dessus de « Paramètres »). Il y crée leur compte, puis leur donne l'email et un mot de passe provisoire : à leur première connexion, elles choisissent le leur. Chacun peut ensuite le changer dans **Paramètres**. Chaque compte a ses propres listes, tags et niveaux d'urgence.
 
 > Pour essayer avec des données toutes prêtes, on peut charger le compte de démo de la maquette (identifiants en tête du fichier). Chargé sur une installation vide, le compte de démo devient l'admin :
 > ```bash

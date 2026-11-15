@@ -1,7 +1,7 @@
 {
   "info": {
-    "name": "BetterTodo API – comptes (étapes 2a, 3c-2 et 3e)",
-    "description": "Tests de bout en bout : santé, installation (premier compte admin), console admin, connexion, déconnexion, profil. À lancer dans l'ordre avec --env-var adminEmail=… --env-var adminPassword=… (voir docs/etapes/03e-admin-et-icones.md).",
+    "name": "BetterTodo API – comptes (étapes 2a, 3c-2, 3e et 3f)",
+    "description": "Tests de bout en bout : santé, installation (premier compte admin), console admin, changement de mot de passe, connexion, déconnexion, profil. À lancer dans l'ordre avec --env-var adminEmail=… --env-var adminPassword=… (voir docs/etapes/03e-admin-et-icones.md et 03f-mot-de-passe.md).",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -172,6 +172,7 @@
             "exec": [
               "pm.test('200 (passer --env-var adminEmail=… --env-var adminPassword=…)', () => pm.response.to.have.status(200));",
               "pm.test('is_admin = true', () => pm.expect(pm.response.json().user.is_admin).to.eql(true));",
+              "pm.test('l\\'admin de l\\'installation n\\'a pas à changer son mot de passe', () => pm.expect(pm.response.json().user.must_change_password).to.eql(false));",
               "pm.collectionVariables.set('adminToken', pm.response.json().token);"
             ]
           }
@@ -240,6 +241,7 @@
               "    pm.expect(body).to.not.have.property('password_hash');",
               "    pm.expect(body).to.not.have.property('token');",
               "});",
+              "pm.test('devra changer son mot de passe', () => pm.expect(body.must_change_password).to.eql(true));",
               "pm.collectionVariables.set('userId', body.id);"
             ]
           }
@@ -965,7 +967,250 @@
       ]
     },
     {
-      "name": "33 Admin – liste des comptes",
+      "name": "33 Mot de passe – ouvrir une 2e session",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/auth/login",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200', () => pm.response.to.have.status(200));",
+              "pm.collectionVariables.set('token3', pm.response.json().token);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "34 Mot de passe – actuel incorrect",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/me/password",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"current_password\": \"mauvais-mot-de-passe\",\n  \"new_password\": \"change-{{password}}\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('400 avec un message', () => {",
+              "    pm.response.to.have.status(400);",
+              "    pm.expect(pm.response.json().error).to.include('actuel incorrect');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "35 Mot de passe – nouveau trop court",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/me/password",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"current_password\": \"{{password}}\",\n  \"new_password\": \"1234\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('400', () => pm.response.to.have.status(400));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "36 Mot de passe – identique à l'actuel",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/me/password",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"current_password\": \"{{password}}\",\n  \"new_password\": \"{{password}}\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('400', () => pm.response.to.have.status(400));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "37 Mot de passe – changé",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/me/password",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"current_password\": \"{{password}}\",\n  \"new_password\": \"change-{{password}}\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 et plus besoin de le changer', () => {",
+              "    pm.response.to.have.status(200);",
+              "    pm.expect(pm.response.json().must_change_password).to.eql(false);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "38 Mot de passe – la session en cours reste ouverte",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/me",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ]
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200', () => pm.response.to.have.status(200));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "39 Mot de passe – les autres sessions sont fermées",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/me",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token3}}"
+          }
+        ]
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('401', () => pm.response.to.have.status(401));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "40 Mot de passe – connexion avec le nouveau",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/auth/login",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"change-{{password}}\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200, sans changement demandé', () => {",
+              "    pm.response.to.have.status(200);",
+              "    pm.expect(pm.response.json().user.must_change_password).to.eql(false);",
+              "});",
+              "pm.collectionVariables.set('token', pm.response.json().token);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "41 Admin – liste des comptes",
       "request": {
         "method": "GET",
         "url": "{{baseUrl}}/admin/users",
@@ -994,7 +1239,7 @@
       ]
     },
     {
-      "name": "34 Admin – mot de passe trop court",
+      "name": "42 Admin – mot de passe trop court",
       "request": {
         "method": "PATCH",
         "url": "{{baseUrl}}/admin/users/{{userId}}",
@@ -1026,7 +1271,7 @@
       ]
     },
     {
-      "name": "35 Admin – réinitialise le mot de passe",
+      "name": "43 Admin – réinitialise le mot de passe",
       "request": {
         "method": "PATCH",
         "url": "{{baseUrl}}/admin/users/{{userId}}",
@@ -1058,7 +1303,7 @@
       ]
     },
     {
-      "name": "36 Les sessions du compte sont fermées",
+      "name": "44 Les sessions du compte sont fermées",
       "request": {
         "method": "GET",
         "url": "{{baseUrl}}/me",
@@ -1082,7 +1327,7 @@
       ]
     },
     {
-      "name": "37 Connexion avec le nouveau mot de passe",
+      "name": "45 Connexion avec le nouveau mot de passe",
       "request": {
         "method": "POST",
         "url": "{{baseUrl}}/auth/login",
@@ -1103,14 +1348,15 @@
           "script": {
             "type": "text/javascript",
             "exec": [
-              "pm.test('200', () => pm.response.to.have.status(200));"
+              "pm.test('200', () => pm.response.to.have.status(200));",
+              "pm.test('mot de passe donné par l\\'admin → à changer de nouveau', () => pm.expect(pm.response.json().user.must_change_password).to.eql(true));"
             ]
           }
         }
       ]
     },
     {
-      "name": "38 Admin – ne peut pas se supprimer",
+      "name": "46 Admin – ne peut pas se supprimer",
       "request": {
         "method": "DELETE",
         "url": "{{baseUrl}}/admin/users/{{adminId}}",
@@ -1134,7 +1380,7 @@
       ]
     },
     {
-      "name": "39 Admin – supprime le compte de test",
+      "name": "47 Admin – supprime le compte de test",
       "request": {
         "method": "DELETE",
         "url": "{{baseUrl}}/admin/users/{{userId}}",
@@ -1158,7 +1404,7 @@
       ]
     },
     {
-      "name": "40 Le compte supprimé ne peut plus se connecter",
+      "name": "48 Le compte supprimé ne peut plus se connecter",
       "request": {
         "method": "POST",
         "url": "{{baseUrl}}/auth/login",
@@ -1186,7 +1432,7 @@
       ]
     },
     {
-      "name": "41 Admin – compte déjà supprimé",
+      "name": "49 Admin – compte déjà supprimé",
       "request": {
         "method": "DELETE",
         "url": "{{baseUrl}}/admin/users/{{userId}}",

@@ -109,6 +109,28 @@
     background: var(--surface);
 }
 
+/* --- Mot de passe --- */
+
+.settings-password .settings-error {
+    margin-top: 14px;
+}
+
+.settings-password-foot {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 14px;
+}
+
+.settings-password-done {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--success);
+    font-weight: 600;
+    white-space: nowrap;
+}
+
 /* --- Niveaux d'urgence --- */
 
 .settings-levels {

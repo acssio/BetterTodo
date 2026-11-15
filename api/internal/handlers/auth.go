@@ -45,21 +45,22 @@ func NewAuthHandler(pool *pgxpool.Pool, sessions *auth.SessionStore, cookieSecur
 
 // userResponse : un utilisateur tel que renvoyé au client (jamais le hash du mot de passe).
 type userResponse struct {
-	ID          string    `json:"id"`
-	Email       string    `json:"email"`
-	DisplayName string    `json:"display_name"`
-	DefaultView string    `json:"default_view"` // Vue des nouvelles listes : "columns" ou "sections"
-	Language    string    `json:"language"`     // "fr" ou "en"
-	IsAdmin     bool      `json:"is_admin"`     // Accès à la console admin
-	CreatedAt   time.Time `json:"created_at"`
+	ID                 string    `json:"id"`
+	Email              string    `json:"email"`
+	DisplayName        string    `json:"display_name"`
+	DefaultView        string    `json:"default_view"`         // Vue des nouvelles listes : "columns" ou "sections"
+	Language           string    `json:"language"`             // "fr" ou "en"
+	IsAdmin            bool      `json:"is_admin"`             // Accès à la console admin
+	MustChangePassword bool      `json:"must_change_password"` // Mot de passe donné par l'admin : à changer
+	CreatedAt          time.Time `json:"created_at"`
 }
 
 // userColumns : colonnes lues pour construire un userResponse (dans l'ordre de scanTargets).
-const userColumns = `id, email, display_name, default_view, language, is_admin, created_at`
+const userColumns = `id, email, display_name, default_view, language, is_admin, must_change_password, created_at`
 
 // scanTargets : les champs de u, dans l'ordre de userColumns.
 func (u *userResponse) scanTargets() []any {
-	return []any{&u.ID, &u.Email, &u.DisplayName, &u.DefaultView, &u.Language, &u.IsAdmin, &u.CreatedAt}
+	return []any{&u.ID, &u.Email, &u.DisplayName, &u.DefaultView, &u.Language, &u.IsAdmin, &u.MustChangePassword, &u.CreatedAt}
 }
 
 // sessionResponse : réponse à une installation ou une connexion réussie.
@@ -242,10 +243,71 @@ func (h *AuthHandler) UpdateMe(w http.ResponseWriter, r *http.Request) {
 	httpjson.Write(w, http.StatusOK, user)
 }
 
+type changePasswordRequest struct {
+	CurrentPassword string `json:"current_password"`
+	NewPassword     string `json:"new_password"`
+}
+
+// ChangePassword : POST /api/v1/me/password (connexion requise) → change son propre mot de passe.
+// Il faut l'ancien. Les autres sessions du compte sont fermées, celle-ci reste ouverte.
+func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
+	var req changePasswordRequest
+	if !httpjson.Read(w, r, &req) {
+		return
+	}
+
+	ctx := r.Context()
+	userID := auth.UserID(ctx)
+
+	var hash string
+	if err := h.pool.QueryRow(ctx, `SELECT password_hash FROM users WHERE id = $1`, userID).Scan(&hash); err != nil {
+		httpjson.ServerError(w, err)
+		return
+	}
+	if !auth.CheckPassword(hash, req.CurrentPassword) {
+		badRequest(w, "Mot de passe actuel incorrect")
+		return
+	}
+	if message := validatePassword(req.NewPassword); message != "" {
+		badRequest(w, message)
+		return
+	}
+	if req.NewPassword == req.CurrentPassword {
+		badRequest(w, "Le nouveau mot de passe doit être différent de l'actuel")
+		return
+	}
+
+	newHash, err := auth.HashPassword(req.NewPassword)
+	if err != nil {
+		httpjson.ServerError(w, err)
+		return
+	}
+
+	var user userResponse
+	err = h.pool.QueryRow(ctx,
+		`UPDATE users SET password_hash = $1, must_change_password = false, updated_at = now()
+		 WHERE id = $2 RETURNING `+userColumns,
+		newHash, userID).Scan(user.scanTargets()...)
+	if err != nil {
+		httpjson.ServerError(w, err)
+		return
+	}
+
+	// Ferme les autres sessions (un autre navigateur, un téléphone…), garde celle-ci
+	_, err = h.pool.Exec(ctx, `DELETE FROM sessions WHERE user_id = $1 AND token_hash <> $2`,
+		userID, auth.HashToken(auth.TokenFromRequest(r)))
+	if err != nil {
+		httpjson.ServerError(w, err)
+		return
+	}
+	httpjson.Write(w, http.StatusOK, user)
+}
+
 // createUser crée l'utilisateur et ses niveaux d'urgence par défaut, dans une seule transaction.
 //
 // firstAdmin = true (installation) : le compte n'est créé que si la table users est vide
-// (sinon errSetupDone), et il est admin. Sinon (console admin) : compte normal.
+// (sinon errSetupDone), et il est admin. Sinon (console admin) : compte normal, qui devra
+// changer le mot de passe choisi par l'admin à sa première connexion.
 func createUser(ctx context.Context, pool *pgxpool.Pool, email, name, hash string, firstAdmin bool) (userResponse, error) {
 	var user userResponse
 
@@ -271,9 +333,10 @@ func createUser(ctx context.Context, pool *pgxpool.Pool, email, name, hash strin
 	}
 
 	err = tx.QueryRow(ctx,
-		`INSERT INTO users (email, display_name, password_hash, is_admin) VALUES ($1, $2, $3, $4)
+		`INSERT INTO users (email, display_name, password_hash, is_admin, must_change_password)
+		 VALUES ($1, $2, $3, $4, $5)
 		 RETURNING `+userColumns,
-		email, name, hash, firstAdmin).Scan(user.scanTargets()...)
+		email, name, hash, firstAdmin, !firstAdmin).Scan(user.scanTargets()...)
 	if err != nil {
 		return user, err
 	}

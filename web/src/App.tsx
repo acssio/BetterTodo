@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { api, ApiError } from './api/ApiClient'
 import type { User } from './api/types'
+import { ChangePasswordPage } from './components/ChangePasswordPage'
 import { ConfirmHost } from './components/ConfirmDialog'
 import { LoginPage } from './components/LoginPage'
 import { Workspace } from './components/Workspace'
@@ -15,8 +16,12 @@ import { Workspace } from './components/Workspace'
  *      └──(pas de session)──► loggedOut ──────────┘  │ (connexion)
  *                                 ▲                  │
  *                                 └──────────────────┘ (déconnexion ou session expirée)
+ *
+ * Entre la session et loggedIn : si user.must_change_password (mot de passe donné
+ * par l'admin), on passe d'abord par mustChangePassword, qui mène à loggedIn une fois
+ * le nouveau mot de passe choisi (ou à loggedOut avec « Se déconnecter »).
  */
-type AppStatus = 'loading' | 'setup' | 'loggedOut' | 'loggedIn'
+type AppStatus = 'loading' | 'setup' | 'loggedOut' | 'mustChangePassword' | 'loggedIn'
 
 class AppState {
     status: AppStatus = 'loading'
@@ -33,8 +38,7 @@ export class App extends React.Component<object, AppState> {
     async componentDidMount(): Promise<void> {
         // Le cookie de session est-il encore valide ?
         try {
-            const user = await api.me()
-            this.setState({ status: 'loggedIn', user })
+            this.onLoggedIn(await api.me())
         } catch (error) {
             if (error instanceof ApiError && error.status === 401) {
                 await this.showLoginOrSetup()
@@ -54,7 +58,13 @@ export class App extends React.Component<object, AppState> {
     }
 
     onLoggedIn = (user: User): void => {
-        this.setState({ status: 'loggedIn', user, error: '' })
+        const status = user.must_change_password ? 'mustChangePassword' : 'loggedIn'
+        this.setState({ status, user, error: '' })
+    }
+
+    /** Nouveau mot de passe choisi sur l'écran obligatoire : on ouvre les listes. */
+    onPasswordChanged = (user: User): void => {
+        this.setState({ status: 'loggedIn', user })
     }
 
     onLogout = async (): Promise<void> => {
@@ -84,6 +94,15 @@ export class App extends React.Component<object, AppState> {
 
             case 'loggedOut':
                 return <LoginPage setup={false} onLoggedIn={this.onLoggedIn} initialError={this.state.error} />
+
+            case 'mustChangePassword':
+                return (
+                    <ChangePasswordPage
+                        user={this.state.user!}
+                        onPasswordChanged={this.onPasswordChanged}
+                        onLogout={this.onLogout}
+                    />
+                )
 
             case 'loggedIn':
                 return (

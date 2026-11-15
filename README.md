@@ -29,3 +29,4 @@ Voir [docs/etapes](docs/etapes) : un document par étape du développement, qui 
 9. [Vue scindée](docs/etapes/03c3-web-vue-scindee.md)
 10. [Listes intelligentes : Aujourd'hui et Planifié](docs/etapes/03d-listes-intelligentes.md)
 11. [Compte administrateur, console admin, plus d'icônes](docs/etapes/03e-admin-et-icones.md)
+12. [Changer son mot de passe](docs/etapes/03f-mot-de-passe.md)

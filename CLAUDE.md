@@ -114,6 +114,11 @@ Observé dans ses autres projets (C++ embarqué, React/TypeScript). Écrire du c
   - **console admin** (`AdminDialog`, bouton au-dessus de « Paramètres », visible seulement pour l'admin) : lister, créer, supprimer un compte (`ON DELETE CASCADE`, pas sur soi-même) et **changer un mot de passe** (ferme les sessions du compte) ; routes `/admin/users` protégées par `AdminHandler.RequireAdmin` ;
   - collections Postman : lancées avec `--env-var adminEmail=… --env-var adminPassword=…`, elles créent puis suppriment leurs comptes de test via l'admin ;
   - icônes : liste fixe étendue à environ 140 icônes Lucide classées par thème (`listIcons.ts`), recherche en français. Ne jamais retirer une icône déjà proposée.
+- **2026-11-15 – Étape 3f : changer son mot de passe** (plan validé le 2026-11-15) :
+  - `users.must_change_password` (migration 006) : vrai quand l'admin crée un compte ou change le mot de passe de quelqu'un d'autre ; la page web affiche alors `ChangePasswordPage` (état `mustChangePassword` de `App`) avant les listes ;
+  - obligation **côté interface seulement** : l'API envoie le drapeau mais ne bloque pas les autres routes ;
+  - `POST /me/password` demande **toujours** l'ancien mot de passe (même sur l'écran obligatoire), et ferme les autres sessions du compte ;
+  - partie « Mot de passe » dans les Paramètres, erreurs affichées sous le formulaire.
 - **2026-11-13 – Maquette web validée** (Figma, page « Web – Maquette v2 »).
 
 ## Questions ouvertes
