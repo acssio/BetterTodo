@@ -193,6 +193,8 @@ Ces tests Go couvrent `Optional`, le nettoyage des tags, les dates, la construct
 /Users/acssiociardo/.local/bin/postman collection run api/tests/bettertodo-api-donnees.postman_collection.json
 ```
 
+Depuis l'étape 3e, ajouter `--env-var adminEmail=… --env-var adminPassword=…` : voir [03e-admin-et-icones.md](03e-admin-et-icones.md).
+
 La 2ᵉ collection (52 requêtes, 80 vérifications) crée deux comptes, A et B, et vérifie dans l'ordre :
 - la création des groupes de listes, listes, groupes et tâches, avec leurs erreurs (couleur, date, titre vide…) ;
 - le glisser-déposer : l'ordre des tâches après déplacement, et les positions renumérotées ;

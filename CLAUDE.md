@@ -108,6 +108,12 @@ Observé dans ses autres projets (C++ embarqué, React/TypeScript). Écrire du c
     - API : `GET /tasks/due?until=` et `GET /tasks/due/counts?today=` ; **la date du jour est envoyée par le client** (fuseau horaire local) ;
     - **pas** de réordonnancement, d'ajout de tâche ni de glisser vers une liste dans ces vues (peut-être plus tard).
   - **Traduction complète de l'interface** (fr / en) : étape à part, après la 3d. D'ici là, la langue ne sert qu'au nom du groupe par défaut.
+- **2026-11-15 – Étape 3e : compte admin et icônes** (plan validé le 2026-11-15) :
+  - **plus d'inscription libre** : `POST /auth/setup` crée le **premier** compte, qui est admin (`users.is_admin`, migration 005), puis répond 403. La page affiche « Créer le compte administrateur » tant que `GET /auth/setup` renvoie `needs_setup` ;
+  - installations existantes : le compte **le plus ancien** devient admin ;
+  - **console admin** (`AdminDialog`, bouton au-dessus de « Paramètres », visible seulement pour l'admin) : lister, créer, supprimer un compte (`ON DELETE CASCADE`, pas sur soi-même) et **changer un mot de passe** (ferme les sessions du compte) ; routes `/admin/users` protégées par `AdminHandler.RequireAdmin` ;
+  - collections Postman : lancées avec `--env-var adminEmail=… --env-var adminPassword=…`, elles créent puis suppriment leurs comptes de test via l'admin ;
+  - icônes : liste fixe étendue à environ 140 icônes Lucide classées par thème (`listIcons.ts`), recherche en français. Ne jamais retirer une icône déjà proposée.
 - **2026-11-13 – Maquette web validée** (Figma, page « Web – Maquette v2 »).
 
 ## Questions ouvertes

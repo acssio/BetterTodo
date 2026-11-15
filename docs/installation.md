@@ -117,15 +117,15 @@ docker compose ps
 
 Les trois lignes doivent afficher **healthy**.
 
-## 5. Créer son compte
+## 5. Créer le compte administrateur
 
 1. Ouvrir http://localhost:8000
-2. Cliquer sur **« Pas encore de compte ? En créer un »**.
+2. Au premier lancement, la page affiche **« Créer le compte administrateur »**.
 3. Nom, email, mot de passe (8 caractères minimum).
 
-Chaque personne crée son propre compte : les listes, tags et niveaux d'urgence ne sont pas partagés.
+Ce premier compte est l'**admin**. Il n'y a pas d'inscription libre : pour les autres personnes, l'admin ouvre **Console admin** (en bas de la barre latérale, au-dessus de « Paramètres »). Il y crée leur compte, puis leur donne l'email et le mot de passe. Chaque compte a ses propres listes, tags et niveaux d'urgence.
 
-> Pour essayer avec des données toutes prêtes, on peut charger le compte de démo de la maquette (identifiants en tête du fichier) :
+> Pour essayer avec des données toutes prêtes, on peut charger le compte de démo de la maquette (identifiants en tête du fichier). Chargé sur une installation vide, le compte de démo devient l'admin :
 > ```bash
 > docker compose exec -T db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"' < db/exemple/exemple.sql
 > ```

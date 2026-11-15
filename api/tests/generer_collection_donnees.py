@@ -1,5 +1,5 @@
 """
-Génère la collection Postman des données (étape 2b, complétée en 3c-2b).
+Génère la collection Postman des données (étape 2b, complétée en 3c-2b et 3e).
 
 Usage, depuis la racine du projet :
     python3 api/tests/generer_collection_donnees.py api/tests/bettertodo-api-donnees.postman_collection.json
@@ -31,12 +31,19 @@ def status(code, label=None):
 
 J = "const b = pm.response.json();"
 
-# --- Préparation : deux comptes ------------------------------------------------
+# --- Préparation : deux comptes, créés par l'admin (étape 3e) -------------------
+# L'admin est passé au lancement : --env-var adminEmail=… --env-var adminPassword=…
+req("Admin – connexion", "POST", "/auth/login", token=None,
+    body={"email": "{{adminEmail}}", "password": "{{adminPassword}}"},
+    tests=[status(200), J, "pm.collectionVariables.set('adminToken', b.token);"])
 for who, var in (("A", "token"), ("B", "tokenB")):
-    req(f"Compte {who} – inscription", "POST", "/auth/register", token=None,
+    req(f"Compte {who} – création par l'admin", "POST", "/admin/users", token="adminToken",
         body={"email": "{{email" + who + "}}", "password": "motdepasse-test-123", "display_name": f"Testeur {who}"},
         pre=[f"pm.collectionVariables.set('email{who}', 'donnees-{who.lower()}-' + Date.now() + '@example.test');"],
-        tests=[status(201), J, f"pm.collectionVariables.set('{var}', b.token);"])
+        tests=[status(201), J, f"pm.collectionVariables.set('{var}Id', b.id);"])
+    req(f"Compte {who} – connexion", "POST", "/auth/login", token=None,
+        body={"email": "{{email" + who + "}}", "password": "motdepasse-test-123"},
+        tests=[status(200), J, f"pm.collectionVariables.set('{var}', b.token);"])
 
 # --- Niveaux d'urgence ---------------------------------------------------------
 req("Niveaux d'urgence par défaut", "GET", "/urgency-levels", tests=[
@@ -253,11 +260,17 @@ req("Supprimer la liste", "DELETE", "/lists/{{listId}}", tests=[status(204)])
 req("La liste n'existe plus", "GET", "/lists/{{listId}}/board", tests=[status(404)])
 req("Lait (dans Administratif) est supprimé avec la liste", "GET", "/tasks/{{task2}}", tests=[status(404)])
 
+# --- Ménage : l'admin supprime les deux comptes de test (et toutes leurs données) ---
+req("Admin supprime le compte A", "DELETE", "/admin/users/{{tokenId}}", token="adminToken", tests=[status(204)])
+req("Admin supprime le compte B", "DELETE", "/admin/users/{{tokenBId}}", token="adminToken", tests=[status(204)])
+req("La session de B ne marche plus", "GET", "/lists", token="tokenB", tests=[status(401)])
+
 collection = {
     "info": {
-        "name": "BetterTodo API – données (étapes 2b et 3c-2b)",
+        "name": "BetterTodo API – données (étapes 2b, 3c-2b et 3e)",
         "description": "Listes, groupes, tâches, tags, niveaux d'urgence, ordre et isolation entre utilisateurs. "
-                       "À lancer dans l'ordre (voir docs/etapes/02b-api-donnees.md).",
+                       "À lancer dans l'ordre, avec --env-var adminEmail=… --env-var adminPassword=… "
+                       "(voir docs/etapes/02b-api-donnees.md et 03e-admin-et-icones.md).",
         "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
     },
     "variable": [{"key": "baseUrl", "value": "http://localhost:8080/api/v1"}],

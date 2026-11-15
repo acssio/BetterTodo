@@ -51,6 +51,9 @@ input.pop-input {
     display: grid;
     grid-template-columns: repeat(7, 1fr);
     gap: 6px;
+    max-height: 190px; /* 4 rangées et demie visibles : on voit que la grille défile */
+    overflow-y: auto;
+    padding-right: 2px;
 }
 
 .list-icon {

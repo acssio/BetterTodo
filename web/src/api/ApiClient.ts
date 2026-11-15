@@ -1,5 +1,5 @@
 import type {
-    Board, DueCounts, DueTask, Folder, Group, ListChanges, Session, Tag, Task, TaskChanges, TodoList,
+    Board, DueCounts, DueTask, Folder, Group, ListChanges, NewUser, Session, Tag, Task, TaskChanges, TodoList,
     UrgencyChanges, UrgencyLevel, User, UserChanges,
 } from './types'
 
@@ -36,8 +36,15 @@ export class ApiClient {
         return this.request('POST', '/auth/login', { email, password })
     }
 
-    register(email: string, password: string, displayName: string): Promise<Session> {
-        return this.request('POST', '/auth/register', { email, password, display_name: displayName })
+    /** true tant qu'aucun compte n'existe : il faut créer le compte administrateur. */
+    async needsSetup(): Promise<boolean> {
+        const status: { needs_setup: boolean } = await this.request('GET', '/auth/setup')
+        return status.needs_setup
+    }
+
+    /** Crée le premier compte (admin) et ouvre sa session. Refusé dès qu'un compte existe. */
+    setup(user: NewUser): Promise<Session> {
+        return this.request('POST', '/auth/setup', user)
     }
 
     logout(): Promise<void> {
@@ -46,6 +53,26 @@ export class ApiClient {
 
     updateMe(changes: UserChanges): Promise<User> {
         return this.request('PATCH', '/me', changes)
+    }
+
+    // --- Console admin (réservée à l'admin) ------------------------------------
+
+    getUsers(): Promise<User[]> {
+        return this.request('GET', '/admin/users')
+    }
+
+    createUser(user: NewUser): Promise<User> {
+        return this.request('POST', '/admin/users', user)
+    }
+
+    /** Nouveau mot de passe ; les sessions ouvertes du compte sont fermées. */
+    resetPassword(userId: string, password: string): Promise<void> {
+        return this.request('PATCH', `/admin/users/${userId}`, { password })
+    }
+
+    /** Supprime le compte et toutes ses données. */
+    deleteUser(userId: string): Promise<void> {
+        return this.request('DELETE', `/admin/users/${userId}`)
     }
 
     // --- Données -------------------------------------------------------------

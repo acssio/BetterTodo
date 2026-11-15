@@ -65,8 +65,10 @@ DECLARE
     today      DATE := current_date;
 BEGIN
     -- Utilisateur ---------------------------------------------------------------
-    INSERT INTO users (email, display_name, password_hash)
-    VALUES ('demo@bettertodo.local', 'Démo', crypt('demo', gen_salt('bf', 10)))
+    -- Admin seulement si c'est le premier compte (installation vide), comme POST /auth/setup
+    INSERT INTO users (email, display_name, password_hash, is_admin)
+    VALUES ('demo@bettertodo.local', 'Démo', crypt('demo', gen_salt('bf', 10)),
+            NOT EXISTS (SELECT 1 FROM users))
     RETURNING id INTO u;
 
     -- Niveaux d'urgence par défaut --------------------------------------------

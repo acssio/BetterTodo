@@ -5,14 +5,12 @@ import type { User } from '../api/types'
 import './LoginPage.css'
 
 interface LoginPageProps {
+    setup: boolean // true = premier lancement : on crée le compte administrateur
     onLoggedIn: (user: User) => void
     initialError: string
 }
 
-type LoginMode = 'login' | 'register'
-
 class LoginPageState {
-    mode: LoginMode = 'login'
     email: string = ''
     password: string = ''
     displayName: string = ''
@@ -20,7 +18,10 @@ class LoginPageState {
     submitting: boolean = false // Bouton désactivé pendant l'appel à l'API
 }
 
-/** Écran de connexion, qui bascule en inscription avec le lien du bas. */
+/**
+ * Écran de connexion. Au premier lancement (aucun compte), il sert à créer le compte
+ * administrateur, comme sur Portainer. Les comptes suivants sont créés dans la console admin.
+ */
 export class LoginPage extends React.Component<LoginPageProps, LoginPageState> {
     constructor(props: LoginPageProps) {
         super(props)
@@ -32,18 +33,15 @@ export class LoginPage extends React.Component<LoginPageProps, LoginPageState> {
 
         this.setState({ submitting: true, error: '' })
         try {
-            const session = this.state.mode === 'login'
-                ? await api.login(this.state.email, this.state.password)
-                : await api.register(this.state.email, this.state.password, this.state.displayName)
+            const { email, password, displayName } = this.state
+            const session = this.props.setup
+                ? await api.setup({ email, password, display_name: displayName })
+                : await api.login(email, password)
             this.props.onLoggedIn(session.user)
         } catch (error) {
             const message = error instanceof ApiError ? error.message : 'Impossible de joindre le serveur.'
             this.setState({ error: message, submitting: false })
         }
-    }
-
-    onToggleMode = (): void => {
-        this.setState({ mode: this.state.mode === 'login' ? 'register' : 'login', error: '' })
     }
 
     onEmailChanged = (event: React.ChangeEvent<HTMLInputElement>): void => {
@@ -59,7 +57,7 @@ export class LoginPage extends React.Component<LoginPageProps, LoginPageState> {
     }
 
     render(): React.ReactNode {
-        const isRegister = this.state.mode === 'register'
+        const isSetup = this.props.setup
 
         return (
             <div className="LoginPage">
@@ -69,9 +67,14 @@ export class LoginPage extends React.Component<LoginPageProps, LoginPageState> {
                         BetterTodo
                     </div>
 
-                    <h1 className="login-title">{isRegister ? 'Créer un compte' : 'Connexion'}</h1>
+                    <h1 className="login-title">{isSetup ? 'Créer le compte administrateur' : 'Connexion'}</h1>
+                    {isSetup && (
+                        <p className="login-hint">
+                            Premier lancement : ce compte pourra ensuite créer et supprimer les autres comptes.
+                        </p>
+                    )}
 
-                    {isRegister && (
+                    {isSetup && (
                         <label className="login-field">
                             <span>Nom affiché</span>
                             <input
@@ -102,8 +105,8 @@ export class LoginPage extends React.Component<LoginPageProps, LoginPageState> {
                             type="password"
                             value={this.state.password}
                             onChange={this.onPasswordChanged}
-                            autoComplete={isRegister ? 'new-password' : 'current-password'}
-                            minLength={isRegister ? 8 : undefined}
+                            autoComplete={isSetup ? 'new-password' : 'current-password'}
+                            minLength={isSetup ? 8 : undefined}
                             required
                         />
                     </label>
@@ -111,11 +114,7 @@ export class LoginPage extends React.Component<LoginPageProps, LoginPageState> {
                     {this.state.error && <div className="login-error">{this.state.error}</div>}
 
                     <button type="submit" className="btn-primary login-submit" disabled={this.state.submitting}>
-                        {isRegister ? 'Créer le compte' : 'Se connecter'}
-                    </button>
-
-                    <button type="button" className="login-switch" onClick={this.onToggleMode}>
-                        {isRegister ? "J'ai déjà un compte" : 'Pas encore de compte ? En créer un'}
+                        {isSetup ? 'Créer le compte' : 'Se connecter'}
                     </button>
                 </form>
             </div>

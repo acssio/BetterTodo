@@ -1,7 +1,7 @@
 {
   "info": {
-    "name": "BetterTodo API – données (étapes 2b et 3c-2b)",
-    "description": "Listes, groupes, tâches, tags, niveaux d'urgence, ordre et isolation entre utilisateurs. À lancer dans l'ordre (voir docs/etapes/02b-api-donnees.md).",
+    "name": "BetterTodo API – données (étapes 2b, 3c-2b et 3e)",
+    "description": "Listes, groupes, tâches, tags, niveaux d'urgence, ordre et isolation entre utilisateurs. À lancer dans l'ordre, avec --env-var adminEmail=… --env-var adminPassword=… (voir docs/etapes/02b-api-donnees.md et 03e-admin-et-icones.md).",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -12,11 +12,45 @@
   ],
   "item": [
     {
-      "name": "01 Compte A – inscription",
+      "name": "01 Admin – connexion",
       "request": {
         "method": "POST",
-        "url": "{{baseUrl}}/auth/register",
+        "url": "{{baseUrl}}/auth/login",
         "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{adminEmail}}\",\n  \"password\": \"{{adminPassword}}\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200', () => pm.response.to.have.status(200));",
+              "const b = pm.response.json();",
+              "pm.collectionVariables.set('adminToken', b.token);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 Compte A – création par l'admin",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/admin/users",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{adminToken}}"
+          },
           {
             "key": "Content-Type",
             "value": "application/json"
@@ -35,7 +69,7 @@
             "exec": [
               "pm.test('201', () => pm.response.to.have.status(201));",
               "const b = pm.response.json();",
-              "pm.collectionVariables.set('token', b.token);"
+              "pm.collectionVariables.set('tokenId', b.id);"
             ]
           }
         },
@@ -51,11 +85,45 @@
       ]
     },
     {
-      "name": "02 Compte B – inscription",
+      "name": "03 Compte A – connexion",
       "request": {
         "method": "POST",
-        "url": "{{baseUrl}}/auth/register",
+        "url": "{{baseUrl}}/auth/login",
         "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{emailA}}\",\n  \"password\": \"motdepasse-test-123\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200', () => pm.response.to.have.status(200));",
+              "const b = pm.response.json();",
+              "pm.collectionVariables.set('token', b.token);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "04 Compte B – création par l'admin",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/admin/users",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{adminToken}}"
+          },
           {
             "key": "Content-Type",
             "value": "application/json"
@@ -74,7 +142,7 @@
             "exec": [
               "pm.test('201', () => pm.response.to.have.status(201));",
               "const b = pm.response.json();",
-              "pm.collectionVariables.set('tokenB', b.token);"
+              "pm.collectionVariables.set('tokenBId', b.id);"
             ]
           }
         },
@@ -90,7 +158,37 @@
       ]
     },
     {
-      "name": "03 Niveaux d'urgence par défaut",
+      "name": "05 Compte B – connexion",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/auth/login",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{emailB}}\",\n  \"password\": \"motdepasse-test-123\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200', () => pm.response.to.have.status(200));",
+              "const b = pm.response.json();",
+              "pm.collectionVariables.set('tokenB', b.token);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "06 Niveaux d'urgence par défaut",
       "request": {
         "method": "GET",
         "url": "{{baseUrl}}/urgency-levels",
@@ -117,7 +215,7 @@
       ]
     },
     {
-      "name": "04 Groupe de listes Personnel",
+      "name": "07 Groupe de listes Personnel",
       "request": {
         "method": "POST",
         "url": "{{baseUrl}}/folders",
@@ -152,7 +250,7 @@
       ]
     },
     {
-      "name": "05 Groupe de listes Travail",
+      "name": "08 Groupe de listes Travail",
       "request": {
         "method": "POST",
         "url": "{{baseUrl}}/folders",
@@ -186,7 +284,7 @@
       ]
     },
     {
-      "name": "06 Groupe de listes Études, inséré en tête",
+      "name": "09 Groupe de listes Études, inséré en tête",
       "request": {
         "method": "POST",
         "url": "{{baseUrl}}/folders",
@@ -220,7 +318,7 @@
       ]
     },
     {
-      "name": "07 Ordre des groupes de listes",
+      "name": "10 Ordre des groupes de listes",
       "request": {
         "method": "GET",
         "url": "{{baseUrl}}/folders",
@@ -246,7 +344,7 @@
       ]
     },
     {
-      "name": "08 Liste Perso",
+      "name": "11 Liste Perso",
       "request": {
         "method": "POST",
         "url": "{{baseUrl}}/lists",
@@ -286,7 +384,7 @@
       ]
     },
     {
-      "name": "09 Nouvelle liste : un groupe « Tâches » par défaut",
+      "name": "12 Nouvelle liste : un groupe « Tâches » par défaut",
       "request": {
         "method": "GET",
         "url": "{{baseUrl}}/lists/{{listId}}/board",
@@ -314,7 +412,7 @@
       ]
     },
     {
-      "name": "10 Liste – couleur invalide",
+      "name": "13 Liste – couleur invalide",
       "request": {
         "method": "POST",
         "url": "{{baseUrl}}/lists",
@@ -346,7 +444,7 @@
       ]
     },
     {
-      "name": "11 Liste – groupe de listes inconnu",
+      "name": "14 Liste – groupe de listes inconnu",
       "request": {
         "method": "POST",
         "url": "{{baseUrl}}/lists",
@@ -378,7 +476,7 @@
       ]
     },
     {
-      "name": "12 Renommer le groupe par défaut en Courses",
+      "name": "15 Renommer le groupe par défaut en Courses",
       "request": {
         "method": "PATCH",
         "url": "{{baseUrl}}/groups/{{groupA}}",
@@ -412,7 +510,7 @@
       ]
     },
     {
-      "name": "13 Groupe Administratif",
+      "name": "16 Groupe Administratif",
       "request": {
         "method": "POST",
         "url": "{{baseUrl}}/lists/{{listId}}/groups",
@@ -447,7 +545,7 @@
       ]
     },
     {
-      "name": "14 Tâche Pain (complète)",
+      "name": "17 Tâche Pain (complète)",
       "request": {
         "method": "POST",
         "url": "{{baseUrl}}/groups/{{groupA}}/tasks",
@@ -488,7 +586,7 @@
       ]
     },
     {
-      "name": "15 Tâche Lait",
+      "name": "18 Tâche Lait",
       "request": {
         "method": "POST",
         "url": "{{baseUrl}}/groups/{{groupA}}/tasks",
@@ -523,7 +621,7 @@
       ]
     },
     {
-      "name": "16 Tâche Œufs",
+      "name": "19 Tâche Œufs",
       "request": {
         "method": "POST",
         "url": "{{baseUrl}}/groups/{{groupA}}/tasks",
@@ -557,7 +655,7 @@
       ]
     },
     {
-      "name": "17 Tâche – date invalide",
+      "name": "20 Tâche – date invalide",
       "request": {
         "method": "POST",
         "url": "{{baseUrl}}/groups/{{groupA}}/tasks",
@@ -589,7 +687,7 @@
       ]
     },
     {
-      "name": "18 Tâche – titre vide",
+      "name": "21 Tâche – titre vide",
       "request": {
         "method": "POST",
         "url": "{{baseUrl}}/groups/{{groupA}}/tasks",
@@ -621,7 +719,7 @@
       ]
     },
     {
-      "name": "19 Glisser Œufs en tête",
+      "name": "22 Glisser Œufs en tête",
       "request": {
         "method": "PATCH",
         "url": "{{baseUrl}}/tasks/{{task3}}",
@@ -655,7 +753,7 @@
       ]
     },
     {
-      "name": "20 Ordre après le glisser-déposer",
+      "name": "23 Ordre après le glisser-déposer",
       "request": {
         "method": "GET",
         "url": "{{baseUrl}}/lists/{{listId}}/board",
@@ -682,7 +780,7 @@
       ]
     },
     {
-      "name": "21 Cocher Pain",
+      "name": "24 Cocher Pain",
       "request": {
         "method": "PATCH",
         "url": "{{baseUrl}}/tasks/{{task1}}",
@@ -716,7 +814,7 @@
       ]
     },
     {
-      "name": "22 Décocher Pain",
+      "name": "25 Décocher Pain",
       "request": {
         "method": "PATCH",
         "url": "{{baseUrl}}/tasks/{{task1}}",
@@ -750,7 +848,7 @@
       ]
     },
     {
-      "name": "23 Effacer échéance et urgence, remplacer les tags",
+      "name": "26 Effacer échéance et urgence, remplacer les tags",
       "request": {
         "method": "PATCH",
         "url": "{{baseUrl}}/tasks/{{task1}}",
@@ -789,7 +887,7 @@
       ]
     },
     {
-      "name": "24 Déplacer Lait dans Administratif",
+      "name": "27 Déplacer Lait dans Administratif",
       "request": {
         "method": "PATCH",
         "url": "{{baseUrl}}/tasks/{{task2}}",
@@ -823,7 +921,7 @@
       ]
     },
     {
-      "name": "25 Board complet",
+      "name": "28 Board complet",
       "request": {
         "method": "GET",
         "url": "{{baseUrl}}/lists/{{listId}}/board",
@@ -854,7 +952,7 @@
       ]
     },
     {
-      "name": "26 Champ inconnu refusé",
+      "name": "29 Champ inconnu refusé",
       "request": {
         "method": "PATCH",
         "url": "{{baseUrl}}/tasks/{{task1}}",
@@ -886,7 +984,7 @@
       ]
     },
     {
-      "name": "27 Identifiant invalide dans l'URL",
+      "name": "30 Identifiant invalide dans l'URL",
       "request": {
         "method": "GET",
         "url": "{{baseUrl}}/lists/pas-un-uuid/board",
@@ -910,7 +1008,7 @@
       ]
     },
     {
-      "name": "28 Liste des tags",
+      "name": "31 Liste des tags",
       "request": {
         "method": "GET",
         "url": "{{baseUrl}}/tags",
@@ -940,7 +1038,7 @@
       ]
     },
     {
-      "name": "29 Tag en double",
+      "name": "32 Tag en double",
       "request": {
         "method": "POST",
         "url": "{{baseUrl}}/tags",
@@ -972,7 +1070,7 @@
       ]
     },
     {
-      "name": "30 Renommer un tag",
+      "name": "33 Renommer un tag",
       "request": {
         "method": "PATCH",
         "url": "{{baseUrl}}/tags/{{tagUrgent}}",
@@ -1006,7 +1104,7 @@
       ]
     },
     {
-      "name": "31 Le tag renommé apparaît sur la tâche",
+      "name": "34 Le tag renommé apparaît sur la tâche",
       "request": {
         "method": "GET",
         "url": "{{baseUrl}}/tasks/{{task1}}",
@@ -1032,7 +1130,7 @@
       ]
     },
     {
-      "name": "32 Nouveau niveau Critique",
+      "name": "35 Nouveau niveau Critique",
       "request": {
         "method": "POST",
         "url": "{{baseUrl}}/urgency-levels",
@@ -1067,7 +1165,7 @@
       ]
     },
     {
-      "name": "33 Critique remonté en rank 0",
+      "name": "36 Critique remonté en rank 0",
       "request": {
         "method": "PATCH",
         "url": "{{baseUrl}}/urgency-levels/{{urgCritique}}",
@@ -1099,7 +1197,7 @@
       ]
     },
     {
-      "name": "34 Ordre des niveaux",
+      "name": "37 Ordre des niveaux",
       "request": {
         "method": "GET",
         "url": "{{baseUrl}}/urgency-levels",
@@ -1126,7 +1224,7 @@
       ]
     },
     {
-      "name": "35 B ne voit aucune liste",
+      "name": "38 B ne voit aucune liste",
       "request": {
         "method": "GET",
         "url": "{{baseUrl}}/lists",
@@ -1151,7 +1249,7 @@
       ]
     },
     {
-      "name": "36 B ne peut pas lire le board de A",
+      "name": "39 B ne peut pas lire le board de A",
       "request": {
         "method": "GET",
         "url": "{{baseUrl}}/lists/{{listId}}/board",
@@ -1175,7 +1273,7 @@
       ]
     },
     {
-      "name": "37 B ne peut pas modifier une tâche de A",
+      "name": "40 B ne peut pas modifier une tâche de A",
       "request": {
         "method": "PATCH",
         "url": "{{baseUrl}}/tasks/{{task1}}",
@@ -1207,7 +1305,7 @@
       ]
     },
     {
-      "name": "38 B ne peut pas ajouter une tâche chez A",
+      "name": "41 B ne peut pas ajouter une tâche chez A",
       "request": {
         "method": "POST",
         "url": "{{baseUrl}}/groups/{{groupA}}/tasks",
@@ -1239,7 +1337,7 @@
       ]
     },
     {
-      "name": "39 B ne peut pas utiliser le groupe de listes de A",
+      "name": "42 B ne peut pas utiliser le groupe de listes de A",
       "request": {
         "method": "POST",
         "url": "{{baseUrl}}/lists",
@@ -1271,7 +1369,7 @@
       ]
     },
     {
-      "name": "40 B crée sa propre liste",
+      "name": "43 B crée sa propre liste",
       "request": {
         "method": "POST",
         "url": "{{baseUrl}}/lists",
@@ -1305,7 +1403,7 @@
       ]
     },
     {
-      "name": "41 B crée un groupe dans sa liste",
+      "name": "44 B crée un groupe dans sa liste",
       "request": {
         "method": "POST",
         "url": "{{baseUrl}}/lists/{{listOfB}}/groups",
@@ -1339,7 +1437,7 @@
       ]
     },
     {
-      "name": "42 B ne peut pas utiliser un niveau d'urgence de A",
+      "name": "45 B ne peut pas utiliser un niveau d'urgence de A",
       "request": {
         "method": "POST",
         "url": "{{baseUrl}}/groups/{{groupOfB}}/tasks",
@@ -1372,7 +1470,7 @@
       ]
     },
     {
-      "name": "43 B ne peut pas déplacer sa tâche dans un groupe de A",
+      "name": "46 B ne peut pas déplacer sa tâche dans un groupe de A",
       "request": {
         "method": "POST",
         "url": "{{baseUrl}}/groups/{{groupOfB}}/tasks",
@@ -1406,7 +1504,7 @@
       ]
     },
     {
-      "name": "44 … le déplacement est refusé",
+      "name": "47 … le déplacement est refusé",
       "request": {
         "method": "PATCH",
         "url": "{{baseUrl}}/tasks/{{taskOfB}}",
@@ -1438,7 +1536,7 @@
       ]
     },
     {
-      "name": "45 B ne peut pas supprimer la liste de A",
+      "name": "48 B ne peut pas supprimer la liste de A",
       "request": {
         "method": "DELETE",
         "url": "{{baseUrl}}/lists/{{listId}}",
@@ -1462,7 +1560,7 @@
       ]
     },
     {
-      "name": "46 La tâche de A est intacte",
+      "name": "49 La tâche de A est intacte",
       "request": {
         "method": "GET",
         "url": "{{baseUrl}}/tasks/{{task1}}",
@@ -1487,7 +1585,7 @@
       ]
     },
     {
-      "name": "47 Masquer les tâches faites de la liste",
+      "name": "50 Masquer les tâches faites de la liste",
       "request": {
         "method": "PATCH",
         "url": "{{baseUrl}}/lists/{{listId}}",
@@ -1521,7 +1619,7 @@
       ]
     },
     {
-      "name": "48 Cocher Pain (pour le vider ensuite)",
+      "name": "51 Cocher Pain (pour le vider ensuite)",
       "request": {
         "method": "PATCH",
         "url": "{{baseUrl}}/tasks/{{task1}}",
@@ -1553,7 +1651,7 @@
       ]
     },
     {
-      "name": "49 Cocher Œufs",
+      "name": "52 Cocher Œufs",
       "request": {
         "method": "PATCH",
         "url": "{{baseUrl}}/tasks/{{task3}}",
@@ -1585,7 +1683,7 @@
       ]
     },
     {
-      "name": "50 B ne peut pas vider les tâches faites de A",
+      "name": "53 B ne peut pas vider les tâches faites de A",
       "request": {
         "method": "DELETE",
         "url": "{{baseUrl}}/lists/{{listId}}/done-tasks",
@@ -1609,7 +1707,7 @@
       ]
     },
     {
-      "name": "51 Vider les tâches faites",
+      "name": "54 Vider les tâches faites",
       "request": {
         "method": "DELETE",
         "url": "{{baseUrl}}/lists/{{listId}}/done-tasks",
@@ -1635,7 +1733,7 @@
       ]
     },
     {
-      "name": "52 Il ne reste que les tâches pas faites",
+      "name": "55 Il ne reste que les tâches pas faites",
       "request": {
         "method": "GET",
         "url": "{{baseUrl}}/lists/{{listId}}/board",
@@ -1665,7 +1763,7 @@
       ]
     },
     {
-      "name": "53 Liste pour les échéances",
+      "name": "56 Liste pour les échéances",
       "request": {
         "method": "POST",
         "url": "{{baseUrl}}/lists",
@@ -1699,7 +1797,7 @@
       ]
     },
     {
-      "name": "54 Son groupe par défaut",
+      "name": "57 Son groupe par défaut",
       "request": {
         "method": "GET",
         "url": "{{baseUrl}}/lists/{{listDue}}/board",
@@ -1725,7 +1823,7 @@
       ]
     },
     {
-      "name": "55 Tâche « En retard »",
+      "name": "58 Tâche « En retard »",
       "request": {
         "method": "POST",
         "url": "{{baseUrl}}/groups/{{groupDue}}/tasks",
@@ -1759,7 +1857,7 @@
       ]
     },
     {
-      "name": "56 Tâche « Du jour »",
+      "name": "59 Tâche « Du jour »",
       "request": {
         "method": "POST",
         "url": "{{baseUrl}}/groups/{{groupDue}}/tasks",
@@ -1793,7 +1891,7 @@
       ]
     },
     {
-      "name": "57 Tâche « Plus tard »",
+      "name": "60 Tâche « Plus tard »",
       "request": {
         "method": "POST",
         "url": "{{baseUrl}}/groups/{{groupDue}}/tasks",
@@ -1827,7 +1925,7 @@
       ]
     },
     {
-      "name": "58 Tâche « Sans date »",
+      "name": "61 Tâche « Sans date »",
       "request": {
         "method": "POST",
         "url": "{{baseUrl}}/groups/{{groupDue}}/tasks",
@@ -1861,7 +1959,7 @@
       ]
     },
     {
-      "name": "59 Tâche faite avec échéance (doit être ignorée)",
+      "name": "62 Tâche faite avec échéance (doit être ignorée)",
       "request": {
         "method": "POST",
         "url": "{{baseUrl}}/groups/{{groupDue}}/tasks",
@@ -1895,7 +1993,7 @@
       ]
     },
     {
-      "name": "60 … cochée",
+      "name": "63 … cochée",
       "request": {
         "method": "PATCH",
         "url": "{{baseUrl}}/tasks/{{dueDone}}",
@@ -1927,7 +2025,7 @@
       ]
     },
     {
-      "name": "61 Compteurs au 2026-06-15",
+      "name": "64 Compteurs au 2026-06-15",
       "request": {
         "method": "GET",
         "url": "{{baseUrl}}/tasks/due/counts?today=2026-06-15",
@@ -1953,7 +2051,7 @@
       ]
     },
     {
-      "name": "62 Aujourd'hui = jusqu'au 2026-06-15",
+      "name": "65 Aujourd'hui = jusqu'au 2026-06-15",
       "request": {
         "method": "GET",
         "url": "{{baseUrl}}/tasks/due?until=2026-06-15",
@@ -1984,7 +2082,7 @@
       ]
     },
     {
-      "name": "63 Planifié = toutes les échéances",
+      "name": "66 Planifié = toutes les échéances",
       "request": {
         "method": "GET",
         "url": "{{baseUrl}}/tasks/due",
@@ -2010,7 +2108,7 @@
       ]
     },
     {
-      "name": "64 Date invalide",
+      "name": "67 Date invalide",
       "request": {
         "method": "GET",
         "url": "{{baseUrl}}/tasks/due?until=15.06.2026",
@@ -2034,7 +2132,7 @@
       ]
     },
     {
-      "name": "65 Compteurs sans date du jour",
+      "name": "68 Compteurs sans date du jour",
       "request": {
         "method": "GET",
         "url": "{{baseUrl}}/tasks/due/counts",
@@ -2058,7 +2156,7 @@
       ]
     },
     {
-      "name": "66 B ne voit pas les échéances de A",
+      "name": "69 B ne voit pas les échéances de A",
       "request": {
         "method": "GET",
         "url": "{{baseUrl}}/tasks/due",
@@ -2083,7 +2181,7 @@
       ]
     },
     {
-      "name": "67 Supprimer la liste des échéances",
+      "name": "70 Supprimer la liste des échéances",
       "request": {
         "method": "DELETE",
         "url": "{{baseUrl}}/lists/{{listDue}}",
@@ -2107,7 +2205,7 @@
       ]
     },
     {
-      "name": "68 Supprimer le groupe de listes Personnel",
+      "name": "71 Supprimer le groupe de listes Personnel",
       "request": {
         "method": "DELETE",
         "url": "{{baseUrl}}/folders/{{folderPerso}}",
@@ -2131,7 +2229,7 @@
       ]
     },
     {
-      "name": "69 La liste Perso est passée hors groupe",
+      "name": "72 La liste Perso est passée hors groupe",
       "request": {
         "method": "GET",
         "url": "{{baseUrl}}/lists",
@@ -2157,7 +2255,7 @@
       ]
     },
     {
-      "name": "70 Supprimer le groupe Courses",
+      "name": "73 Supprimer le groupe Courses",
       "request": {
         "method": "DELETE",
         "url": "{{baseUrl}}/groups/{{groupA}}",
@@ -2181,7 +2279,7 @@
       ]
     },
     {
-      "name": "71 Ses tâches sont supprimées (ou déjà vidées)",
+      "name": "74 Ses tâches sont supprimées (ou déjà vidées)",
       "request": {
         "method": "GET",
         "url": "{{baseUrl}}/tasks/{{task1}}",
@@ -2205,7 +2303,7 @@
       ]
     },
     {
-      "name": "72 Supprimer la liste",
+      "name": "75 Supprimer la liste",
       "request": {
         "method": "DELETE",
         "url": "{{baseUrl}}/lists/{{listId}}",
@@ -2229,7 +2327,7 @@
       ]
     },
     {
-      "name": "73 La liste n'existe plus",
+      "name": "76 La liste n'existe plus",
       "request": {
         "method": "GET",
         "url": "{{baseUrl}}/lists/{{listId}}/board",
@@ -2253,7 +2351,7 @@
       ]
     },
     {
-      "name": "74 Lait (dans Administratif) est supprimé avec la liste",
+      "name": "77 Lait (dans Administratif) est supprimé avec la liste",
       "request": {
         "method": "GET",
         "url": "{{baseUrl}}/tasks/{{task2}}",
@@ -2271,6 +2369,78 @@
             "type": "text/javascript",
             "exec": [
               "pm.test('404', () => pm.response.to.have.status(404));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "78 Admin supprime le compte A",
+      "request": {
+        "method": "DELETE",
+        "url": "{{baseUrl}}/admin/users/{{tokenId}}",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{adminToken}}"
+          }
+        ]
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('204', () => pm.response.to.have.status(204));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "79 Admin supprime le compte B",
+      "request": {
+        "method": "DELETE",
+        "url": "{{baseUrl}}/admin/users/{{tokenBId}}",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{adminToken}}"
+          }
+        ]
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('204', () => pm.response.to.have.status(204));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "80 La session de B ne marche plus",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/lists",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{tokenB}}"
+          }
+        ]
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('401', () => pm.response.to.have.status(401));"
             ]
           }
         }
