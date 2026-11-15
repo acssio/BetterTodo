@@ -3,16 +3,19 @@ import {
     Check, ChevronDown, ChevronRight, Ellipsis, FolderPlus, LogOut, PanelLeftClose, PanelLeftOpen,
     Pencil, Plus, Settings, Trash2,
 } from 'lucide-react'
-import type { Folder, TodoList, User } from '../api/types'
+import type { DueCounts, Folder, TodoList, User } from '../api/types'
+import { SMART_SCHEDULED, SMART_TODAY, type SmartKind } from '../utils/smartLists'
 import { InlineInput } from './InlineInput'
 import { ListIcon } from './ListIcon'
 import { Menu } from './Menu'
+import { SMART_INFO } from './smartInfo'
 import './Sidebar.css'
 
 interface SidebarProps {
     user: User
     folders: Folder[]
     lists: TodoList[]
+    dueCounts: DueCounts | null // Compteurs « Aujourd'hui » / « Planifié »
     selectedListId: string | null  // Liste de la moitié active
     secondaryListId: string | null // Liste de l'autre moitié (vue scindée), ou null
     width: number     // Largeur en pixels
@@ -89,6 +92,11 @@ export class Sidebar extends React.Component<SidebarProps, SidebarState> {
                     )}
                 </div>
 
+                <nav className="sidebar-smart">
+                    {this.renderSmart(SMART_TODAY)}
+                    {this.renderSmart(SMART_SCHEDULED)}
+                </nav>
+
                 {compact ? (
                     <div className="sidebar-label">
                         <button className="icon-btn" title="Agrandir la barre" onClick={this.props.onExpand}>
@@ -155,6 +163,35 @@ export class Sidebar extends React.Component<SidebarProps, SidebarState> {
                     </div>
                 </div>
             </aside>
+        )
+    }
+
+    /** « Aujourd'hui » ou « Planifié » : s'ouvre comme une liste (clic, Cmd+clic, glisser). */
+    private renderSmart(kind: SmartKind): React.ReactNode {
+        const info = SMART_INFO[kind]
+        const count = kind === SMART_TODAY ? this.props.dueCounts?.today : this.props.dueCounts?.scheduled
+
+        const classes = ['sidebar-item']
+        if (kind === this.props.selectedListId) classes.push('active')
+        if (kind === this.props.secondaryListId) classes.push('open-side')
+
+        return (
+            <button
+                className={classes.join(' ')}
+                title={this.props.compact ? info.title : 'Cmd+clic ou glisser à droite : ouvrir à côté'}
+                draggable
+                onClick={event => this.props.onSelectList(kind, event.metaKey || event.ctrlKey)}
+                onDragStart={event => {
+                    event.dataTransfer.setData('text/plain', info.title)
+                    event.dataTransfer.effectAllowed = 'copy'
+                    this.props.onListDragStart(kind)
+                }}
+                onDragEnd={this.props.onListDragEnd}
+            >
+                <info.icon size={16} color={info.color} />
+                <span className="sidebar-item-name">{info.title}</span>
+                {count !== undefined && count > 0 && <span className="sidebar-count">{count}</span>}
+            </button>
         )
     }
 

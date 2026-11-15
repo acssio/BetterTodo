@@ -205,6 +205,43 @@ req("Il ne reste que les tâches pas faites", "GET", "/lists/{{listId}}/board", 
     "    pm.expect(tasks.map(t => t.title)).to.include('Lait');",
     "});"])
 
+# --- Échéances : listes intelligentes « Aujourd'hui » et « Planifié » (étape 3d) ---
+# On fixe la date du jour à 2026-06-15 (c'est le client qui l'envoie).
+req("Liste pour les échéances", "POST", "/lists", body={"name": "Échéances"}, tests=[
+    status(201), J, "pm.collectionVariables.set('listDue', b.id);"])
+req("Son groupe par défaut", "GET", "/lists/{{listDue}}/board", tests=[
+    status(200), J, "pm.collectionVariables.set('groupDue', b.groups[0].id);"])
+for title, due in [("En retard", "2026-01-01"), ("Du jour", "2026-06-15"), ("Plus tard", "2027-01-01"), ("Sans date", None)]:
+    body = {"title": title}
+    if due:
+        body["due_date"] = due
+    req(f"Tâche « {title} »", "POST", "/groups/{{groupDue}}/tasks", body=body, tests=[
+        status(201), J, f"pm.collectionVariables.set('due_{title.replace(' ', '_')}', b.id);"])
+req("Tâche faite avec échéance (doit être ignorée)", "POST", "/groups/{{groupDue}}/tasks",
+    body={"title": "Déjà faite", "due_date": "2026-06-15"}, tests=[
+        status(201), J, "pm.collectionVariables.set('dueDone', b.id);"])
+req("… cochée", "PATCH", "/tasks/{{dueDone}}", body={"done": True}, tests=[status(200)])
+
+req("Compteurs au 2026-06-15", "GET", "/tasks/due/counts?today=2026-06-15", tests=[
+    status(200), J,
+    "pm.test('today = 2 (retard + jour), scheduled = 3', () => pm.expect(b).to.eql({ today: 2, scheduled: 3 }));"])
+req("Aujourd'hui = jusqu'au 2026-06-15", "GET", "/tasks/due?until=2026-06-15", tests=[
+    status(200), J,
+    "pm.test('retard puis jour, ni futur, ni sans date, ni faite', () => pm.expect(b.map(t => t.title)).to.eql(['En retard', 'Du jour']));",
+    'pm.test("avec la liste et le groupe d\'origine", () => {',
+    "    pm.expect(b[0].list.name).to.eql('Échéances');",
+    "    pm.expect(b[0].group_name).to.eql('Tâches');",
+    "    pm.expect(b[0]).to.have.property('tags');",
+    "});"])
+req("Planifié = toutes les échéances", "GET", "/tasks/due", tests=[
+    status(200), J,
+    "pm.test('triées par date', () => pm.expect(b.map(t => t.title)).to.eql(['En retard', 'Du jour', 'Plus tard']));"])
+req("Date invalide", "GET", "/tasks/due?until=15.06.2026", tests=[status(400)])
+req("Compteurs sans date du jour", "GET", "/tasks/due/counts", tests=[status(400)])
+req("B ne voit pas les échéances de A", "GET", "/tasks/due", token="tokenB", tests=[
+    status(200), "pm.test('aucune tâche de A', () => pm.expect(pm.response.json().map(t => t.title)).to.not.include('Du jour'));"])
+req("Supprimer la liste des échéances", "DELETE", "/lists/{{listDue}}", tests=[status(204)])
+
 # --- Suppressions ----------------------------------------------------------------
 req("Supprimer le groupe de listes Personnel", "DELETE", "/folders/{{folderPerso}}", tests=[status(204)])
 req("La liste Perso est passée hors groupe", "GET", "/lists", tests=[

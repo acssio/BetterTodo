@@ -5,6 +5,13 @@
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000
 
+/** Date du jour au format de l'API ("2026-11-15"), dans le fuseau horaire LOCAL. */
+export function todayIso(today: Date = new Date()): string {
+    const month = String(today.getMonth() + 1).padStart(2, '0')
+    const day = String(today.getDate()).padStart(2, '0')
+    return `${today.getFullYear()}-${month}-${day}`
+}
+
 /** "2026-11-18" → Date au 18 novembre 2026, 00:00 heure locale. */
 export function parseDate(iso: string): Date {
     const [year, month, day] = iso.split('-').map(Number)

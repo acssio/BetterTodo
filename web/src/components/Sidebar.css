@@ -51,6 +51,14 @@
     flex: 1;
 }
 
+/* « Aujourd'hui » et « Planifié », au-dessus des listes */
+.sidebar-smart {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding-bottom: 14px;
+}
+
 .sidebar-lists {
     display: flex;
     flex-direction: column;

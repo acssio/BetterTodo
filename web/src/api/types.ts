@@ -131,3 +131,15 @@ export interface Tag {
     name: string
     task_count: number
 }
+
+/** Tâche d'une liste intelligente (Aujourd'hui, Planifié) : avec sa liste et son groupe d'origine. */
+export interface DueTask extends Task {
+    list: { id: string, name: string, color: string, icon: string }
+    group_name: string
+}
+
+/** Compteurs des listes intelligentes (GET /tasks/due/counts). */
+export interface DueCounts {
+    today: number     // Échéance aujourd'hui ou en retard
+    scheduled: number // Toutes les tâches avec une échéance
+}

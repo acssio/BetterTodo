@@ -97,7 +97,13 @@ Observé dans ses autres projets (C++ embarqué, React/TypeScript). Écrire du c
     - **afficher / masquer les tâches faites**, par liste, retenu sur le serveur (`lists.show_done`) ;
     - **vider les tâches faites** d'une liste (route dédiée, une seule transaction) ;
     - **langue du compte** (`users.language`, 'fr' ou 'en', migration 004), choisie dans les Paramètres.
-  - **3d** : listes intelligentes « **Aujourd'hui** » (échéance aujourd'hui **ou en retard**, pas faites) et « **Planifié** » (toutes les tâches avec une échéance), en haut de la barre latérale.
+  - **3d** : listes intelligentes « **Aujourd'hui** » (échéance aujourd'hui **ou en retard**, pas faites) et « **Planifié** » (toutes les tâches avec une échéance), en haut de la barre latérale. Plan validé le 2026-11-15 :
+    - **Aujourd'hui** : deux sections, « En retard » puis « Aujourd'hui » ;
+    - **Planifié** : toutes les échéances, une section par date (En retard, Aujourd'hui, Demain, puis chaque date) ;
+    - **seulement les tâches à faire** : une tâche cochée disparaît après une courte animation ;
+    - chaque tâche affiche sa liste d'origine ; on peut cocher et ouvrir l'overlay ; ces vues s'ouvrent aussi en vue scindée ;
+    - API : `GET /tasks/due?until=` et `GET /tasks/due/counts?today=` ; **la date du jour est envoyée par le client** (fuseau horaire local) ;
+    - **pas** de réordonnancement, d'ajout de tâche ni de glisser vers une liste dans ces vues (peut-être plus tard).
   - **Traduction complète de l'interface** (fr / en) : étape à part, après la 3d. D'ici là, la langue ne sert qu'au nom du groupe par défaut.
 - **2026-11-13 – Maquette web validée** (Figma, page « Web – Maquette v2 »).
 

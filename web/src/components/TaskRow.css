@@ -47,6 +47,30 @@
     color: var(--done);
 }
 
+/* Liste d'origine (listes intelligentes) */
+.row-list {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+    max-width: 160px;
+    padding: 2px 7px;
+    border-radius: 6px;
+    background: #F0F0EE;
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Tâche cochée dans une liste intelligente : elle s'efface avant de disparaître */
+.TaskRow.leaving {
+    opacity: 0;
+    transition: opacity 0.5s ease 0.15s;
+}
+
 /* Pousse les colonnes tags / échéance / urgence à droite */
 .row-spacer {
     flex: 1;

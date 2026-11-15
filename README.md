@@ -14,6 +14,7 @@ Voir [docs/etapes](docs/etapes) : un document par étape du développement, qui 
 7. [Page web : paramètres](docs/etapes/03c2-web-parametres.md)
 8. [Tâches faites, groupe par défaut, langue](docs/etapes/03c2b-web-taches-faites-langue.md)
 9. [Vue scindée](docs/etapes/03c3-web-vue-scindee.md)
+10. [Listes intelligentes : Aujourd'hui et Planifié](docs/etapes/03d-listes-intelligentes.md)
 
 En bref :
 

@@ -65,6 +65,7 @@ func main() {
 	taskHandler := handlers.NewTaskHandler(pool)
 	urgencyHandler := handlers.NewUrgencyHandler(pool)
 	tagHandler := handlers.NewTagHandler(pool)
+	dueHandler := handlers.NewDueHandler(pool)
 
 	// Routes -------------------------------------------------------------------
 	mux := http.NewServeMux()
@@ -100,6 +101,9 @@ func main() {
 	private("DELETE /api/v1/groups/{id}", groupHandler.Delete)
 
 	private("POST /api/v1/groups/{id}/tasks", taskHandler.Create)
+	// Listes intelligentes (plus précises que /tasks/{id} : le routeur les choisit en priorité)
+	private("GET /api/v1/tasks/due", dueHandler.List)
+	private("GET /api/v1/tasks/due/counts", dueHandler.Counts)
 	private("GET /api/v1/tasks/{id}", taskHandler.Get)
 	private("PATCH /api/v1/tasks/{id}", taskHandler.Update)
 	private("DELETE /api/v1/tasks/{id}", taskHandler.Delete)

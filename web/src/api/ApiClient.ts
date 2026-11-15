@@ -1,5 +1,5 @@
 import type {
-    Board, Folder, Group, ListChanges, Session, Tag, Task, TaskChanges, TodoList,
+    Board, DueCounts, DueTask, Folder, Group, ListChanges, Session, Tag, Task, TaskChanges, TodoList,
     UrgencyChanges, UrgencyLevel, User, UserChanges,
 } from './types'
 
@@ -113,6 +113,16 @@ export class ApiClient {
 
     deleteTask(taskId: string): Promise<void> {
         return this.request('DELETE', `/tasks/${taskId}`)
+    }
+
+    /** Tâches à faire avec une échéance, toutes listes confondues (jusqu'à until si donné). */
+    getDueTasks(until?: string): Promise<DueTask[]> {
+        return this.request('GET', until ? `/tasks/due?until=${until}` : '/tasks/due')
+    }
+
+    /** Compteurs « Aujourd'hui » / « Planifié ». today = date locale du jour. */
+    getDueCounts(today: string): Promise<DueCounts> {
+        return this.request('GET', `/tasks/due/counts?today=${today}`)
     }
 
     getUrgencyLevels(): Promise<UrgencyLevel[]> {

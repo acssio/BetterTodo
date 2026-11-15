@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { Check, StickyNote } from 'lucide-react'
 import type { Task, UrgencyLevel } from '../api/types'
+import { ListIcon } from './ListIcon'
 import { DueDate, UrgencyPill } from './TaskCard'
 import './TaskRow.css'
 
@@ -13,6 +14,9 @@ interface TaskRowProps {
     onOpen: (task: Task, anchor: DOMRect) => void
     onDragStart: (task: Task) => void
     onDragEnd: () => void
+    listBadge?: { name: string, color: string, icon: string } // Listes intelligentes : liste d'origine
+    canDrag?: boolean  // false dans les listes intelligentes (l'ordre vient des dates)
+    leaving?: boolean  // Tâche cochée qui va disparaître (courte animation)
 }
 
 /**
@@ -49,6 +53,7 @@ export class TaskRow extends React.Component<TaskRowProps> {
         if (task.done) classes.push('done')
         if (selected) classes.push('selected')
         if (dragging) classes.push('dragging')
+        if (this.props.leaving) classes.push('leaving')
 
         return (
             <div
@@ -56,7 +61,7 @@ export class TaskRow extends React.Component<TaskRowProps> {
                 data-task-id={task.id}
                 role="button"
                 tabIndex={0}
-                draggable
+                draggable={this.props.canDrag ?? true}
                 onClick={this.onClick}
                 onKeyDown={this.onKeyDown}
                 onDragStart={this.onDragStart}
@@ -71,6 +76,12 @@ export class TaskRow extends React.Component<TaskRowProps> {
                 </button>
                 <span className="row-title">{task.title}</span>
                 {task.notes !== '' && <span className="card-note" title={task.notes}><StickyNote size={12} /></span>}
+                {this.props.listBadge && (
+                    <span className="row-list" title={`Liste « ${this.props.listBadge.name} »`}>
+                        <ListIcon icon={this.props.listBadge.icon} color={this.props.listBadge.color} size={12} />
+                        {this.props.listBadge.name}
+                    </span>
+                )}
                 <span className="row-spacer" />
 
                 <span className="row-tags">

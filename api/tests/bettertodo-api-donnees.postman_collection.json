@@ -1665,7 +1665,449 @@
       ]
     },
     {
-      "name": "53 Supprimer le groupe de listes Personnel",
+      "name": "53 Liste pour les échéances",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/lists",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Échéances\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('201', () => pm.response.to.have.status(201));",
+              "const b = pm.response.json();",
+              "pm.collectionVariables.set('listDue', b.id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "54 Son groupe par défaut",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/lists/{{listDue}}/board",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ]
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200', () => pm.response.to.have.status(200));",
+              "const b = pm.response.json();",
+              "pm.collectionVariables.set('groupDue', b.groups[0].id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "55 Tâche « En retard »",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/groups/{{groupDue}}/tasks",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"En retard\",\n  \"due_date\": \"2026-01-01\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('201', () => pm.response.to.have.status(201));",
+              "const b = pm.response.json();",
+              "pm.collectionVariables.set('due_En_retard', b.id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "56 Tâche « Du jour »",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/groups/{{groupDue}}/tasks",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"Du jour\",\n  \"due_date\": \"2026-06-15\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('201', () => pm.response.to.have.status(201));",
+              "const b = pm.response.json();",
+              "pm.collectionVariables.set('due_Du_jour', b.id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "57 Tâche « Plus tard »",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/groups/{{groupDue}}/tasks",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"Plus tard\",\n  \"due_date\": \"2027-01-01\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('201', () => pm.response.to.have.status(201));",
+              "const b = pm.response.json();",
+              "pm.collectionVariables.set('due_Plus_tard', b.id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "58 Tâche « Sans date »",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/groups/{{groupDue}}/tasks",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"Sans date\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('201', () => pm.response.to.have.status(201));",
+              "const b = pm.response.json();",
+              "pm.collectionVariables.set('due_Sans_date', b.id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "59 Tâche faite avec échéance (doit être ignorée)",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/groups/{{groupDue}}/tasks",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"Déjà faite\",\n  \"due_date\": \"2026-06-15\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('201', () => pm.response.to.have.status(201));",
+              "const b = pm.response.json();",
+              "pm.collectionVariables.set('dueDone', b.id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "60 … cochée",
+      "request": {
+        "method": "PATCH",
+        "url": "{{baseUrl}}/tasks/{{dueDone}}",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"done\": true\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200', () => pm.response.to.have.status(200));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "61 Compteurs au 2026-06-15",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/tasks/due/counts?today=2026-06-15",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ]
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200', () => pm.response.to.have.status(200));",
+              "const b = pm.response.json();",
+              "pm.test('today = 2 (retard + jour), scheduled = 3', () => pm.expect(b).to.eql({ today: 2, scheduled: 3 }));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "62 Aujourd'hui = jusqu'au 2026-06-15",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/tasks/due?until=2026-06-15",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ]
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200', () => pm.response.to.have.status(200));",
+              "const b = pm.response.json();",
+              "pm.test('retard puis jour, ni futur, ni sans date, ni faite', () => pm.expect(b.map(t => t.title)).to.eql(['En retard', 'Du jour']));",
+              "pm.test(\"avec la liste et le groupe d'origine\", () => {",
+              "    pm.expect(b[0].list.name).to.eql('Échéances');",
+              "    pm.expect(b[0].group_name).to.eql('Tâches');",
+              "    pm.expect(b[0]).to.have.property('tags');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "63 Planifié = toutes les échéances",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/tasks/due",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ]
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200', () => pm.response.to.have.status(200));",
+              "const b = pm.response.json();",
+              "pm.test('triées par date', () => pm.expect(b.map(t => t.title)).to.eql(['En retard', 'Du jour', 'Plus tard']));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "64 Date invalide",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/tasks/due?until=15.06.2026",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ]
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('400', () => pm.response.to.have.status(400));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "65 Compteurs sans date du jour",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/tasks/due/counts",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ]
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('400', () => pm.response.to.have.status(400));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "66 B ne voit pas les échéances de A",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/tasks/due",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{tokenB}}"
+          }
+        ]
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200', () => pm.response.to.have.status(200));",
+              "pm.test('aucune tâche de A', () => pm.expect(pm.response.json().map(t => t.title)).to.not.include('Du jour'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "67 Supprimer la liste des échéances",
+      "request": {
+        "method": "DELETE",
+        "url": "{{baseUrl}}/lists/{{listDue}}",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ]
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('204', () => pm.response.to.have.status(204));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "68 Supprimer le groupe de listes Personnel",
       "request": {
         "method": "DELETE",
         "url": "{{baseUrl}}/folders/{{folderPerso}}",
@@ -1689,7 +2131,7 @@
       ]
     },
     {
-      "name": "54 La liste Perso est passée hors groupe",
+      "name": "69 La liste Perso est passée hors groupe",
       "request": {
         "method": "GET",
         "url": "{{baseUrl}}/lists",
@@ -1715,7 +2157,7 @@
       ]
     },
     {
-      "name": "55 Supprimer le groupe Courses",
+      "name": "70 Supprimer le groupe Courses",
       "request": {
         "method": "DELETE",
         "url": "{{baseUrl}}/groups/{{groupA}}",
@@ -1739,7 +2181,7 @@
       ]
     },
     {
-      "name": "56 Ses tâches sont supprimées (ou déjà vidées)",
+      "name": "71 Ses tâches sont supprimées (ou déjà vidées)",
       "request": {
         "method": "GET",
         "url": "{{baseUrl}}/tasks/{{task1}}",
@@ -1763,7 +2205,7 @@
       ]
     },
     {
-      "name": "57 Supprimer la liste",
+      "name": "72 Supprimer la liste",
       "request": {
         "method": "DELETE",
         "url": "{{baseUrl}}/lists/{{listId}}",
@@ -1787,7 +2229,7 @@
       ]
     },
     {
-      "name": "58 La liste n'existe plus",
+      "name": "73 La liste n'existe plus",
       "request": {
         "method": "GET",
         "url": "{{baseUrl}}/lists/{{listId}}/board",
@@ -1811,7 +2253,7 @@
       ]
     },
     {
-      "name": "59 Lait (dans Administratif) est supprimé avec la liste",
+      "name": "74 Lait (dans Administratif) est supprimé avec la liste",
       "request": {
         "method": "GET",
         "url": "{{baseUrl}}/tasks/{{task2}}",

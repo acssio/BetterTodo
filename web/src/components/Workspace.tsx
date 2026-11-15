@@ -1,13 +1,16 @@
 import * as React from 'react'
 import { api, ApiError } from '../api/ApiClient'
 import type {
-    Board as BoardData, BoardGroup, Folder, ListChanges, ListView, Task, TaskChanges, TodoList, UrgencyLevel, User,
+    Board as BoardData, BoardGroup, DueCounts, DueTask, Folder, ListChanges, ListView, Task, TaskChanges, TodoList,
+    UrgencyLevel, User,
 } from '../api/types'
 import {
     appendTask, boardWithGroup, boardWithTask, countDoneTasks, countOpenTasks, findTask, hideDoneTasks, indexInGroup,
     moveTask, placeTask, removeTask, replaceTask, visibleToFullIndex,
 } from '../utils/board'
+import { todayIso } from '../utils/dates'
 import type { DragState, DropTarget } from '../utils/dragDrop'
+import { isSmart, SMART_TODAY } from '../utils/smartLists'
 import { SIDEBAR, sidebarMode } from '../utils/sidebarLayout'
 import type { TaskViewActions, TaskViewProps } from './actions'
 import { Board } from './Board'
@@ -15,6 +18,7 @@ import { ListEditPopover } from './ListEditPopover'
 import { ListHeader } from './ListHeader'
 import { SectionsView } from './SectionsView'
 import { SettingsDialog } from './SettingsDialog'
+import { SmartView } from './SmartView'
 import { Sidebar } from './Sidebar'
 import { SidebarResizer } from './SidebarResizer'
 import { TaskPopover } from './TaskPopover'
@@ -41,15 +45,25 @@ interface OpenPopover {
     anchor: DOMRect
 }
 
-/** Une moitié de l'écran : la liste affichée et son contenu (null pendant le chargement). */
+/**
+ * Une moitié de l'écran : la liste affichée et son contenu (null pendant le chargement).
+ * listId peut aussi être une liste intelligente ('smart:today', 'smart:scheduled') :
+ * son contenu est alors dans due, et board reste null.
+ */
 interface Pane {
     listId: string
     board: BoardData | null
+    due: DueTask[] | null
 }
+
+// Durée de l'animation d'une tâche cochée qui quitte une liste intelligente (voir TaskRow.css)
+const LEAVING_DELAY = 650
 
 class WorkspaceState {
     folders: Folder[] = []
     lists: TodoList[] = []
+    dueCounts: DueCounts | null = null       // Compteurs « Aujourd'hui » / « Planifié »
+    leavingTaskIds: string[] = []            // Tâches cochées qui s'effacent d'une liste intelligente
     urgencyLevels: UrgencyLevel[] = []
     panes: Pane[] = []          // 1 liste affichée, ou 2 en vue scindée (gauche, droite)
     activePane: number = 0      // Moitié où s'ouvre une liste cliquée dans la barre latérale
@@ -100,9 +114,10 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
                 api.getUrgencyLevels(),
             ])
             this.setState({ folders, lists, urgencyLevels, loading: false })
+            void this.refreshCounts()
 
             // Rouvre les listes de la dernière visite (si elles existent encore), sinon la première
-            const saved = readSavedPanes().filter(id => lists.some(list => list.id === id))
+            const saved = readSavedPanes().filter(id => isSmart(id) || lists.some(list => list.id === id))
             const listIds = saved.length > 0 ? saved : lists.slice(0, 1).map(list => list.id)
             for (let index = 0; index < listIds.length; index++) {
                 await this.openList(listIds[index], index)
@@ -200,7 +215,7 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
 
             const panes = [...state.panes]
             const index = Math.min(paneIndex, panes.length) // Pas de « trou » : au plus une moitié de plus
-            panes[index] = { listId, board: null }
+            panes[index] = { listId, board: null, due: null }
             return { ...state, panes, activePane: index, openTask: null, addingGroupListId: null, error: '', sidebarPeek: false }
         })
         await this.reloadBoard(listId)
@@ -244,6 +259,10 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
         const listIds = listId ? [listId] : this.state.panes.map(pane => pane.listId)
 
         for (const id of listIds) {
+            if (isSmart(id)) {
+                await this.reloadSmart(id)
+                continue
+            }
             try {
                 const board = await api.getBoard(id)
                 // On ne range le board que si la liste est toujours affichée
@@ -256,13 +275,47 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
         }
     }
 
-    /** Recharge les listes (pour les compteurs de la barre latérale). */
+    /** Recharge une liste intelligente : « Aujourd'hui » = échéances jusqu'à aujourd'hui (date LOCALE). */
+    private async reloadSmart(id: string): Promise<void> {
+        try {
+            const due = await api.getDueTasks(id === SMART_TODAY ? todayIso() : undefined)
+            this.setState(state => ({
+                panes: state.panes.map(pane => (pane.listId === id ? { ...pane, due } : pane)),
+            }))
+        } catch (error) {
+            this.handleError(error)
+        }
+    }
+
+    private async refreshCounts(): Promise<void> {
+        try {
+            this.setState({ dueCounts: await api.getDueCounts(todayIso()) })
+        } catch (error) {
+            this.handleError(error)
+        }
+    }
+
+    /**
+     * Après une modification de tâches : recharge les compteurs de la barre latérale
+     * et les listes intelligentes affichées (une échéance a pu changer).
+     */
     private async refreshLists(): Promise<void> {
         try {
             this.setState({ lists: await api.getLists() })
         } catch (error) {
             this.handleError(error)
         }
+        void this.refreshCounts()
+        for (const pane of this.state.panes) {
+            if (isSmart(pane.listId)) void this.reloadSmart(pane.listId)
+        }
+    }
+
+    /** Applique une fonction aux tâches des listes intelligentes affichées. */
+    private updateDue(change: (tasks: DueTask[]) => DueTask[]): void {
+        this.setState(state => ({
+            panes: state.panes.map(pane => (pane.due ? { ...pane, due: change(pane.due) } : pane)),
+        }))
     }
 
     /** Applique une fonction de utils/board.ts à chaque board affiché. */
@@ -406,14 +459,31 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
     // =========================================================================
 
     toggleTask = async (task: Task): Promise<void> => {
-        this.updateBoards(board => replaceTask(board, { ...task, done: !task.done }))
+        const done = !task.done
+        this.updateBoards(board => replaceTask(board, { ...task, done }))
+        this.updateDue(tasks => tasks.map(t => (t.id === task.id ? { ...t, done } : t)))
+
+        // Cochée dans une liste intelligente : la ligne s'efface, puis la liste est rechargée
+        const inSmart = this.state.panes.some(pane => pane.due?.some(t => t.id === task.id))
+        if (done && inSmart) {
+            this.setState(state => ({ leavingTaskIds: [...state.leavingTaskIds, task.id] }))
+        }
+
         try {
-            const saved = await api.updateTask(task.id, { done: !task.done })
+            const saved = await api.updateTask(task.id, { done })
             this.updateBoards(board => replaceTask(board, saved))
-            void this.refreshLists()
         } catch (error) {
             this.handleError(error)
             void this.reloadBoard()
+        }
+
+        if (done && inSmart) {
+            window.setTimeout(() => {
+                this.setState(state => ({ leavingTaskIds: state.leavingTaskIds.filter(id => id !== task.id) }))
+                void this.refreshLists()
+            }, LEAVING_DELAY)
+        } else {
+            void this.refreshLists()
         }
     }
 
@@ -548,6 +618,7 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
         ))
         try {
             await api.clearDoneTasks(listId)
+            void this.refreshLists()
         } catch (error) {
             this.handleError(error)
             void this.reloadBoard(listId)
@@ -568,7 +639,9 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
         try {
             const saved = await api.updateTask(taskId, changes)
             this.updateBoards(board => replaceTask(board, saved))
-            if (changes.done !== undefined) void this.refreshLists()
+            // Listes intelligentes : on garde la liste et le groupe d'origine, on met à jour le reste
+            this.updateDue(tasks => tasks.map(t => (t.id === saved.id ? { ...t, ...saved } : t)))
+            if (changes.done !== undefined || changes.due_date !== undefined) void this.refreshLists()
         } catch (error) {
             this.handleError(error)
             void this.reloadBoard()
@@ -578,6 +651,7 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
     private async deleteTask(taskId: string): Promise<void> {
         this.setState({ openTask: null })
         this.updateBoards(board => removeTask(board, taskId))
+        this.updateDue(tasks => tasks.filter(t => t.id !== taskId))
         try {
             await api.deleteTask(taskId)
             void this.refreshLists()
@@ -658,6 +732,18 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
                 className={classes.join(' ')}
                 onMouseDown={() => { if (this.state.activePane !== index) this.setState({ activePane: index }) }}
             >
+                {isSmart(pane.listId) && (
+                    <SmartView
+                        kind={pane.listId}
+                        tasks={pane.due}
+                        urgencyLevels={this.state.urgencyLevels}
+                        openTaskId={this.state.openTask?.id ?? null}
+                        leavingTaskIds={this.state.leavingTaskIds}
+                        onToggle={this.toggleTask}
+                        onOpen={this.openTask}
+                        onClosePane={this.state.panes.length === 2 ? () => this.closePane(index) : undefined}
+                    />
+                )}
                 {board && board.list.id === pane.listId && (
                     <>
                         <ListHeader
@@ -738,6 +824,7 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
                 user={this.props.user}
                 folders={this.state.folders}
                 lists={this.state.lists}
+                dueCounts={this.state.dueCounts}
                 selectedListId={panes[activePane]?.listId ?? null}
                 secondaryListId={this.splitVisible() ? panes[1 - activePane]?.listId ?? null : null}
                 width={width}
@@ -818,15 +905,24 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
 
     private renderPopover(): React.ReactNode {
         const open = this.state.openTask
-        const board = open ? boardWithTask(this.boards(), open.id) : undefined
-        const task = open && board ? findTask(board, open.id) : undefined
-        if (!open || !board || !task) return null
+        if (!open) return null
+
+        // La tâche vient d'une liste affichée, ou d'une liste intelligente
+        const board = boardWithTask(this.boards(), open.id)
+        const due = this.state.panes.flatMap(pane => pane.due ?? []).find(t => t.id === open.id)
+        const task = board ? findTask(board, open.id) : due
+        if (!task) return null
+
+        // Depuis une liste intelligente, on ne connaît que le groupe de la tâche (pas toute sa liste)
+        const groups = board
+            ? board.groups
+            : [{ id: task.group_id, list_id: due!.list.id, name: due!.group_name, position: 0 }]
 
         return (
             <TaskPopover
                 key={task.id} // Nouvelle tâche → nouveau composant (repart de son titre et ses notes)
                 task={task}
-                groups={board.groups}
+                groups={groups}
                 urgencyLevels={this.state.urgencyLevels}
                 anchor={open.anchor}
                 onUpdate={changes => this.updateTask(task.id, changes)}

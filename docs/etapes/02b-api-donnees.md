@@ -50,6 +50,8 @@ Toutes sous `/api/v1`, et **toutes demandent d'être connecté**.
 | DELETE | `/groups/{id}` | supprime aussi ses tâches |
 | POST | `/groups/{id}/tasks` | `{title, notes?, due_date?, urgency_id?, tags?, position?}` |
 | GET | `/tasks/{id}` | une tâche |
+| GET | `/tasks/due?until=` | tâches à faire avec une échéance, toutes listes (étape 3d) |
+| GET | `/tasks/due/counts?today=` | compteurs « Aujourd'hui » / « Planifié » (étape 3d) |
 | PATCH | `/tasks/{id}` | `{title?, notes?, due_date?, urgency_id?, done?, group_id?, position?, tags?}` |
 | DELETE | `/tasks/{id}` | |
 | GET | `/urgency-levels` | niveaux, du moins au plus urgent |
