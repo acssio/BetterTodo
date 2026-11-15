@@ -2,6 +2,7 @@ import * as React from 'react'
 import { Calendar, Check, Plus, Trash2, X } from 'lucide-react'
 import type { Group, Task, TaskChanges, UrgencyLevel } from '../api/types'
 import { DismissListener, popoverPosition } from '../utils/popover'
+import { confirmDialog } from './confirm'
 import './TaskPopover.css'
 
 const POPOVER_WIDTH = 360
@@ -132,8 +133,8 @@ export class TaskPopover extends React.Component<TaskPopoverProps, TaskPopoverSt
         void this.update({ tags: this.props.task.tags.filter(tag => tag !== name) })
     }
 
-    onDeleteClick = (): void => {
-        if (window.confirm(`Supprimer la tâche « ${this.props.task.title} » ?`)) {
+    onDeleteClick = async (): Promise<void> => {
+        if (await confirmDialog.ask(`Supprimer la tâche « ${this.props.task.title} » ?`)) {
             this.props.onDelete()
         }
     }

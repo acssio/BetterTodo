@@ -2,6 +2,7 @@ import * as React from 'react'
 import { ChevronDown, Search, Trash2, X } from 'lucide-react'
 import type { Folder, ListChanges, TodoList } from '../api/types'
 import { DismissListener, popoverPosition } from '../utils/popover'
+import { confirmDialog } from './confirm'
 import { ListIcon } from './ListIcon'
 import { LIST_COLORS, LIST_ICONS } from './listIcons'
 import './TaskPopover.css'
@@ -62,8 +63,8 @@ export class ListEditPopover extends React.Component<ListEditPopoverProps, ListE
         this.props.onUpdate({ folder_id: event.target.value || null }) // "" = hors groupe de listes
     }
 
-    onDeleteClick = (): void => {
-        if (window.confirm(`Supprimer la liste « ${this.props.list.name} » et toutes ses tâches ?`)) {
+    onDeleteClick = async (): Promise<void> => {
+        if (await confirmDialog.ask(`Supprimer la liste « ${this.props.list.name} » et toutes ses tâches ?`)) {
             this.props.onDelete()
         }
     }

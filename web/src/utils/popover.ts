@@ -56,6 +56,7 @@ export class DismissListener {
         const target = event.target as Element
         if (this.root.current?.contains(target)) return
         if (this.ignoreSelector && target.closest(this.ignoreSelector)) return
+        if (target.closest('[data-keep-popovers]')) return // Ex. la fenêtre de confirmation par-dessus
         this.onDismiss()
     }
 

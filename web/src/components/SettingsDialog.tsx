@@ -5,6 +5,7 @@ import type { Language, ListView, Tag, UrgencyLevel, User, UserChanges } from '.
 import { computeDropIndex } from '../utils/dragDrop'
 import { moveItem } from '../utils/moveItem'
 import { DismissListener } from '../utils/popover'
+import { confirmDialog } from './confirm'
 import { InlineInput } from './InlineInput'
 import { LIST_COLORS } from './listIcons'
 import './TaskPopover.css'     // .pop-tag, .pop-tag-add
@@ -128,7 +129,7 @@ export class SettingsDialog extends React.Component<SettingsDialogProps, Setting
     }
 
     private async deleteLevel(level: UrgencyLevel): Promise<void> {
-        if (!window.confirm(`Supprimer le niveau « ${level.name} » ? Les tâches de ce niveau passeront sans urgence.`)) return
+        if (!(await confirmDialog.ask(`Supprimer le niveau « ${level.name} » ? Les tâches de ce niveau passeront sans urgence.`))) return
 
         this.setLevels(this.state.levels.filter(l => l.id !== level.id))
         try {
@@ -197,7 +198,7 @@ export class SettingsDialog extends React.Component<SettingsDialogProps, Setting
 
     private async deleteTag(tag: Tag): Promise<void> {
         const usage = tag.task_count > 0 ? ` Il sera enlevé de ${tag.task_count} tâche${tag.task_count > 1 ? 's' : ''}.` : ''
-        if (!window.confirm(`Supprimer le tag « ${tag.name} » ?${usage}`)) return
+        if (!(await confirmDialog.ask(`Supprimer le tag « ${tag.name} » ?${usage}`))) return
 
         this.setState(state => ({ tags: state.tags.filter(t => t.id !== tag.id) }))
         try {

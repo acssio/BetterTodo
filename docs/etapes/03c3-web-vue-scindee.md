@@ -122,6 +122,15 @@ Avec le compte de test, à 1 440 px puis à 900 px :
 | La tâche revient à sa place après un glisser entre listes | Le `PATCH` a échoué (bandeau rouge) | Onglet Réseau : réponse de `PATCH /tasks/…` |
 | Les listes ouvertes ne sont pas retenues | `localStorage` bloqué (navigation privée) | Normal : on rouvre la première liste |
 
+## Corrections après tes tests
+
+**« La vue scindée ne fonctionne pas »** : la vue scindée demandait une **fenêtre** d'au moins 1 100 px. Or le navigateur intégré de l'application Claude fait souvent 600 à 900 px de large. Rien ne s'affichait, et rien n'expliquait pourquoi. Trois changements :
+1. **La condition porte sur la place réellement disponible pour les listes** (fenêtre moins barre latérale) : au moins **640 px**, soit 2 × 320 px. Par exemple, une fenêtre de 790 px avec la barre en icônes (60 px) laisse 730 px : ça suffit (`SPLIT_MIN_MAIN_WIDTH`, `canSplit()` dans `Workspace`).
+2. **S'il n'y a vraiment pas la place**, un Cmd+clic affiche un message en bas de l'écran, avec les deux largeurs et la solution : agrandir la fenêtre ou réduire la barre latérale. La liste s'ouvre quand même normalement. En glissant une liste, la zone de dépôt affiche la même explication.
+3. **Glisser une liste** : les zones de dépôt sont maintenant affichées juste **après** l'événement `dragstart` (`setTimeout`), comme pour les tâches. Modifier la page pendant le `dragstart` peut annuler le glisser dans certains navigateurs.
+
+> Le glisser d'une liste ne peut pas être testé par l'outil (la souris automatisée ne déclenche pas le glisser natif) : merci de l'essayer à la main. Le Cmd+clic, lui, a été testé avec de vrais clics : message à 604 px, vue scindée à 790 px avec la barre en icônes.
+
 ## Et après ?
 
 L'**étape 3d** : les listes intelligentes « **Aujourd'hui** » (échéance aujourd'hui ou en retard) et « **Planifié** » (toutes les tâches avec une échéance), en haut de la barre latérale.

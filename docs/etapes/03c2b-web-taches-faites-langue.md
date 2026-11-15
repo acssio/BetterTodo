@@ -121,6 +121,23 @@ Avec le compte de test :
 | Le groupe par défaut a le mauvais nom | Langue du compte | Paramètres → Langue (les listes déjà créées ne changent pas) |
 | Les tâches faites ont disparu | Masquées (bouton œil bleu), ou vidées | Cliquer sur l'œil. Un vidage, lui, est définitif |
 
+## Correction après tes tests : « Vider ne fonctionne pas »
+
+**Cause** : la confirmation utilisait `window.confirm`. Le **navigateur intégré de l'application Claude désactive les boîtes de dialogue natives** : `confirm()` y répond « non » tout de suite, sans rien afficher. Le message dans la console du navigateur le dit :
+
+```
+Page dialog suppressed (confirm) — native JavaScript dialogs are disabled in this browser; confirm() returned false
+```
+
+Toutes les suppressions avec confirmation échouaient donc en silence : tâche, groupe, liste, groupe de listes, tag, niveau d'urgence, vider. Mes tests remplaçaient `window.confirm` par « oui », ce qui cachait le problème.
+
+**Correction** : une fenêtre de confirmation **dessinée par BetterTodo**, qui marche dans tous les navigateurs :
+- `components/confirm.ts` : la classe `ConfirmService` et son instance `confirmDialog`. On l'utilise avec `if (!(await confirmDialog.ask('Supprimer … ?'))) return`. Pour une simple information, c'est `confirmDialog.inform(…)` ;
+- `components/ConfirmDialog.tsx` : `ConfirmHost`, placé une seule fois dans `App`, affiche la demande. Entrée confirme, Échap annule, et un clic à côté annule aussi ;
+- l'attribut `data-keep-popovers` évite qu'un clic dans la confirmation ferme l'overlay ouvert derrière, qui écoute les clics « en dehors » de lui.
+
+**Vérifié avec de vrais clics**, sans rien remplacer : menu « … » → « Vider les tâches faites (1) » → la fenêtre s'affiche → « Vider » → `DELETE …/done-tasks` part, et la tâche disparaît.
+
 ## Et après ?
 
 **3c-3 : la vue scindée**

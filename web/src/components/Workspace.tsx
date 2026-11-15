@@ -14,6 +14,7 @@ import { isSmart, SMART_TODAY } from '../utils/smartLists'
 import { SIDEBAR, sidebarMode } from '../utils/sidebarLayout'
 import type { TaskViewActions, TaskViewProps } from './actions'
 import { Board } from './Board'
+import { confirmDialog } from './confirm'
 import { ListEditPopover } from './ListEditPopover'
 import { ListHeader } from './ListHeader'
 import { SectionsView } from './SectionsView'
@@ -29,8 +30,10 @@ const PANES_KEY = 'bettertodo.panes'
 const OLD_SELECTED_LIST_KEY = 'bettertodo.selectedList' // Ancienne clé (avant la vue scindée)
 const SIDEBAR_WIDTH_KEY = 'bettertodo.sidebarWidth'
 
-// En dessous de cette largeur de fenêtre, on n'affiche que la moitié active
-const SPLIT_MIN_WINDOW_WIDTH = 1100
+// Place minimale pour les listes (fenêtre moins barre latérale) pour afficher deux moitiés :
+// 2 × 320 px. En dessous, on n'affiche que la moitié active.
+const SPLIT_MIN_MAIN_WIDTH = 640
+const NOTICE_DURATION = 6000 // ms d'affichage d'un message en bas de l'écran
 
 interface WorkspaceProps {
     user: User
@@ -83,6 +86,7 @@ class WorkspaceState {
     lastExpandedWidth: number = this.sidebarWidth >= SIDEBAR.compactBelow ? this.sidebarWidth : SIDEBAR.default
     windowWidth: number = window.innerWidth
     sidebarPeek: boolean = false           // Ouverte par-dessus le contenu (fenêtre étroite)
+    notice: string = ''                    // Message en bas de l'écran (ex. vue scindée impossible)
 }
 
 /**
@@ -195,9 +199,38 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
     // Moitiés (vue scindée)
     // =========================================================================
 
-    /** La vue scindée est-elle affichée ? (2 listes ouvertes ET fenêtre assez large) */
+    /** Largeur disponible pour les listes : la fenêtre moins la barre latérale (telle qu'affichée). */
+    private mainWidth(): number {
+        const { windowWidth, sidebarWidth } = this.state
+        const sidebar = sidebarMode(windowWidth, sidebarWidth) === 'narrow' ? SIDEBAR.min : sidebarWidth
+        return windowWidth - sidebar
+    }
+
+    /** Y a-t-il la place pour deux moitiés ? */
+    private canSplit(): boolean {
+        return this.mainWidth() >= SPLIT_MIN_MAIN_WIDTH
+    }
+
+    /** La vue scindée est-elle affichée ? (2 listes ouvertes ET assez de place) */
     private splitVisible(): boolean {
-        return this.state.panes.length === 2 && this.state.windowWidth >= SPLIT_MIN_WINDOW_WIDTH
+        return this.state.panes.length === 2 && this.canSplit()
+    }
+
+    /** Affiche un message quelques secondes en bas de l'écran. */
+    private showNotice(notice: string): void {
+        this.setState({ notice })
+        window.clearTimeout(this.noticeTimer)
+        this.noticeTimer = window.setTimeout(() => this.setState({ notice: '' }), NOTICE_DURATION)
+    }
+
+    private noticeTimer: number | undefined
+
+    /** Message quand on demande la vue scindée sans avoir la place. */
+    private splitTooNarrow(): void {
+        this.showNotice(
+            `Pas assez de place pour la vue scindée (il faut ${SPLIT_MIN_MAIN_WIDTH} px pour les listes, ` +
+            `il y en a ${this.mainWidth()}). Agrandis la fenêtre ou réduis la barre latérale.`,
+        )
     }
 
     /**
@@ -223,7 +256,10 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
 
     /** Clic sur une liste : dans la moitié active. Cmd/Ctrl+clic : dans l'autre moitié (créée si besoin). */
     onSelectList = (listId: string, toSide: boolean): void => {
-        if (toSide) {
+        if (toSide && !this.canSplit()) {
+            this.splitTooNarrow() // On explique, puis on ouvre la liste normalement
+            void this.openList(listId, this.state.activePane)
+        } else if (toSide) {
             void this.openList(listId, this.state.panes.length < 2 ? 1 : 1 - this.state.activePane)
         } else {
             void this.openList(listId, this.state.activePane)
@@ -237,7 +273,9 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
     // --- Glisser une liste de la barre latérale vers une moitié ----------------
 
     onListDragStart = (listId: string): void => {
-        this.setState({ listDrag: listId, openTask: null })
+        // setTimeout : afficher les zones de dépôt PENDANT le dragstart peut annuler le glisser
+        // dans certains navigateurs (le contenu change sous la souris). On attend la fin de l'événement.
+        window.setTimeout(() => this.setState({ listDrag: listId, openTask: null }), 0)
     }
 
     onListDragEnd = (): void => {
@@ -379,7 +417,7 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
 
     /** Supprime un groupe de listes : ses listes ne sont pas supprimées, elles passent hors groupe. */
     onDeleteFolder = async (folder: Folder): Promise<void> => {
-        if (!window.confirm(`Supprimer le groupe de listes « ${folder.name} » ? Ses listes sont gardées, hors groupe.`)) return
+        if (!(await confirmDialog.ask(`Supprimer le groupe de listes « ${folder.name} » ? Ses listes sont gardées, hors groupe.`))) return
 
         this.setState(state => ({
             folders: state.folders.filter(f => f.id !== folder.id),
@@ -584,7 +622,7 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
         let message = `Supprimer le groupe « ${group.name} » ?`
         if (count === 1) message = `Supprimer le groupe « ${group.name} » et sa tâche ?`
         if (count > 1) message = `Supprimer le groupe « ${group.name} » et ses ${count} tâches ?`
-        if (!window.confirm(message)) return
+        if (!(await confirmDialog.ask(message))) return
 
         this.updateBoards(board => ({ ...board, groups: board.groups.filter(g => g.id !== group.id) }))
         try {
@@ -605,11 +643,11 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
     onClearDone = async (board: BoardData): Promise<void> => {
         const count = countDoneTasks(board)
         if (count === 0) {
-            window.alert('Aucune tâche faite à vider dans cette liste.')
+            await confirmDialog.inform('Aucune tâche faite à vider dans cette liste.')
             return
         }
         const word = count > 1 ? `les ${count} tâches faites` : 'la tâche faite'
-        if (!window.confirm(`Supprimer définitivement ${word} de « ${board.list.name} » ?`)) return
+        if (!(await confirmDialog.ask(`Supprimer définitivement ${word} de « ${board.list.name} » ?`, { confirmLabel: 'Vider' }))) return
 
         const listId = board.list.id
         this.setState({ openTask: null })
@@ -702,6 +740,12 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
                     )}
                 </main>
 
+                {this.state.notice && (
+                    <div className="workspace-notice" role="status">
+                        {this.state.notice}
+                        <button onClick={() => this.setState({ notice: '' })}>OK</button>
+                    </div>
+                )}
                 {this.renderPopover()}
                 {this.renderListEditor()}
                 {this.state.settingsOpen && (
@@ -770,7 +814,7 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
      * Deux listes → « Remplacer » à gauche / à droite.
      */
     private renderListDropZones(): React.ReactNode {
-        const canSplit = this.state.windowWidth >= SPLIT_MIN_WINDOW_WIDTH
+        const canSplit = this.canSplit()
         const twoPanes = this.state.panes.length === 2
 
         // Fenêtre étroite : une seule moitié est visible, la liste remplace celle-là
@@ -798,6 +842,11 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
                         }}
                     >
                         <span className="list-drop-label">{zone.label}</span>
+                        {!canSplit && (
+                            <span className="list-drop-hint">
+                                Pas assez de place pour la vue scindée : agrandis la fenêtre ou réduis la barre latérale.
+                            </span>
+                        )}
                     </div>
                 ))}
             </div>

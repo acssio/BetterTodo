@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { api, ApiError } from './api/ApiClient'
 import type { User } from './api/types'
+import { ConfirmHost } from './components/ConfirmDialog'
 import { LoginPage } from './components/LoginPage'
 import { Workspace } from './components/Workspace'
 
@@ -72,12 +73,15 @@ export class App extends React.Component<object, AppState> {
 
             case 'loggedIn':
                 return (
-                    <Workspace
-                        user={this.state.user!}
-                        onLogout={this.onLogout}
-                        onUserChanged={this.onUserChanged}
-                        onSessionExpired={this.onSessionExpired}
-                    />
+                    <>
+                        <Workspace
+                            user={this.state.user!}
+                            onLogout={this.onLogout}
+                            onUserChanged={this.onUserChanged}
+                            onSessionExpired={this.onSessionExpired}
+                        />
+                        <ConfirmHost />
+                    </>
                 )
         }
     }

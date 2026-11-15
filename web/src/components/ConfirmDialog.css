@@ -1,0 +1,50 @@
+.ConfirmDialog-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 60; /* Au-dessus de tout, y compris les Paramètres */
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 120px 16px 16px;
+    background: rgba(20, 20, 20, 0.35);
+}
+
+.ConfirmDialog {
+    width: 100%;
+    max-width: 400px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    padding: 20px;
+    background: var(--surface);
+    border-radius: 14px;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.25);
+}
+
+.ConfirmDialog p {
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.confirm-buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.confirm-danger {
+    background: var(--danger);
+}
+
+/* Bouton secondaire (aussi utilisé par les Paramètres) */
+.btn-ghost {
+    height: 34px;
+    padding: 0 14px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-weight: 600;
+}
+
+.btn-ghost:hover {
+    background: var(--hover);
+}

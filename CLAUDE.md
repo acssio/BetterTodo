@@ -86,6 +86,9 @@ Observé dans ses autres projets (C++ embarqué, React/TypeScript). Écrire du c
     - en-tête en icônes seules via `@container main` ;
     - pas de texte qui passe à la ligne : on coupe avec « … » ;
   - servi par nginx sur `localhost:8000`, qui transmet `/api` au conteneur `api`.
+  - **jamais de `window.confirm` / `window.alert`** : le navigateur intégré de l'app Claude les désactive (confirm répond « non » sans rien afficher). Utiliser `confirmDialog.ask(…)` / `confirmDialog.inform(…)` (`components/confirm.ts`, affiché par `ConfirmHost`) ;
+  - **tester avec de vrais clics** dans le navigateur. Ne pas remplacer `window.confirm` ni simuler ce qui peut être fait pour de vrai : deux bugs (vider les tâches faites, vue scindée) étaient masqués par la simulation ;
+  - vue scindée : possible dès que la place pour les listes (fenêtre moins barre latérale) atteint 640 px ; sinon, un message l'explique.
 - **2026-11-13 – Découpage de l'étape 3 :** 3a affichage, 3b modifications (overlay, glisser-déposer natif HTML5), 3c vue sections, vue scindée, paramètres.
 - **2026-11-13 – Étape 3c en trois morceaux**, livrés dans cet ordre, chacun avec son commit et son README :
   - **3c-1** : vue sections (glisser-déposer commun aux deux vues), bascule Colonnes/Sections enregistrée sur la liste (`default_view`), overlay « Modifier une liste », renommer / supprimer un groupe de listes ;
