@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -87,5 +88,33 @@ func TestPatternsCouleurEtIcone(t *testing.T) {
 	}
 	if !iconPattern.MatchString("graduation-cap") || iconPattern.MatchString("Briefcase") || iconPattern.MatchString("a b") {
 		t.Error("iconPattern")
+	}
+}
+
+func TestValidateNewUser(t *testing.T) {
+	cases := []struct {
+		email, password, name string
+		ok                    bool
+	}{
+		{"a@b.fr", "motdepasse", "Alice", true},
+		{"pas-un-email", "motdepasse", "Alice", false},
+		{"a@b.fr", "court", "Alice", false},
+		{"a@b.fr", "motdepasse", "", false},
+		{"a@b.fr", strings.Repeat("x", 73), "Alice", false}, // bcrypt : 72 octets maximum
+	}
+	for _, c := range cases {
+		message := validateNewUser(c.email, c.password, c.name)
+		if (message == "") != c.ok {
+			t.Errorf("validateNewUser(%q, %q, %q) = %q", c.email, c.password, c.name, message)
+		}
+	}
+}
+
+func TestValidatePassword(t *testing.T) {
+	if validatePassword("12345678") != "" {
+		t.Error("8 caractères doivent suffire")
+	}
+	if validatePassword("1234567") == "" {
+		t.Error("7 caractères doivent être refusés")
 	}
 }

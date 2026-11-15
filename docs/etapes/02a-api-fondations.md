@@ -46,7 +46,7 @@ Toutes les routes sont sous `/api/v1`. Corps et réponses sont en JSON. Les erre
 | Méthode | Route | Connexion | Effet |
 |---|---|---|---|
 | GET | `/health` | non | `{"status":"ok"}` si le serveur **et** la base répondent, sinon 503 |
-| POST | `/auth/register` | non | crée un compte et ses 3 niveaux d'urgence par défaut, puis connecte (201) |
+| POST | `/auth/register` | non | crée un compte et ses 3 niveaux d'urgence par défaut, puis connecte (201). **Remplacée à l'étape 3e** par `/auth/setup` (premier compte, admin) et la console admin |
 | POST | `/auth/login` | non | connecte (200), ou 401 si email ou mot de passe incorrect |
 | POST | `/auth/logout` | oui | ferme **cette** session (204) |
 | GET | `/me` | oui | l'utilisateur connecté |

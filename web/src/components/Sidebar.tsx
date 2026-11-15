@@ -1,7 +1,7 @@
 import * as React from 'react'
 import {
     Check, ChevronDown, ChevronRight, Ellipsis, FolderPlus, LogOut, PanelLeftClose, PanelLeftOpen,
-    Pencil, Plus, Settings, Trash2,
+    Pencil, Plus, Settings, ShieldUser, Trash2,
 } from 'lucide-react'
 import type { DueCounts, Folder, TodoList, User } from '../api/types'
 import { SMART_SCHEDULED, SMART_TODAY, type SmartKind } from '../utils/smartLists'
@@ -33,6 +33,7 @@ interface SidebarProps {
     onDeleteFolder: (folder: Folder) => void
     onEditList: (list: TodoList, anchor: DOMRect) => void
     onOpenSettings: () => void
+    onOpenAdmin: () => void // Console admin (bouton visible seulement pour l'admin)
     onLogout: () => void
 }
 
@@ -151,6 +152,12 @@ export class Sidebar extends React.Component<SidebarProps, SidebarState> {
                 </nav>
 
                 <div className="sidebar-footer">
+                    {user.is_admin && (
+                        <button className="sidebar-item" title="Console admin" onClick={this.props.onOpenAdmin}>
+                            <ShieldUser size={16} />
+                            <span className="sidebar-item-name">Console admin</span>
+                        </button>
+                    )}
                     <button className="sidebar-item" title="Paramètres" onClick={this.props.onOpenSettings}>
                         <Settings size={16} />
                         <span className="sidebar-item-name">Paramètres</span>

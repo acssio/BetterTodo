@@ -19,6 +19,7 @@ import { ListEditPopover } from './ListEditPopover'
 import { ListHeader } from './ListHeader'
 import { SectionsView } from './SectionsView'
 import { SettingsDialog } from './SettingsDialog'
+import { AdminDialog } from './AdminDialog'
 import { SmartView } from './SmartView'
 import { Sidebar } from './Sidebar'
 import { SidebarResizer } from './SidebarResizer'
@@ -77,6 +78,7 @@ class WorkspaceState {
     dropPane: number | null = null         // Moitié survolée pendant ce glisser
     addingGroupListId: string | null = null
     settingsOpen: boolean = false
+    adminOpen: boolean = false // Console admin
     loading: boolean = true                // Premier chargement
     error: string = ''
 
@@ -441,6 +443,14 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
         void this.reloadBoard()
     }
 
+    onOpenAdmin = (): void => {
+        this.setState({ adminOpen: true, openTask: null, editingList: null, sidebarPeek: false })
+    }
+
+    onCloseAdmin = (): void => {
+        this.setState({ adminOpen: false })
+    }
+
     onEditList = (list: TodoList, anchor: DOMRect): void => {
         this.setState({ editingList: { id: list.id, anchor }, openTask: null })
     }
@@ -757,6 +767,7 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
                         onClose={this.onCloseSettings}
                     />
                 )}
+                {this.state.adminOpen && <AdminDialog user={this.props.user} onClose={this.onCloseAdmin} />}
             </div>
         )
     }
@@ -891,6 +902,7 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
                 onDeleteFolder={this.onDeleteFolder}
                 onEditList={this.onEditList}
                 onOpenSettings={this.onOpenSettings}
+                onOpenAdmin={this.onOpenAdmin}
                 onLogout={this.props.onLogout}
             />
         )

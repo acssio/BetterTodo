@@ -12,7 +12,15 @@ export interface User {
     display_name: string
     default_view: ListView // Vue des nouvelles listes (Paramètres)
     language: Language
+    is_admin: boolean // Accès à la console admin (premier compte créé)
     created_at: string
+}
+
+/** Création d'un compte (installation ou console admin). */
+export interface NewUser {
+    email: string
+    password: string
+    display_name: string
 }
 
 /** Champs modifiables du compte (PATCH /me). */
@@ -22,7 +30,7 @@ export interface UserChanges {
     language?: Language
 }
 
-/** Réponse à une connexion ou une inscription. */
+/** Réponse à une connexion ou à l'installation (premier compte). */
 export interface Session {
     user: User
     token: string // Inutile pour la page web : elle utilise le cookie

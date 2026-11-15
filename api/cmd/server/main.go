@@ -66,13 +66,15 @@ func main() {
 	urgencyHandler := handlers.NewUrgencyHandler(pool)
 	tagHandler := handlers.NewTagHandler(pool)
 	dueHandler := handlers.NewDueHandler(pool)
+	adminHandler := handlers.NewAdminHandler(pool)
 
 	// Routes -------------------------------------------------------------------
 	mux := http.NewServeMux()
 
 	// Publiques
 	mux.HandleFunc("GET /api/v1/health", healthHandler.Check)
-	mux.HandleFunc("POST /api/v1/auth/register", authHandler.Register)
+	mux.HandleFunc("GET /api/v1/auth/setup", authHandler.SetupStatus) // Premier lancement ?
+	mux.HandleFunc("POST /api/v1/auth/setup", authHandler.Setup)      // Crée le premier compte (admin)
 	mux.HandleFunc("POST /api/v1/auth/login", authHandler.Login)
 
 	// Connexion requise : private(route, handler) passe d'abord par requireUser
@@ -117,6 +119,16 @@ func main() {
 	private("POST /api/v1/tags", tagHandler.Create)
 	private("PATCH /api/v1/tags/{id}", tagHandler.Update)
 	private("DELETE /api/v1/tags/{id}", tagHandler.Delete)
+
+	// Console admin : connexion requise, puis compte admin requis
+	admin := func(route string, handler http.HandlerFunc) {
+		mux.Handle(route, requireUser(adminHandler.RequireAdmin(handler)))
+	}
+
+	admin("GET /api/v1/admin/users", adminHandler.ListUsers)
+	admin("POST /api/v1/admin/users", adminHandler.CreateUser)
+	admin("PATCH /api/v1/admin/users/{id}", adminHandler.ResetPassword)
+	admin("DELETE /api/v1/admin/users/{id}", adminHandler.DeleteUser)
 
 	server := &http.Server{
 		Addr:              cfg.ListenAddr,

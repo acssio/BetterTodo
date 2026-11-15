@@ -28,7 +28,10 @@ var defaultUrgencyLevels = []struct{ name, color string }{
 // de temps que pour un vrai compte, et on ne peut pas deviner quels emails sont inscrits.
 var dummyHash, _ = auth.HashPassword("mot-de-passe-factice")
 
-// AuthHandler gère l'inscription, la connexion, la déconnexion et le profil.
+// errSetupDone : l'installation a déjà eu lieu (un compte existe), POST /auth/setup est refusé.
+var errSetupDone = errors.New("installation déjà faite")
+
+// AuthHandler gère l'installation (premier compte), la connexion, la déconnexion et le profil.
 type AuthHandler struct {
 	pool         *pgxpool.Pool
 	sessions     *auth.SessionStore
@@ -47,25 +50,27 @@ type userResponse struct {
 	DisplayName string    `json:"display_name"`
 	DefaultView string    `json:"default_view"` // Vue des nouvelles listes : "columns" ou "sections"
 	Language    string    `json:"language"`     // "fr" ou "en"
+	IsAdmin     bool      `json:"is_admin"`     // Accès à la console admin
 	CreatedAt   time.Time `json:"created_at"`
 }
 
 // userColumns : colonnes lues pour construire un userResponse (dans l'ordre de scanTargets).
-const userColumns = `id, email, display_name, default_view, language, created_at`
+const userColumns = `id, email, display_name, default_view, language, is_admin, created_at`
 
 // scanTargets : les champs de u, dans l'ordre de userColumns.
 func (u *userResponse) scanTargets() []any {
-	return []any{&u.ID, &u.Email, &u.DisplayName, &u.DefaultView, &u.Language, &u.CreatedAt}
+	return []any{&u.ID, &u.Email, &u.DisplayName, &u.DefaultView, &u.Language, &u.IsAdmin, &u.CreatedAt}
 }
 
-// sessionResponse : réponse à une inscription ou une connexion réussie.
+// sessionResponse : réponse à une installation ou une connexion réussie.
 type sessionResponse struct {
 	User      userResponse `json:"user"`
 	Token     string       `json:"token"`      // Pour les apps natives (en-tête Authorization)
 	ExpiresAt time.Time    `json:"expires_at"` // La page web, elle, utilise le cookie
 }
 
-type registerRequest struct {
+// newUserRequest : création d'un compte (installation ou console admin).
+type newUserRequest struct {
 	Email       string `json:"email"`
 	Password    string `json:"password"`
 	DisplayName string `json:"display_name"`
@@ -76,16 +81,28 @@ type loginRequest struct {
 	Password string `json:"password"`
 }
 
-// Register : POST /api/v1/auth/register
-func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
-	var req registerRequest
+// SetupStatus : GET /api/v1/auth/setup → {"needs_setup": true} tant qu'aucun compte n'existe.
+// La page web affiche alors « Créer le compte administrateur » au lieu de « Connexion ».
+func (h *AuthHandler) SetupStatus(w http.ResponseWriter, r *http.Request) {
+	var needsSetup bool
+	if err := h.pool.QueryRow(r.Context(), `SELECT NOT EXISTS (SELECT 1 FROM users)`).Scan(&needsSetup); err != nil {
+		httpjson.ServerError(w, err)
+		return
+	}
+	httpjson.Write(w, http.StatusOK, map[string]bool{"needs_setup": needsSetup})
+}
+
+// Setup : POST /api/v1/auth/setup → crée le premier compte, qui est admin.
+// Refusé (403) dès qu'un compte existe : les comptes suivants sont créés par l'admin.
+func (h *AuthHandler) Setup(w http.ResponseWriter, r *http.Request) {
+	var req newUserRequest
 	if !httpjson.Read(w, r, &req) {
 		return
 	}
 
 	email := normalizeEmail(req.Email)
 	name := strings.TrimSpace(req.DisplayName)
-	if message := validateRegister(email, req.Password, name); message != "" {
+	if message := validateNewUser(email, req.Password, name); message != "" {
 		httpjson.Error(w, http.StatusBadRequest, message)
 		return
 	}
@@ -96,9 +113,9 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := h.createUser(r.Context(), email, name, hash)
-	if isUniqueViolation(err) {
-		httpjson.Error(w, http.StatusConflict, "Un compte existe déjà avec cet email")
+	user, err := createUser(r.Context(), h.pool, email, name, hash, true)
+	if errors.Is(err, errSetupDone) {
+		httpjson.Error(w, http.StatusForbidden, "L'installation est déjà faite : demande un compte à l'administrateur")
 		return
 	}
 	if err != nil {
@@ -226,19 +243,37 @@ func (h *AuthHandler) UpdateMe(w http.ResponseWriter, r *http.Request) {
 }
 
 // createUser crée l'utilisateur et ses niveaux d'urgence par défaut, dans une seule transaction.
-func (h *AuthHandler) createUser(ctx context.Context, email, name, hash string) (userResponse, error) {
+//
+// firstAdmin = true (installation) : le compte n'est créé que si la table users est vide
+// (sinon errSetupDone), et il est admin. Sinon (console admin) : compte normal.
+func createUser(ctx context.Context, pool *pgxpool.Pool, email, name, hash string, firstAdmin bool) (userResponse, error) {
 	var user userResponse
 
-	tx, err := h.pool.Begin(ctx)
+	tx, err := pool.Begin(ctx)
 	if err != nil {
 		return user, err
 	}
 	defer tx.Rollback(ctx) // Sans effet si le Commit a réussi
 
+	if firstAdmin {
+		// Verrou jusqu'à la fin de la transaction : si deux installations arrivent en même temps,
+		// la seconde attend que la première soit finie, puis voit qu'un compte existe.
+		if _, err = tx.Exec(ctx, `LOCK TABLE users IN EXCLUSIVE MODE`); err != nil {
+			return user, err
+		}
+		var exists bool
+		if err = tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM users)`).Scan(&exists); err != nil {
+			return user, err
+		}
+		if exists {
+			return user, errSetupDone
+		}
+	}
+
 	err = tx.QueryRow(ctx,
-		`INSERT INTO users (email, display_name, password_hash) VALUES ($1, $2, $3)
+		`INSERT INTO users (email, display_name, password_hash, is_admin) VALUES ($1, $2, $3, $4)
 		 RETURNING `+userColumns,
-		email, name, hash).Scan(user.scanTargets()...)
+		email, name, hash, firstAdmin).Scan(user.scanTargets()...)
 	if err != nil {
 		return user, err
 	}
@@ -281,17 +316,24 @@ func normalizeEmail(email string) string {
 	return strings.ToLower(strings.TrimSpace(email))
 }
 
-// validateRegister retourne un message d'erreur, ou "" si tout est valide.
-func validateRegister(email, password, name string) string {
+// validateNewUser retourne un message d'erreur, ou "" si tout est valide.
+func validateNewUser(email, password, name string) string {
 	switch {
 	case !strings.Contains(email, "@") || len(email) > 254:
 		return "Email invalide"
+	case name == "" || utf8.RuneCountInString(name) > 100:
+		return "Le nom affiché doit faire entre 1 et 100 caractères"
+	}
+	return validatePassword(password)
+}
+
+// validatePassword retourne un message d'erreur, ou "" si le mot de passe est valide.
+func validatePassword(password string) string {
+	switch {
 	case utf8.RuneCountInString(password) < auth.MinPasswordLength:
 		return "Le mot de passe doit faire au moins 8 caractères"
 	case len(password) > auth.MaxPasswordBytes:
 		return "Le mot de passe est trop long (72 octets maximum)"
-	case name == "" || utf8.RuneCountInString(name) > 100:
-		return "Le nom affiché doit faire entre 1 et 100 caractères"
 	}
 	return ""
 }
