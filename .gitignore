@@ -3,3 +3,7 @@
 
 # macOS
 .DS_Store
+
+# Binaires du serveur MCP (go build dans mcp/)
+mcp/mcp
+mcp/bettertodo-mcp

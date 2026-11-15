@@ -119,6 +119,13 @@ Observé dans ses autres projets (C++ embarqué, React/TypeScript). Écrire du c
   - obligation **côté interface seulement** : l'API envoie le drapeau mais ne bloque pas les autres routes ;
   - `POST /me/password` demande **toujours** l'ancien mot de passe (même sur l'écran obligatoire), et ferme les autres sessions du compte ;
   - partie « Mot de passe » dans les Paramètres, erreurs affichées sous le formulaire.
+- **2026-11-15 – Étape 4 : intégration MCP** (Claude lit et écrit les tâches) :
+  - **jetons d'accès personnels** (`api_tokens`, migration 007) : préfixe `btd_`, seul le hash SHA-256 en base, pas d'expiration, créés / révoqués dans Paramètres › Jetons d'accès (affichés une seule fois) ;
+  - un jeton marche partout **sauf** sur les routes sensibles (`RequireSession` → 403) : mot de passe, `/me/tokens`, console admin, déconnexion ;
+  - **serveur MCP local (stdio)** en Go, module à part dans `mcp/`, SDK officiel `modelcontextprotocol/go-sdk`. Client de l'API (`BETTERTODO_URL` + `BETTERTODO_TOKEN`), jamais de la base ;
+  - outils : lire listes / liste / échéances / tags et urgences, créer et modifier une tâche (cocher compris). **Aucune suppression** ;
+  - l'instance de l'utilisateur tourne sur un **serveur distant** : le binaire tourne sur le Mac et appelle l'API en HTTPS. Tuto : `docs/connecter-claude.md` ;
+  - plus tard peut-être : mode MCP distant (HTTP + OAuth) pour claude.ai web / mobile.
 - **2026-11-13 – Maquette web validée** (Figma, page « Web – Maquette v2 »).
 
 ## Questions ouvertes

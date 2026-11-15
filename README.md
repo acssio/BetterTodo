@@ -14,6 +14,10 @@ docker compose up -d --build --wait
 
 Puis ouvrir http://localhost:8000.
 
+## Connecter Claude (MCP)
+
+Claude (Claude Code, Claude Desktop) peut lire, créer, modifier et cocher tes tâches, mais pas les supprimer. Il passe par un jeton d'accès créé dans les Paramètres. Tuto : **[Connecter Claude à BetterTodo](docs/connecter-claude.md)**.
+
 ## Comprendre le code
 
 Voir [docs/etapes](docs/etapes) : un document par étape du développement, qui explique ce qui a été fait et comment le lancer.
@@ -30,3 +34,4 @@ Voir [docs/etapes](docs/etapes) : un document par étape du développement, qui 
 10. [Listes intelligentes : Aujourd'hui et Planifié](docs/etapes/03d-listes-intelligentes.md)
 11. [Compte administrateur, console admin, plus d'icônes](docs/etapes/03e-admin-et-icones.md)
 12. [Changer son mot de passe](docs/etapes/03f-mot-de-passe.md)
+13. [Intégration MCP : jetons d'accès et serveur MCP pour Claude](docs/etapes/04-integration-mcp.md)

@@ -1,7 +1,7 @@
 import * as React from 'react'
-import { Check, Columns3, GripVertical, Plus, Rows2, Trash2, X } from 'lucide-react'
+import { Check, Columns3, Copy, GripVertical, KeyRound, Plus, Rows2, Trash2, X } from 'lucide-react'
 import { api, ApiError } from '../api/ApiClient'
-import type { Language, ListView, Tag, UrgencyLevel, User, UserChanges } from '../api/types'
+import type { ApiToken, Language, ListView, Tag, UrgencyLevel, User, UserChanges } from '../api/types'
 import { computeDropIndex } from '../utils/dragDrop'
 import { moveItem } from '../utils/moveItem'
 import { DismissListener } from '../utils/popover'
@@ -38,19 +38,27 @@ class SettingsDialogState {
     confirmPassword: string = ''
     passwordDone: boolean = false // true = « Mot de passe changé » affiché
     passwordError: string = ''    // Affichée sous le formulaire (l'erreur générale est en haut, hors de vue)
+    tokens: ApiToken[] = []       // Partie « Jetons d'accès »
+    tokensLoaded: boolean = false
+    addingToken: boolean = false
+    newToken: string = ''         // Jeton tout juste créé : affiché une seule fois
+    tokenCopied: boolean = false
+    tokenSelected: boolean = false // Presse-papiers refusé : le jeton est sélectionné, à copier avec Cmd+C
     error: string = ''
 }
 
 /**
- * Écran Paramètres (écran 6 de la maquette) : compte, niveaux d'urgence, tags, vue par défaut.
+ * Écran Paramètres (écran 6 de la maquette) : compte, niveaux d'urgence, tags, vue par défaut,
+ * jetons d'accès (pour Claude via MCP).
  *
  * Exception à la règle « seul Workspace parle à l'API » : c'est un écran à part,
- * qui charge et modifie ses propres données (les tags). Il prévient Workspace de
+ * qui charge et modifie ses propres données (les tags, les jetons d'accès). Il prévient Workspace de
  * ce qui le concerne (onUserChanged, onUrgencyLevelsChanged), et Workspace recharge
  * la liste affichée à la fermeture (un tag renommé y apparaît peut-être).
  */
 export class SettingsDialog extends React.Component<SettingsDialogProps, SettingsDialogState> {
     private dialogRef = React.createRef<HTMLDivElement>()
+    private newTokenRef = React.createRef<HTMLInputElement>()
     private dismiss = new DismissListener(this.dialogRef, () => this.props.onClose())
 
     constructor(props: SettingsDialogProps) {
@@ -61,7 +69,8 @@ export class SettingsDialog extends React.Component<SettingsDialogProps, Setting
     async componentDidMount(): Promise<void> {
         this.dismiss.start()
         try {
-            this.setState({ tags: await api.getTags(), tagsLoaded: true })
+            const [tags, tokens] = await Promise.all([api.getTags(), api.getApiTokens()])
+            this.setState({ tags, tagsLoaded: true, tokens, tokensLoaded: true })
         } catch (error) {
             this.showError(error)
         }
@@ -235,6 +244,42 @@ export class SettingsDialog extends React.Component<SettingsDialogProps, Setting
     }
 
     // =========================================================================
+    // Jetons d'accès
+    // =========================================================================
+
+    private async createToken(name: string): Promise<void> {
+        try {
+            const created = await api.createApiToken(name)
+            const { token, ...listed } = created // Le jeton en clair n'est gardé que pour l'encadré
+            this.setState(state => ({ tokens: [listed, ...state.tokens], newToken: token, tokenCopied: false, tokenSelected: false, addingToken: false }))
+        } catch (error) {
+            this.showError(error)
+        }
+    }
+
+    private async deleteToken(token: ApiToken): Promise<void> {
+        if (!(await confirmDialog.ask(`Révoquer le jeton « ${token.name} » ? Les programmes qui l'utilisent n'auront plus accès à tes listes.`, { confirmLabel: 'Révoquer' }))) return
+
+        this.setState(state => ({ tokens: state.tokens.filter(t => t.id !== token.id) }))
+        try {
+            await api.deleteApiToken(token.id)
+        } catch (error) {
+            this.showError(error)
+        }
+    }
+
+    onCopyTokenClick = async (): Promise<void> => {
+        try {
+            await navigator.clipboard.writeText(this.state.newToken)
+            this.setState({ tokenCopied: true })
+        } catch {
+            // Presse-papiers refusé (page en HTTP hors localhost, navigateur intégré…) : on sélectionne le jeton
+            this.newTokenRef.current?.select()
+            this.setState({ tokenSelected: true })
+        }
+    }
+
+    // =========================================================================
     // Rendu
     // =========================================================================
 
@@ -259,6 +304,7 @@ export class SettingsDialog extends React.Component<SettingsDialogProps, Setting
                         {this.renderLevels()}
                         {this.renderTags()}
                         {this.renderDefaultView()}
+                        {this.renderTokens()}
                     </div>
 
                     <footer className="settings-foot">
@@ -515,4 +561,64 @@ export class SettingsDialog extends React.Component<SettingsDialogProps, Setting
             </section>
         )
     }
+
+    private renderTokens(): React.ReactNode {
+        const { tokens, tokensLoaded, newToken } = this.state
+
+        return (
+            <section>
+                <h3>Jetons d'accès</h3>
+                <p className="settings-desc">
+                    Pour qu'un programme, comme Claude via MCP, lise et modifie tes tâches sans ton mot de passe.
+                    Il ne peut ni changer ton mot de passe, ni gérer les jetons, ni ouvrir la console admin.
+                </p>
+
+                {newToken && (
+                    <div className="settings-new-token">
+                        <p>Copie ce jeton maintenant : il ne sera plus jamais affiché.</p>
+                        <div className="settings-new-token-row">
+                            <input ref={this.newTokenRef} readOnly value={newToken} onFocus={event => event.currentTarget.select()} aria-label="Nouveau jeton" />
+                            <button className="btn-ghost" onClick={() => void this.onCopyTokenClick()}>
+                                {this.state.tokenCopied ? <><Check size={14} />Copié</> : <><Copy size={14} />Copier</>}
+                            </button>
+                        </div>
+                        {this.state.tokenSelected && <p className="settings-desc">Jeton sélectionné : copie-le avec Cmd+C (Ctrl+C).</p>}
+                    </div>
+                )}
+
+                <div className="settings-tokens">
+                    {!tokensLoaded && <span className="settings-desc">Chargement…</span>}
+                    {tokens.map(token => (
+                        <div key={token.id} className="settings-token">
+                            <KeyRound size={15} className="settings-token-icon" />
+                            <span className="settings-token-name" title={token.name}>{token.name}</span>
+                            <span className="settings-token-dates">
+                                {token.last_used_at ? `Utilisé le ${formatDay(token.last_used_at)}` : 'Jamais utilisé'}
+                            </span>
+                            <button className="icon-btn" title={`Révoquer « ${token.name} »`} onClick={() => void this.deleteToken(token)}>
+                                <Trash2 size={15} />
+                            </button>
+                        </div>
+                    ))}
+                </div>
+
+                {this.state.addingToken ? (
+                    <InlineInput
+                        placeholder="Nom du jeton (ex. Claude sur le MacBook)"
+                        onSubmit={name => this.createToken(name)}
+                        onCancel={() => this.setState({ addingToken: false })}
+                    />
+                ) : (
+                    <button className="settings-add" onClick={() => this.setState({ addingToken: true })}>
+                        <Plus size={14} />Créer un jeton
+                    </button>
+                )}
+            </section>
+        )
+    }
+}
+
+/** "2026-11-15T10:42:00Z" → "15/11/2026" (date locale) */
+function formatDay(iso: string): string {
+    return new Date(iso).toLocaleDateString('fr-FR')
 }

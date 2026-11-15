@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -26,6 +27,9 @@ func NewSessionStore(pool *pgxpool.Pool, duration time.Duration) *SessionStore {
 // Create ouvre une session pour userID et retourne le jeton à donner au client.
 func (s *SessionStore) Create(ctx context.Context, userID string) (string, time.Time, error) {
 	token := NewToken()
+	for strings.HasPrefix(token, APITokenPrefix) { // Très rare, mais serait pris pour un jeton d'accès
+		token = NewToken()
+	}
 	expiresAt := time.Now().Add(s.duration)
 
 	// Au passage, on fait le ménage dans les sessions expirées de cet utilisateur

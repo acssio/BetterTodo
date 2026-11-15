@@ -152,3 +152,16 @@ export interface DueCounts {
     today: number     // Échéance aujourd'hui ou en retard
     scheduled: number // Toutes les tâches avec une échéance
 }
+
+/** Jeton d'accès personnel (Paramètres) : permet à un programme, comme Claude via MCP, d'utiliser l'API. */
+export interface ApiToken {
+    id: string
+    name: string
+    created_at: string
+    last_used_at: string | null // null = jamais utilisé
+}
+
+/** Réponse de la création : la seule fois où le jeton lui-même est envoyé. */
+export interface CreatedApiToken extends ApiToken {
+    token: string
+}

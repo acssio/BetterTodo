@@ -3,6 +3,7 @@ package auth
 import (
 	"bytes"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -76,5 +77,18 @@ func TestTokenFromRequest(t *testing.T) {
 	r = httptest.NewRequest("GET", "/", nil)
 	if got := TokenFromRequest(r); got != "" {
 		t.Errorf("sans jeton : obtenu %q", got)
+	}
+}
+
+func TestNewAPIToken(t *testing.T) {
+	token := NewAPIToken()
+	if !strings.HasPrefix(token, APITokenPrefix) {
+		t.Errorf("le jeton d'accès doit commencer par %q : %q", APITokenPrefix, token)
+	}
+	if len(token) != len(APITokenPrefix)+43 {
+		t.Errorf("longueur du jeton d'accès : %d", len(token))
+	}
+	if NewAPIToken() == token {
+		t.Error("deux jetons d'accès identiques générés")
 	}
 }
