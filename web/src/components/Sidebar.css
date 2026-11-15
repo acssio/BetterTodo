@@ -165,6 +165,12 @@
     font-weight: 600;
 }
 
+/* Liste ouverte dans l'autre moitié (vue scindée) */
+.sidebar-item.open-side {
+    box-shadow: inset 2px 0 0 var(--accent);
+    color: var(--text);
+}
+
 .sidebar-item:disabled {
     opacity: 0.55;
 }

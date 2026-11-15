@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { Columns3, Ellipsis, Eye, EyeOff, Pencil, Plus, Rows2, Search, Trash2 } from 'lucide-react'
+import { Columns3, Ellipsis, Eye, EyeOff, Pencil, Plus, Rows2, Search, Trash2, X } from 'lucide-react'
 import type { ListView, TodoList } from '../api/types'
 import { ListIcon } from './ListIcon'
 import { Menu } from './Menu'
@@ -14,6 +14,7 @@ interface ListHeaderProps {
     onEditList: (anchor: DOMRect) => void
     onToggleShowDone: () => void
     onClearDone: () => void
+    onClosePane?: () => void // Seulement en vue scindée : ferme cette moitié
 }
 
 class ListHeaderState {
@@ -116,6 +117,12 @@ export class ListHeader extends React.Component<ListHeaderProps, ListHeaderState
                         />
                     )}
                 </div>
+
+                {this.props.onClosePane && (
+                    <button className="icon-btn header-tool" title="Fermer cette moitié" onClick={this.props.onClosePane}>
+                        <X size={16} />
+                    </button>
+                )}
 
                 <button className="btn-primary header-new-group" title="Nouveau groupe" onClick={this.props.onNewGroup}>
                     <Plus size={14} /><span className="btn-label">Nouveau groupe</span>

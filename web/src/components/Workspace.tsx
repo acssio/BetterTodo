@@ -4,8 +4,8 @@ import type {
     Board as BoardData, BoardGroup, Folder, ListChanges, ListView, Task, TaskChanges, TodoList, UrgencyLevel, User,
 } from '../api/types'
 import {
-    appendTask, countDoneTasks, countOpenTasks, findTask, hideDoneTasks, indexInGroup, moveTask, removeTask, replaceTask,
-    visibleToFullIndex,
+    appendTask, boardWithGroup, boardWithTask, countDoneTasks, countOpenTasks, findTask, hideDoneTasks, indexInGroup,
+    moveTask, placeTask, removeTask, replaceTask, visibleToFullIndex,
 } from '../utils/board'
 import type { DragState, DropTarget } from '../utils/dragDrop'
 import { SIDEBAR, sidebarMode } from '../utils/sidebarLayout'
@@ -20,9 +20,13 @@ import { SidebarResizer } from './SidebarResizer'
 import { TaskPopover } from './TaskPopover'
 import './Workspace.css'
 
-// Clés du navigateur : dernière liste consultée, largeur de la barre latérale
-const SELECTED_LIST_KEY = 'bettertodo.selectedList'
+// Clés du navigateur : listes ouvertes (vue scindée), largeur de la barre latérale
+const PANES_KEY = 'bettertodo.panes'
+const OLD_SELECTED_LIST_KEY = 'bettertodo.selectedList' // Ancienne clé (avant la vue scindée)
 const SIDEBAR_WIDTH_KEY = 'bettertodo.sidebarWidth'
+
+// En dessous de cette largeur de fenêtre, on n'affiche que la moitié active
+const SPLIT_MIN_WINDOW_WIDTH = 1100
 
 interface WorkspaceProps {
     user: User
@@ -37,18 +41,26 @@ interface OpenPopover {
     anchor: DOMRect
 }
 
+/** Une moitié de l'écran : la liste affichée et son contenu (null pendant le chargement). */
+interface Pane {
+    listId: string
+    board: BoardData | null
+}
+
 class WorkspaceState {
     folders: Folder[] = []
     lists: TodoList[] = []
     urgencyLevels: UrgencyLevel[] = []
-    selectedListId: string | null = null
-    board: BoardData | null = null // Contenu de la liste sélectionnée
+    panes: Pane[] = []          // 1 liste affichée, ou 2 en vue scindée (gauche, droite)
+    activePane: number = 0      // Moitié où s'ouvre une liste cliquée dans la barre latérale
     openTask: OpenPopover | null = null    // Overlay d'une tâche
     editingList: OpenPopover | null = null // Overlay « Modifier une liste »
     drag: DragState | null = null          // Glisser-déposer d'une tâche en cours
+    listDrag: string | null = null         // Liste glissée depuis la barre latérale
+    dropPane: number | null = null         // Moitié survolée pendant ce glisser
+    addingGroupListId: string | null = null
     settingsOpen: boolean = false
-    addingGroup: boolean = false
-    loading: boolean = true        // Premier chargement
+    loading: boolean = true                // Premier chargement
     error: string = ''
 
     // Barre latérale
@@ -56,17 +68,21 @@ class WorkspaceState {
     // Largeur à retrouver en quittant le mode icônes
     lastExpandedWidth: number = this.sidebarWidth >= SIDEBAR.compactBelow ? this.sidebarWidth : SIDEBAR.default
     windowWidth: number = window.innerWidth
-    sidebarPeek: boolean = false                // Ouverte par-dessus le contenu (fenêtre étroite)
+    sidebarPeek: boolean = false           // Ouverte par-dessus le contenu (fenêtre étroite)
 }
 
 /**
- * L'écran principal une fois connecté : barre latérale + liste sélectionnée.
+ * L'écran principal une fois connecté : barre latérale + une ou deux listes (vue scindée).
  *
- * C'est le SEUL composant (avec App) qui parle à l'API. Pour chaque modification :
+ * C'est le composant qui parle à l'API pour les listes et les tâches. Pour chaque modification :
  *   1. l'écran est mis à jour tout de suite (« mise à jour optimiste ») ;
  *   2. la requête part vers l'API ;
  *   3. la réponse du serveur remplace la version locale ;
- *      en cas d'erreur, on recharge le board pour revenir à la vérité du serveur.
+ *      en cas d'erreur, on recharge les listes affichées pour revenir à la vérité du serveur.
+ *
+ * Vue scindée : chaque moitié (Pane) a son board. Les modifications de tâches sont
+ * appliquées à TOUS les boards affichés (updateBoards) : une tâche n'est que dans un
+ * board, les autres ne changent pas. C'est ce qui rend le glisser d'une liste à l'autre simple.
  */
 export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> implements TaskViewActions {
     constructor(props: WorkspaceProps) {
@@ -85,11 +101,11 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
             ])
             this.setState({ folders, lists, urgencyLevels, loading: false })
 
-            // Rouvre la dernière liste consultée, sinon la première
-            const remembered = readStorage(SELECTED_LIST_KEY)
-            const first = lists.find(list => list.id === remembered) ?? lists[0]
-            if (first) {
-                await this.selectList(first.id)
+            // Rouvre les listes de la dernière visite (si elles existent encore), sinon la première
+            const saved = readSavedPanes().filter(id => lists.some(list => list.id === id))
+            const listIds = saved.length > 0 ? saved : lists.slice(0, 1).map(list => list.id)
+            for (let index = 0; index < listIds.length; index++) {
+                await this.openList(listIds[index], index)
             }
         } catch (error) {
             this.handleError(error)
@@ -98,6 +114,13 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
 
     componentWillUnmount(): void {
         window.removeEventListener('resize', this.onWindowResize)
+    }
+
+    /** Les listes ouvertes ont changé → on les retient pour la prochaine visite. */
+    componentDidUpdate(_props: WorkspaceProps, previous: WorkspaceState): void {
+        const before = previous.panes.map(pane => pane.listId).join()
+        const now = this.state.panes.map(pane => pane.listId)
+        if (now.join() !== before) savePanes(now)
     }
 
     // =========================================================================
@@ -154,29 +177,82 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
     }
 
     // =========================================================================
-    // Navigation
+    // Moitiés (vue scindée)
     // =========================================================================
 
-    /** Affiche une liste : charge son board. */
-    selectList = async (listId: string): Promise<void> => {
-        this.setState({ selectedListId: listId, openTask: null, addingGroup: false, error: '', sidebarPeek: false })
-        writeStorage(SELECTED_LIST_KEY, listId)
-        // On passe listId : this.state n'est PAS encore à jour juste après setState
+    /** La vue scindée est-elle affichée ? (2 listes ouvertes ET fenêtre assez large) */
+    private splitVisible(): boolean {
+        return this.state.panes.length === 2 && this.state.windowWidth >= SPLIT_MIN_WINDOW_WIDTH
+    }
+
+    /**
+     * Ouvre une liste dans la moitié paneIndex (0 = gauche, 1 = droite ; 1 crée la moitié droite).
+     * Si la liste est déjà ouverte dans l'autre moitié, on active simplement celle-ci.
+     */
+    openList = async (listId: string, paneIndex: number): Promise<void> => {
+        // setState(state => …) et non this.state : au démarrage, deux openList se suivent de
+        // près, et this.state peut ne pas encore contenir le board rangé par le premier.
+        this.setState(state => {
+            const already = state.panes.findIndex(pane => pane.listId === listId)
+            if (already !== -1) {
+                return { ...state, activePane: already, sidebarPeek: false }
+            }
+
+            const panes = [...state.panes]
+            const index = Math.min(paneIndex, panes.length) // Pas de « trou » : au plus une moitié de plus
+            panes[index] = { listId, board: null }
+            return { ...state, panes, activePane: index, openTask: null, addingGroupListId: null, error: '', sidebarPeek: false }
+        })
         await this.reloadBoard(listId)
     }
 
-    /** Recharge le board d'une liste (par défaut, la liste sélectionnée) depuis le serveur. */
-    private async reloadBoard(listId: string | null = this.state.selectedListId): Promise<void> {
-        if (!listId) return
+    /** Clic sur une liste : dans la moitié active. Cmd/Ctrl+clic : dans l'autre moitié (créée si besoin). */
+    onSelectList = (listId: string, toSide: boolean): void => {
+        if (toSide) {
+            void this.openList(listId, this.state.panes.length < 2 ? 1 : 1 - this.state.activePane)
+        } else {
+            void this.openList(listId, this.state.activePane)
+        }
+    }
 
-        try {
-            const board = await api.getBoard(listId)
-            // Si on a changé de liste entre-temps, on ignore cette réponse
-            if (this.state.selectedListId === listId) {
-                this.setState({ board })
+    closePane = (index: number): void => {
+        this.setState(state => ({ panes: state.panes.filter((_, i) => i !== index), activePane: 0, openTask: null }))
+    }
+
+    // --- Glisser une liste de la barre latérale vers une moitié ----------------
+
+    onListDragStart = (listId: string): void => {
+        this.setState({ listDrag: listId, openTask: null })
+    }
+
+    onListDragEnd = (): void => {
+        this.setState({ listDrag: null, dropPane: null })
+    }
+
+    onListDrop = (paneIndex: number): void => {
+        const listId = this.state.listDrag
+        this.setState({ listDrag: null, dropPane: null })
+        if (listId) void this.openList(listId, paneIndex)
+    }
+
+    // =========================================================================
+    // Chargement des données
+    // =========================================================================
+
+    /** Recharge depuis le serveur le board d'une liste affichée (par défaut : toutes). */
+    private async reloadBoard(listId?: string): Promise<void> {
+        const listIds = listId ? [listId] : this.state.panes.map(pane => pane.listId)
+
+        for (const id of listIds) {
+            try {
+                const board = await api.getBoard(id)
+                // On ne range le board que si la liste est toujours affichée
+                this.setState(state => ({
+                    panes: state.panes.map(pane => (pane.listId === id ? { ...pane, board } : pane)),
+                }))
+            } catch (error) {
+                this.handleError(error)
             }
-        } catch (error) {
-            this.handleError(error)
         }
     }
 
@@ -189,13 +265,20 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
         }
     }
 
-    /** Modifie le board local avec une fonction de utils/board.ts. */
-    private updateBoard(change: (board: BoardData) => BoardData): void {
-        this.setState(state => (state.board ? { board: change(state.board) } : null))
+    /** Applique une fonction de utils/board.ts à chaque board affiché. */
+    private updateBoards(change: (board: BoardData) => BoardData): void {
+        this.setState(state => ({
+            panes: state.panes.map(pane => (pane.board ? { ...pane, board: change(pane.board) } : pane)),
+        }))
+    }
+
+    /** Les boards déjà chargés. */
+    private boards(): BoardData[] {
+        return this.state.panes.flatMap(pane => (pane.board ? [pane.board] : []))
     }
 
     // =========================================================================
-    // Barre latérale
+    // Barre latérale : groupes de listes et listes
     // =========================================================================
 
     /** Replie / déplie un groupe de listes. */
@@ -221,12 +304,12 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
         }
     }
 
-    /** Crée une liste et l'ouvre aussitôt. */
+    /** Crée une liste et l'ouvre aussitôt dans la moitié active. */
     onCreateList = async (name: string, folderId: string | null): Promise<void> => {
         try {
             const list = await api.createList(name, folderId)
             await this.refreshLists()
-            await this.selectList(list.id)
+            await this.openList(list.id, this.state.activePane)
         } catch (error) {
             this.handleError(error)
         }
@@ -261,7 +344,7 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
         this.setState({ settingsOpen: true, openTask: null, editingList: null, sidebarPeek: false })
     }
 
-    /** À la fermeture : la liste affichée peut contenir un tag renommé ou supprimé. */
+    /** À la fermeture : les listes affichées peuvent contenir un tag renommé ou supprimé. */
     onCloseSettings = (): void => {
         this.setState({ settingsOpen: false })
         void this.reloadBoard()
@@ -271,12 +354,12 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
         this.setState({ editingList: { id: list.id, anchor }, openTask: null })
     }
 
-    /** Modifie une liste (nom, couleur, icône, groupe de listes, vue). */
+    /** Modifie une liste (nom, couleur, icône, groupe de listes, vue, tâches faites). */
     updateList = async (listId: string, changes: ListChanges): Promise<void> => {
         const apply = (list: TodoList): TodoList => (list.id === listId ? { ...list, ...changes } : list)
         this.setState(state => ({
             lists: state.lists.map(apply),
-            board: state.board ? { ...state.board, list: apply(state.board.list) } : null,
+            panes: state.panes.map(pane => (pane.board ? { ...pane, board: { ...pane.board, list: apply(pane.board.list) } } : pane)),
         }))
 
         try {
@@ -289,23 +372,24 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
     }
 
     /** Bascule Colonnes / Sections : enregistrée sur la liste (retrouvée sur tous les appareils). */
-    onChangeView = (view: ListView): void => {
-        const listId = this.state.selectedListId
-        if (listId && this.state.board?.list.default_view !== view) {
-            void this.updateList(listId, { default_view: view })
-        }
+    onChangeView = (list: TodoList, view: ListView): void => {
+        if (list.default_view !== view) void this.updateList(list.id, { default_view: view })
     }
 
     deleteList = async (list: TodoList): Promise<void> => {
         const remaining = this.state.lists.filter(l => l.id !== list.id)
         this.setState({ editingList: null, lists: remaining })
 
-        // Si c'était la liste affichée, on ouvre la première qui reste
-        if (this.state.selectedListId === list.id) {
-            if (remaining.length > 0) {
-                void this.selectList(remaining[0].id)
+        // Si la liste était affichée : on ferme sa moitié (vue scindée) ou on ouvre la première qui reste
+        const paneIndex = this.state.panes.findIndex(pane => pane.listId === list.id)
+        if (paneIndex !== -1) {
+            if (this.state.panes.length === 2) {
+                this.closePane(paneIndex)
+            } else if (remaining.length > 0) {
+                this.setState({ panes: [] })
+                void this.openList(remaining[0].id, 0)
             } else {
-                this.setState({ selectedListId: null, board: null })
+                this.setState({ panes: [] })
             }
         }
 
@@ -322,10 +406,10 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
     // =========================================================================
 
     toggleTask = async (task: Task): Promise<void> => {
-        this.updateBoard(board => replaceTask(board, { ...task, done: !task.done }))
+        this.updateBoards(board => replaceTask(board, { ...task, done: !task.done }))
         try {
             const saved = await api.updateTask(task.id, { done: !task.done })
-            this.updateBoard(board => replaceTask(board, saved))
+            this.updateBoards(board => replaceTask(board, saved))
             void this.refreshLists()
         } catch (error) {
             this.handleError(error)
@@ -340,14 +424,14 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
     createTask = async (groupId: string, title: string): Promise<void> => {
         try {
             const task = await api.createTask(groupId, title)
-            this.updateBoard(board => appendTask(board, task))
+            this.updateBoards(board => appendTask(board, task))
             void this.refreshLists()
         } catch (error) {
             this.handleError(error)
         }
     }
 
-    // --- Glisser-déposer : l'état est ici, au-dessus de toutes les vues -------------
+    // --- Glisser-déposer : l'état est ici, au-dessus des deux moitiés -----------
 
     startTaskDrag = (task: Task): void => {
         // setTimeout : laisse le navigateur faire sa « photo » de la carte avant de la griser
@@ -370,20 +454,25 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
         }
     }
 
-    /** Déplace une tâche : index compté sans la tâche déplacée (comme l'API). */
+    /**
+     * Déplace une tâche dans un groupe, éventuellement d'une AUTRE liste (vue scindée).
+     * visibleIndex : index sous la souris, compté parmi les tâches affichées sans la tâche déplacée.
+     */
     private async moveTask(taskId: string, groupId: string, visibleIndex: number): Promise<void> {
-        const board = this.state.board
-        const task = board ? findTask(board, taskId) : undefined
-        const group = board?.groups.find(g => g.id === groupId)
-        if (!board || !task || !group) return
+        const boards = this.boards()
+        const source = boardWithTask(boards, taskId)
+        const target = boardWithGroup(boards, groupId)
+        const task = source ? findTask(source, taskId) : undefined
+        const group = target?.groups.find(g => g.id === groupId)
+        if (!source || !target || !task || !group) return
 
-        // Tâches faites masquées : l'index visé est compté parmi les tâches visibles seulement
-        const index = board.list.show_done ? visibleIndex : visibleToFullIndex(group.tasks, taskId, visibleIndex)
+        // Tâches faites masquées dans la liste cible : l'index est compté parmi les tâches visibles
+        const index = target.list.show_done ? visibleIndex : visibleToFullIndex(group.tasks, taskId, visibleIndex)
 
         const sameGroup = task.group_id === groupId
-        if (sameGroup && indexInGroup(board, taskId) === index) return // Reposée à sa place
+        if (sameGroup && indexInGroup(source, taskId) === index) return // Reposée à sa place
 
-        this.updateBoard(b => moveTask(b, taskId, groupId, index))
+        this.updateBoards(board => placeTask(board, task, groupId, index))
         const changes: TaskChanges = { position: index }
         if (!sameGroup) changes.group_id = groupId
 
@@ -393,56 +482,27 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
             this.handleError(error)
         }
         void this.reloadBoard() // Récupère les positions renumérotées par le serveur
+        if (source.list.id !== target.list.id) void this.refreshLists() // Compteurs des deux listes
     }
 
-    createGroup = async (name: string): Promise<void> => {
-        const listId = this.state.selectedListId
-        if (!listId) return
-
+    createGroup = async (listId: string, name: string): Promise<void> => {
         try {
             const group = await api.createGroup(listId, name)
-            this.updateBoard(board => ({ ...board, groups: [...board.groups, { ...group, tasks: [] }] }))
+            this.updateBoards(board => (
+                board.list.id === listId ? { ...board, groups: [...board.groups, { ...group, tasks: [] }] } : board
+            ))
         } catch (error) {
             this.handleError(error)
         }
     }
 
     renameGroup = async (groupId: string, name: string): Promise<void> => {
-        this.updateBoard(board => ({
+        this.updateBoards(board => ({
             ...board,
             groups: board.groups.map(g => (g.id === groupId ? { ...g, name } : g)),
         }))
         try {
             await api.renameGroup(groupId, name)
-        } catch (error) {
-            this.handleError(error)
-            void this.reloadBoard()
-        }
-    }
-
-    // --- Tâches faites : masquer / vider ----------------------------------------
-
-    onToggleShowDone = (): void => {
-        const list = this.state.board?.list
-        if (list) void this.updateList(list.id, { show_done: !list.show_done })
-    }
-
-    onClearDone = async (): Promise<void> => {
-        const board = this.state.board
-        if (!board) return
-
-        const count = countDoneTasks(board)
-        if (count === 0) {
-            window.alert('Aucune tâche faite à vider dans cette liste.')
-            return
-        }
-        const word = count > 1 ? `les ${count} tâches faites` : 'la tâche faite'
-        if (!window.confirm(`Supprimer définitivement ${word} de « ${board.list.name} » ?`)) return
-
-        this.setState({ openTask: null })
-        this.updateBoard(b => ({ ...b, groups: b.groups.map(g => ({ ...g, tasks: g.tasks.filter(t => !t.done) })) }))
-        try {
-            await api.clearDoneTasks(board.list.id)
         } catch (error) {
             this.handleError(error)
             void this.reloadBoard()
@@ -456,13 +516,41 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
         if (count > 1) message = `Supprimer le groupe « ${group.name} » et ses ${count} tâches ?`
         if (!window.confirm(message)) return
 
-        this.updateBoard(board => ({ ...board, groups: board.groups.filter(g => g.id !== group.id) }))
+        this.updateBoards(board => ({ ...board, groups: board.groups.filter(g => g.id !== group.id) }))
         try {
             await api.deleteGroup(group.id)
             void this.refreshLists()
         } catch (error) {
             this.handleError(error)
             void this.reloadBoard()
+        }
+    }
+
+    // --- Tâches faites : masquer / vider ----------------------------------------
+
+    onToggleShowDone = (list: TodoList): void => {
+        void this.updateList(list.id, { show_done: !list.show_done })
+    }
+
+    onClearDone = async (board: BoardData): Promise<void> => {
+        const count = countDoneTasks(board)
+        if (count === 0) {
+            window.alert('Aucune tâche faite à vider dans cette liste.')
+            return
+        }
+        const word = count > 1 ? `les ${count} tâches faites` : 'la tâche faite'
+        if (!window.confirm(`Supprimer définitivement ${word} de « ${board.list.name} » ?`)) return
+
+        const listId = board.list.id
+        this.setState({ openTask: null })
+        this.updateBoards(b => (
+            b.list.id === listId ? { ...b, groups: b.groups.map(g => ({ ...g, tasks: g.tasks.filter(t => !t.done) })) } : b
+        ))
+        try {
+            await api.clearDoneTasks(listId)
+        } catch (error) {
+            this.handleError(error)
+            void this.reloadBoard(listId)
         }
     }
 
@@ -474,12 +562,12 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
         // Changement de groupe : la tâche part tout de suite à la fin du nouveau groupe
         if (changes.group_id) {
             const groupId = changes.group_id
-            this.updateBoard(board => moveTask(board, taskId, groupId, Number.MAX_SAFE_INTEGER))
+            this.updateBoards(board => moveTask(board, taskId, groupId, Number.MAX_SAFE_INTEGER))
         }
 
         try {
             const saved = await api.updateTask(taskId, changes)
-            this.updateBoard(board => replaceTask(board, saved))
+            this.updateBoards(board => replaceTask(board, saved))
             if (changes.done !== undefined) void this.refreshLists()
         } catch (error) {
             this.handleError(error)
@@ -489,7 +577,7 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
 
     private async deleteTask(taskId: string): Promise<void> {
         this.setState({ openTask: null })
-        this.updateBoard(board => removeTask(board, taskId))
+        this.updateBoards(board => removeTask(board, taskId))
         try {
             await api.deleteTask(taskId)
             void this.refreshLists()
@@ -514,8 +602,9 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
     }
 
     render(): React.ReactNode {
-        const { lists, selectedListId, board, error, loading } = this.state
-        const showBoard = board !== null && board.list.id === selectedListId
+        const { lists, panes, activePane, error, loading } = this.state
+        // Fenêtre trop étroite : seule la moitié active est affichée (l'autre reste ouverte)
+        const shown = this.splitVisible() ? [0, 1] : panes.length > 0 ? [Math.min(activePane, panes.length - 1)] : []
 
         return (
             <div className="Workspace">
@@ -529,28 +618,17 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
                         </div>
                     )}
 
-                    {showBoard && (
-                        <>
-                            <ListHeader
-                                list={board.list}
-                                openTasks={countOpenTasks(board)}
-                                onNewGroup={() => this.setState({ addingGroup: true })}
-                                onChangeView={this.onChangeView}
-                                onEditList={anchor => this.onEditList(board.list, anchor)}
-                                doneTasks={countDoneTasks(board)}
-                                onToggleShowDone={this.onToggleShowDone}
-                                onClearDone={() => void this.onClearDone()}
-                            />
-                            {this.renderView(board)}
-                        </>
-                    )}
+                    <div className="panes">
+                        {shown.map(index => this.renderPane(index))}
+                        {this.state.listDrag && this.renderListDropZones()}
+                    </div>
 
                     {!loading && lists.length === 0 && (
                         <div className="workspace-empty">Crée ta première liste avec le + de la barre latérale.</div>
                     )}
                 </main>
 
-                {showBoard && this.renderPopover(board)}
+                {this.renderPopover()}
                 {this.renderListEditor()}
                 {this.state.settingsOpen && (
                     <SettingsDialog
@@ -565,6 +643,81 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
         )
     }
 
+    /** Une moitié : en-tête de la liste + vue colonnes ou sections. */
+    private renderPane(index: number): React.ReactNode {
+        const pane = this.state.panes[index]
+        const board = pane.board
+        const split = this.splitVisible()
+
+        const classes = ['pane']
+        if (split && index === this.state.activePane) classes.push('active')
+
+        return (
+            <section
+                key={pane.listId}
+                className={classes.join(' ')}
+                onMouseDown={() => { if (this.state.activePane !== index) this.setState({ activePane: index }) }}
+            >
+                {board && board.list.id === pane.listId && (
+                    <>
+                        <ListHeader
+                            list={board.list}
+                            openTasks={countOpenTasks(board)}
+                            doneTasks={countDoneTasks(board)}
+                            onNewGroup={() => this.setState({ addingGroupListId: board.list.id })}
+                            onChangeView={view => this.onChangeView(board.list, view)}
+                            onEditList={anchor => this.onEditList(board.list, anchor)}
+                            onToggleShowDone={() => this.onToggleShowDone(board.list)}
+                            onClearDone={() => void this.onClearDone(board)}
+                            onClosePane={this.state.panes.length === 2 ? () => this.closePane(index) : undefined}
+                        />
+                        {this.renderView(board)}
+                    </>
+                )}
+            </section>
+        )
+    }
+
+    /**
+     * Pendant qu'on glisse une liste depuis la barre latérale : des zones de dépôt
+     * par-dessus les moitiés. Une seule liste ouverte → « Ouvrir ici » / « Ouvrir à droite ».
+     * Deux listes → « Remplacer » à gauche / à droite.
+     */
+    private renderListDropZones(): React.ReactNode {
+        const canSplit = this.state.windowWidth >= SPLIT_MIN_WINDOW_WIDTH
+        const twoPanes = this.state.panes.length === 2
+
+        // Fenêtre étroite : une seule moitié est visible, la liste remplace celle-là
+        const zones = canSplit
+            ? [
+                { pane: 0, label: twoPanes ? 'Remplacer à gauche' : 'Ouvrir ici' },
+                { pane: 1, label: twoPanes ? 'Remplacer à droite' : 'Ouvrir à droite' },
+            ]
+            : [{ pane: Math.min(this.state.activePane, Math.max(0, this.state.panes.length - 1)), label: 'Ouvrir ici' }]
+
+        return (
+            <div className="list-drop-zones">
+                {zones.map(zone => (
+                    <div
+                        key={zone.pane}
+                        className={this.state.dropPane === zone.pane ? 'list-drop-zone over' : 'list-drop-zone'}
+                        onDragOver={event => {
+                            event.preventDefault() // Accepte le dépôt
+                            if (this.state.dropPane !== zone.pane) this.setState({ dropPane: zone.pane })
+                        }}
+                        onDragLeave={() => this.setState({ dropPane: null })}
+                        onDrop={event => {
+                            event.preventDefault()
+                            this.onListDrop(zone.pane)
+                        }}
+                    >
+                        <span className="list-drop-label">{zone.label}</span>
+                    </div>
+                ))}
+            </div>
+        )
+    }
+
     /**
      * Trois cas :
      *   - fenêtre large : barre à la largeur choisie + poignée pour la redimensionner ;
@@ -573,7 +726,7 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
      *     avec un fond qui la referme au clic. Un espace de 60 px garde la place.
      */
     private renderSidebar(): React.ReactNode {
-        const { windowWidth, sidebarWidth, sidebarPeek } = this.state
+        const { windowWidth, sidebarWidth, sidebarPeek, panes, activePane } = this.state
         const mode = sidebarMode(windowWidth, sidebarWidth)
         const peek = mode === 'narrow' && sidebarPeek
 
@@ -585,13 +738,16 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
                 user={this.props.user}
                 folders={this.state.folders}
                 lists={this.state.lists}
-                selectedListId={this.state.selectedListId}
+                selectedListId={panes[activePane]?.listId ?? null}
+                secondaryListId={this.splitVisible() ? panes[1 - activePane]?.listId ?? null : null}
                 width={width}
                 compact={mode !== 'expanded' && !peek}
                 peek={peek}
                 onExpand={this.onSidebarExpand}
                 onCollapse={this.onSidebarCollapse}
-                onSelectList={this.selectList}
+                onSelectList={this.onSelectList}
+                onListDragStart={this.onListDragStart}
+                onListDragEnd={this.onListDragEnd}
                 onToggleFolder={this.onToggleFolder}
                 onCreateList={this.onCreateList}
                 onCreateFolder={this.onCreateFolder}
@@ -636,8 +792,8 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
             actions: this,
             openTaskId: this.state.openTask?.id ?? null,
             drag: this.state.drag,
-            addingGroup: this.state.addingGroup,
-            onAddingGroupDone: () => this.setState({ addingGroup: false }),
+            addingGroup: this.state.addingGroupListId === board.list.id,
+            onAddingGroupDone: () => this.setState({ addingGroupListId: null }),
         }
         return board.list.default_view === 'sections' ? <SectionsView {...props} /> : <Board {...props} />
     }
@@ -660,10 +816,11 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
         )
     }
 
-    private renderPopover(board: BoardData): React.ReactNode {
+    private renderPopover(): React.ReactNode {
         const open = this.state.openTask
-        const task = open ? findTask(board, open.id) : undefined
-        if (!open || !task) return null
+        const board = open ? boardWithTask(this.boards(), open.id) : undefined
+        const task = open && board ? findTask(board, open.id) : undefined
+        if (!open || !board || !task) return null
 
         return (
             <TaskPopover
@@ -686,6 +843,22 @@ function readSidebarWidth(): number {
     return width >= SIDEBAR.min && width <= SIDEBAR.max ? width : SIDEBAR.default
 }
 
+/** Listes ouvertes lors de la dernière visite (1 ou 2 identifiants). */
+function readSavedPanes(): string[] {
+    try {
+        const saved = JSON.parse(readStorage(PANES_KEY) ?? '[]')
+        if (Array.isArray(saved) && saved.every(id => typeof id === 'string')) return saved.slice(0, 2)
+    } catch {
+        // Valeur abîmée : on l'ignore
+    }
+    const old = readStorage(OLD_SELECTED_LIST_KEY) // Avant la vue scindée, une seule liste était retenue
+    return old ? [old] : []
+}
+
+function savePanes(listIds: string[]): void {
+    writeStorage(PANES_KEY, JSON.stringify(listIds))
+}
+
 // localStorage peut être indisponible (navigation privée, stockage bloqué) : on l'ignore alors.
 function readStorage(key: string): string | null {
     try {
@@ -699,6 +872,6 @@ function writeStorage(key: string, value: string): void {
     try {
         localStorage.setItem(key, value)
     } catch {
-        // Pas grave : on ne se souviendra simplement pas de la liste
+        // Pas grave : on ne se souviendra simplement pas de ce réglage
     }
 }

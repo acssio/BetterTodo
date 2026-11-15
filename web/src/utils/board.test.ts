@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import type { Board, Task } from '../api/types'
 import {
-    appendTask, countDoneTasks, countOpenTasks, findTask, hideDoneTasks, indexInGroup, moveTask, removeTask,
-    replaceTask, visibleToFullIndex,
+    appendTask, boardWithGroup, boardWithTask, countDoneTasks, countOpenTasks, findTask, hideDoneTasks, indexInGroup,
+    moveTask, placeTask, removeTask, replaceTask, visibleToFullIndex,
 } from './board'
 
 /** Crée une tâche minimale pour les tests. */
@@ -96,5 +96,34 @@ describe('tâches faites masquées', () => {
 
     it('groupe sans tâche visible : en tête', () => {
         expect(visibleToFullIndex([task('x', 'g', true)], 'z', 0)).toBe(0)
+    })
+})
+
+describe('vue scindée : placeTask entre deux boards', () => {
+    // Deuxième board : liste m, groupe h = [e]
+    function otherBoard(): Board {
+        const board = makeBoard()
+        return {
+            list: { ...board.list, id: 'm' },
+            groups: [{ id: 'h', list_id: 'm', name: 'H', position: 0, tasks: [task('e', 'h')] }],
+        }
+    }
+
+    it('retire la tâche du board source et l\'insère dans le board cible', () => {
+        const source = makeBoard()
+        const moving = findTask(source, 'b')!
+        const newSource = placeTask(source, moving, 'h', 0)
+        const newTarget = placeTask(otherBoard(), moving, 'h', 0)
+
+        expect(ids(newSource, 0)).toEqual(['a', 'c'])
+        expect(ids(newTarget, 0)).toEqual(['b', 'e'])
+        expect(findTask(newTarget, 'b')?.group_id).toBe('h')
+    })
+
+    it('boardWithGroup et boardWithTask', () => {
+        const boards = [makeBoard(), otherBoard()]
+        expect(boardWithGroup(boards, 'h')?.list.id).toBe('m')
+        expect(boardWithTask(boards, 'a')?.list.id).toBe('l')
+        expect(boardWithTask(boards, 'zz')).toBeUndefined()
     })
 })

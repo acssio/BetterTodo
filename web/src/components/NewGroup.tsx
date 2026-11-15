@@ -21,7 +21,7 @@ export class NewGroup extends React.Component<NewGroupProps> {
                     <InlineInput
                         placeholder="Nom du groupe"
                         onSubmit={async name => {
-                            await view.actions.createGroup(name)
+                            await view.actions.createGroup(view.board.list.id, name)
                             view.onAddingGroupDone()
                         }}
                         onCancel={view.onAddingGroupDone}

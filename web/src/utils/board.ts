@@ -106,3 +106,30 @@ export function visibleToFullIndex(tasks: Task[], movedId: string, visibleIndex:
     }
     return others.indexOf(visible[visible.length - 1]) + 1 // Juste après la dernière visible
 }
+
+/**
+ * Place la tâche dans le groupe groupId, à l'index donné (compté sans la tâche).
+ * Contrairement à moveTask, la tâche peut venir d'un AUTRE board (vue scindée) :
+ *   - si ce board contient la tâche, elle en est retirée ;
+ *   - si ce board contient le groupe, elle y est insérée.
+ * On appelle donc cette fonction sur chaque board affiché.
+ */
+export function placeTask(board: Board, task: Task, groupId: string, index: number): Board {
+    const moved: Task = { ...task, group_id: groupId }
+    return mapGroups(removeTask(board, task.id), group => {
+        if (group.id !== groupId) return group
+        const tasks = [...group.tasks]
+        tasks.splice(Math.max(0, Math.min(index, tasks.length)), 0, moved)
+        return { ...group, tasks }
+    })
+}
+
+/** Le board (parmi plusieurs) qui contient le groupe, ou undefined. */
+export function boardWithGroup(boards: Board[], groupId: string): Board | undefined {
+    return boards.find(board => board.groups.some(group => group.id === groupId))
+}
+
+/** Le board (parmi plusieurs) qui contient la tâche, ou undefined. */
+export function boardWithTask(boards: Board[], taskId: string): Board | undefined {
+    return boards.find(board => findTask(board, taskId) !== undefined)
+}

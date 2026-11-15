@@ -9,7 +9,7 @@ export interface TaskViewActions {
     toggleTask(task: Task): void
     openTask(task: Task, anchor: DOMRect): void
     createTask(groupId: string, title: string): Promise<void>
-    createGroup(name: string): Promise<void>
+    createGroup(listId: string, name: string): Promise<void>
     renameGroup(groupId: string, name: string): Promise<void>
     deleteGroup(group: BoardGroup): void
 

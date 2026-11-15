@@ -13,13 +13,16 @@ interface SidebarProps {
     user: User
     folders: Folder[]
     lists: TodoList[]
-    selectedListId: string | null
+    selectedListId: string | null  // Liste de la moitié active
+    secondaryListId: string | null // Liste de l'autre moitié (vue scindée), ou null
     width: number     // Largeur en pixels
     compact: boolean  // true = icônes seules
     peek: boolean     // true = ouverte par-dessus le contenu (fenêtre étroite)
     onExpand: () => void
     onCollapse: () => void
-    onSelectList: (listId: string) => void
+    onSelectList: (listId: string, toSide: boolean) => void // toSide : Cmd/Ctrl+clic → ouvrir à côté
+    onListDragStart: (listId: string) => void                // Glisser une liste vers la zone principale
+    onListDragEnd: () => void
     onToggleFolder: (folder: Folder) => void
     onCreateList: (name: string, folderId: string | null) => Promise<void>
     onCreateFolder: (name: string) => Promise<void>
@@ -255,13 +258,21 @@ export class Sidebar extends React.Component<SidebarProps, SidebarState> {
         const classes = ['sidebar-item']
         if (indented) classes.push('indented')
         if (list.id === this.props.selectedListId) classes.push('active')
+        if (list.id === this.props.secondaryListId) classes.push('open-side')
 
         return (
             <div key={list.id} className="sidebar-row">
                 <button
                     className={classes.join(' ')}
-                    title={this.props.compact ? list.name : undefined}
-                    onClick={() => this.props.onSelectList(list.id)}
+                    title={this.props.compact ? list.name : 'Cmd+clic ou glisser à droite : ouvrir à côté'}
+                    draggable
+                    onClick={event => this.props.onSelectList(list.id, event.metaKey || event.ctrlKey)}
+                    onDragStart={event => {
+                        event.dataTransfer.setData('text/plain', list.name)
+                        event.dataTransfer.effectAllowed = 'copy'
+                        this.props.onListDragStart(list.id)
+                    }}
+                    onDragEnd={this.props.onListDragEnd}
                 >
                     <ListIcon icon={list.icon} color={list.color} />
                     <span className="sidebar-item-name">{list.name}</span>

@@ -79,7 +79,8 @@ Observé dans ses autres projets (C++ embarqué, React/TypeScript). Écrire du c
   - `lucide-react` avec une liste fixe d'icônes (`listIcons.ts`) ;
   - linter : oxlint (installé par Vite) ; tests : Vitest (`npm test`), surtout sur les fonctions pures de `utils/` ;
   - modifications « optimistes » dans `Workspace` : l'écran d'abord, puis l'API, et rechargement du board en cas d'erreur ;
-  - ne jamais relire `this.state` juste après `setState` : passer la valeur en paramètre ;
+  - ne jamais relire `this.state` juste après `setState` : passer la valeur en paramètre, et pour calculer un nouvel état à partir de l'ancien, toujours `setState(state => …)` (bug rencontré deux fois) ;
+  - vue scindée : `Workspace.panes` (1 ou 2 moitiés, un board chacune) ; les modifications de tâches s'appliquent à tous les boards (`updateBoards`) ;
   - l'interface doit rester lisible en fenêtre étroite (demande de l'utilisateur) :
     - barre latérale redimensionnable, avec un mode icônes (`utils/sidebarLayout.ts`) ;
     - en-tête en icônes seules via `@container main` ;
