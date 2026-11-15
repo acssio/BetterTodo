@@ -1,0 +1,215 @@
+.TaskPopover {
+    position: fixed;
+    z-index: 10;
+    max-height: calc(100vh - 16px);
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    box-shadow: var(--shadow-pop);
+}
+
+.pop-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.pop-check {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    border: 1.5px solid #B5B5B1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.pop-check.checked {
+    background: var(--success);
+    border-color: var(--success);
+}
+
+.pop-title-input {
+    flex: 1;
+    min-width: 0;
+    padding: 4px 6px;
+    margin-left: -6px;
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    background: none;
+    font-size: 15px;
+    font-weight: 600;
+    outline: none;
+}
+
+.pop-title-input:hover {
+    border-color: var(--border);
+}
+
+.pop-title-input:focus {
+    border-color: var(--accent);
+}
+
+.pop-row {
+    display: flex;
+    gap: 12px;
+}
+
+.pop-row .pop-field {
+    flex: 1;
+    min-width: 0;
+}
+
+.pop-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.pop-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--faint);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.pop-input {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 32px;
+    padding: 0 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--sidebar);
+    color: var(--muted);
+    outline: none;
+}
+
+.pop-input input {
+    flex: 1;
+    min-width: 0;
+    border: none;
+    background: none;
+    color: var(--text);
+    outline: none;
+}
+
+select.pop-input {
+    color: var(--text);
+}
+
+/* Boutons d'urgence */
+.pop-urgency {
+    display: flex;
+    gap: 4px;
+}
+
+.pop-urgency button {
+    flex: 1;
+    padding: 6px 0;
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--muted);
+}
+
+.pop-urgency button.on {
+    border-color: var(--text);
+    color: var(--text);
+}
+
+/* Tags */
+.pop-tags {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+}
+
+.pop-tag {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 4px 3px 8px;
+    border-radius: var(--radius-sm);
+    background: #F0F0EE;
+    font-size: 12px;
+}
+
+.pop-tag button {
+    display: flex;
+    padding: 1px;
+    border-radius: 4px;
+    color: var(--faint);
+}
+
+.pop-tag button:hover {
+    background: #E2E2DE;
+    color: var(--text);
+}
+
+.pop-tag-add {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    border: 1px dashed #CFCFCB;
+    border-radius: var(--radius-sm);
+    color: var(--faint);
+    font-size: 12px;
+}
+
+.pop-tag-add input {
+    width: 70px;
+    border: none;
+    background: none;
+    outline: none;
+}
+
+.pop-notes {
+    min-height: 80px;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--sidebar);
+    font: inherit;
+    line-height: 18px;
+    resize: vertical;
+    outline: none;
+}
+
+.pop-notes:focus,
+.pop-input:focus-within {
+    border-color: var(--accent);
+    background: var(--surface);
+}
+
+.pop-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-top: 12px;
+    border-top: 1px solid var(--border-light);
+}
+
+.pop-delete {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--danger);
+    font-weight: 500;
+}
+
+.pop-status {
+    font-size: 12px;
+    color: var(--faint);
+}

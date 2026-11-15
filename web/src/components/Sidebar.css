@@ -1,0 +1,286 @@
+.Sidebar {
+    flex-shrink: 0;           /* La largeur est donnée par Workspace (style="width: …") */
+    display: flex;
+    flex-direction: column;
+    padding: 16px 12px;
+    background: var(--sidebar);
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+}
+
+.sidebar-brand {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 0 16px 8px;
+    min-height: 44px;
+    font-size: 15px;
+    font-weight: 700;
+}
+
+.sidebar-brand-name {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+}
+
+.sidebar-logo {
+    flex-shrink: 0;
+    width: 24px;
+    height: 24px;
+    border-radius: 7px;
+    background: var(--text);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.sidebar-label {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 0 0 6px 8px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--faint);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.sidebar-label span {
+    flex: 1;
+}
+
+/* « Aujourd'hui » et « Planifié », au-dessus des listes */
+.sidebar-smart {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding-bottom: 14px;
+}
+
+.sidebar-lists {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 1;
+}
+
+.sidebar-folder {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.sidebar-folder-head {
+    display: flex;
+    align-items: center;
+    padding-top: 6px;
+}
+
+.sidebar-folder-toggle {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--muted);
+    text-align: left;
+}
+
+/* Le « + » et le « … » d'un groupe de listes n'apparaissent qu'au survol (ou menu ouvert) */
+.sidebar-folder-add,
+.sidebar-folder-menu .icon-btn {
+    width: 24px;
+    height: 24px;
+}
+
+.sidebar-folder-add,
+.sidebar-folder-menu {
+    opacity: 0;
+}
+
+.sidebar-folder-head:hover .sidebar-folder-add,
+.sidebar-folder-head:hover .sidebar-folder-menu,
+.sidebar-folder-head.menu-open .sidebar-folder-menu,
+.sidebar-folder-add:focus-visible,
+.sidebar-folder-menu:focus-within {
+    opacity: 1;
+}
+
+/* Une liste : le bouton crayon se superpose au nombre de tâches, au survol */
+.sidebar-row {
+    position: relative;
+}
+
+.sidebar-row-edit {
+    position: absolute;
+    right: 4px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 26px;
+    height: 26px;
+    opacity: 0;
+}
+
+.sidebar-row:hover .sidebar-row-edit,
+.sidebar-row-edit:focus-visible {
+    opacity: 1;
+}
+
+.sidebar-row:hover .sidebar-count {
+    visibility: hidden;
+}
+
+.sidebar-adding {
+    padding: 2px 0;
+}
+
+.sidebar-adding.indented {
+    padding-left: 20px;
+}
+
+.sidebar-folder-name {
+    flex: 1;
+}
+
+/* Une liste (ou Paramètres) */
+.sidebar-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 8px;
+    border-radius: var(--radius);
+    color: var(--text-soft);
+    text-align: left;
+}
+
+.sidebar-item.indented {
+    padding-left: 28px;
+}
+
+.sidebar-item:hover:not(:disabled) {
+    background: var(--hover);
+}
+
+.sidebar-item.active {
+    background: var(--hover);
+    color: var(--text);
+    font-weight: 600;
+}
+
+/* Liste ouverte dans l'autre moitié (vue scindée) */
+.sidebar-item.open-side {
+    box-shadow: inset 2px 0 0 var(--accent);
+    color: var(--text);
+}
+
+.sidebar-item:disabled {
+    opacity: 0.55;
+}
+
+.sidebar-item-name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.sidebar-count {
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--faint);
+}
+
+.sidebar-empty {
+    padding: 8px;
+    color: var(--faint);
+}
+
+.sidebar-footer {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding-top: 12px;
+}
+
+.sidebar-user {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 0 0 8px;
+    border-top: 1px solid var(--border);
+    padding-top: 10px;
+}
+
+.sidebar-user-name {
+    flex: 1;
+    font-weight: 500;
+    color: var(--muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* =============================================================================
+   Mode compact : icônes seules (barre rétrécie, ou fenêtre étroite)
+   ============================================================================= */
+
+.Sidebar.compact {
+    padding: 16px 8px;
+    overflow-x: hidden;
+}
+
+.Sidebar.compact .sidebar-brand {
+    justify-content: center;
+    padding-left: 0;
+}
+
+.Sidebar.compact .sidebar-label {
+    justify-content: center;
+    padding-left: 0;
+}
+
+.Sidebar.compact .sidebar-brand-name,
+.Sidebar.compact .sidebar-item-name,
+.Sidebar.compact .sidebar-count,
+.Sidebar.compact .sidebar-folder-name,
+.Sidebar.compact .sidebar-folder-add,
+.Sidebar.compact .sidebar-folder-menu,
+.Sidebar.compact .sidebar-user-name {
+    display: none;
+}
+
+.Sidebar.compact .sidebar-item,
+.Sidebar.compact .sidebar-item.indented {
+    justify-content: center;
+    padding: 9px 0;
+}
+
+/* L'en-tête d'un groupe de listes devient un petit chevron centré */
+.Sidebar.compact .sidebar-folder-toggle {
+    justify-content: center;
+    padding: 6px 0 2px;
+}
+
+.Sidebar.compact .sidebar-user {
+    justify-content: center;
+    padding-left: 0;
+}
+
+/* =============================================================================
+   Fenêtre étroite : la barre s'ouvre PAR-DESSUS le contenu
+   ============================================================================= */
+
+.Sidebar.peek {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 30;
+    box-shadow: var(--shadow-pop);
+}

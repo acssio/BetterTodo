@@ -1,0 +1,3 @@
+# Réinstallés / recompilés dans l'image
+node_modules
+dist

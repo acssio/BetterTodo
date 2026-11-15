@@ -1,0 +1,21 @@
+/* En-tête d'une section de liste intelligente : « En retard », « Aujourd'hui », « lun. 18 nov. » */
+.smart-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.smart-title {
+    font-size: 14px;
+    font-weight: 700;
+    display: inline-block; /* Nécessaire pour ::first-letter */
+}
+
+/* « lun. 18 nov. » → « Lun. 18 nov. » (seulement la première lettre) */
+.smart-title::first-letter {
+    text-transform: uppercase;
+}
+
+.smart-title.late {
+    color: var(--danger);
+}

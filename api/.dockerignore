@@ -1,0 +1,3 @@
+# Fichiers inutiles pour construire l'image
+tests/
+*.md

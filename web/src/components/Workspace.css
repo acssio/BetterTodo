@@ -1,0 +1,153 @@
+.Workspace {
+    height: 100%;
+    display: flex;
+}
+
+.workspace-main {
+    flex: 1;
+    min-width: 0; /* Permet au board de défiler au lieu d'élargir la page */
+    display: flex;
+    flex-direction: column;
+}
+
+.workspace-error {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 12px 24px 0;
+    padding: 8px 12px;
+    border-radius: var(--radius);
+    background: #FDE8E8;
+    color: var(--danger);
+    font-weight: 500;
+}
+
+.workspace-error button {
+    color: var(--danger);
+    text-decoration: underline;
+}
+
+.workspace-empty {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--faint);
+}
+
+/* Fenêtre étroite + barre ouverte par-dessus : la place de la barre en icônes est gardée */
+.Workspace {
+    position: relative;
+}
+
+.sidebar-spacer {
+    flex-shrink: 0;
+    border-right: 1px solid var(--border);
+    background: var(--sidebar);
+}
+
+.sidebar-backdrop {
+    position: absolute;
+    inset: 0;
+    z-index: 29;
+    background: rgba(20, 20, 20, 0.2);
+}
+
+/* =============================================================================
+   Moitiés (vue scindée)
+   ============================================================================= */
+
+.panes {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    position: relative; /* Pour les zones de dépôt d'une liste */
+}
+
+/* Une moitié. C'est aussi le « container » des @container main (ListHeader.css, Board.css…) :
+   en vue scindée, chaque moitié passe en icônes selon SA largeur. */
+.pane {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    container: main / inline-size;
+}
+
+.pane + .pane {
+    border-left: 1px solid #D4D4D0;
+}
+
+/* Moitié active (où s'ouvre une liste cliquée) : trait bleu sous l'en-tête */
+.pane.active .ListHeader {
+    box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+/* Zones de dépôt quand on glisse une liste depuis la barre latérale */
+.list-drop-zones {
+    position: absolute;
+    inset: 0;
+    z-index: 15;
+    display: flex;
+}
+
+.list-drop-zone {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    align-items: center;
+    justify-content: center;
+    margin: 8px;
+    border: 2px dashed #B9CCF5;
+    border-radius: var(--radius-lg);
+    background: rgba(47, 111, 235, 0.04);
+    transition: background 0.1s, border-color 0.1s;
+}
+
+.list-drop-zone.over {
+    border-color: var(--accent);
+    background: rgba(47, 111, 235, 0.10);
+}
+
+.list-drop-label {
+    padding: 10px 16px;
+    border-radius: var(--radius-md);
+    background: var(--accent);
+    color: #FFFFFF;
+    font-weight: 600;
+    box-shadow: 0 6px 16px rgba(47, 111, 235, 0.3);
+    pointer-events: none; /* Le dépôt se fait sur la zone, pas sur l'étiquette */
+}
+
+.list-drop-hint {
+    max-width: 260px;
+    text-align: center;
+    color: var(--muted);
+    pointer-events: none;
+}
+
+/* Message en bas de l'écran (ex. pas assez de place pour la vue scindée) */
+.workspace-notice {
+    position: fixed;
+    left: 50%;
+    bottom: 20px;
+    transform: translateX(-50%);
+    z-index: 50;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    max-width: min(560px, calc(100vw - 32px));
+    padding: 10px 14px;
+    border-radius: var(--radius-md);
+    background: var(--text);
+    color: #FFFFFF;
+    box-shadow: var(--shadow-pop);
+}
+
+.workspace-notice button {
+    flex-shrink: 0;
+    color: #FFFFFF;
+    font-weight: 600;
+    text-decoration: underline;
+}

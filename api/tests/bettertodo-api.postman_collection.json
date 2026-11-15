@@ -1,0 +1,758 @@
+{
+  "info": {
+    "name": "BetterTodo API – comptes (étapes 2a et 3c-2)",
+    "description": "Tests de bout en bout : santé, inscription, connexion, déconnexion. À lancer dans l'ordre (voir docs/etapes/02a-api-fondations.md).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080/api/v1"
+    },
+    {
+      "key": "password",
+      "value": "motdepasse-test-123"
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Un email unique par exécution, pour pouvoir relancer la collection autant de fois que voulu",
+          "if (!pm.collectionVariables.get('email')) {",
+          "    pm.collectionVariables.set('email', 'test-' + Date.now() + '@example.test');",
+          "}"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "01 Santé",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/health"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 et status ok', () => {",
+              "    pm.response.to.have.status(200);",
+              "    pm.expect(pm.response.json().status).to.eql('ok');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 Profil – sans jeton",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/me"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('401 Unauthorized', () => pm.response.to.have.status(401));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "03 Inscription",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/auth/register",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"  {{email}} \",\n  \"password\": \"{{password}}\",\n  \"display_name\": \"Testeur\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const body = pm.response.json();",
+              "pm.test('201 Created', () => pm.response.to.have.status(201));",
+              "pm.test('renvoie un jeton et l\\'utilisateur', () => {",
+              "    pm.expect(body.token).to.be.a('string').and.have.lengthOf(43);",
+              "    pm.expect(body.user.email).to.eql(pm.collectionVariables.get('email'));",
+              "    pm.expect(body.user).to.not.have.property('password_hash');",
+              "});",
+              "pm.test('pose le cookie de session HttpOnly', () => {",
+              "    const cookie = pm.response.headers.get('Set-Cookie');",
+              "    pm.expect(cookie).to.include('bettertodo_session=');",
+              "    pm.expect(cookie).to.include('HttpOnly');",
+              "});",
+              "pm.collectionVariables.set('token', body.token);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "04 Inscription – email déjà pris",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/auth/register",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\",\n  \"display_name\": \"Doublon\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('409 Conflict', () => pm.response.to.have.status(409));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "05 Inscription – mot de passe trop court",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/auth/register",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"court-{{email}}\",\n  \"password\": \"1234\",\n  \"display_name\": \"Court\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('400 avec un message', () => {",
+              "    pm.response.to.have.status(400);",
+              "    pm.expect(pm.response.json().error).to.include('8 caractères');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "06 Inscription – champ inconnu",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/auth/register",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"x@example.test\",\n  \"pasword\": \"faute-de-frappe\",\n  \"display_name\": \"X\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('400 : le champ mal orthographié est signalé', () => {",
+              "    pm.response.to.have.status(400);",
+              "    pm.expect(pm.response.json().error).to.include('pasword');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "07 Profil (jeton)",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/me",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ]
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 et le bon utilisateur', () => {",
+              "    pm.response.to.have.status(200);",
+              "    pm.expect(pm.response.json().display_name).to.eql('Testeur');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "08 Profil – vue par défaut initiale",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/me",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ]
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('default_view = columns', () => pm.expect(pm.response.json().default_view).to.eql('columns'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "09 Profil – modifier nom et vue par défaut",
+      "request": {
+        "method": "PATCH",
+        "url": "{{baseUrl}}/me",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"display_name\": \"  Testeur modifié \",\n  \"default_view\": \"sections\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const b = pm.response.json();",
+              "pm.test('200, nom nettoyé, vue changée', () => {",
+              "    pm.response.to.have.status(200);",
+              "    pm.expect(b.display_name).to.eql('Testeur modifié');",
+              "    pm.expect(b.default_view).to.eql('sections');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "10 Profil – vue invalide",
+      "request": {
+        "method": "PATCH",
+        "url": "{{baseUrl}}/me",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"default_view\": \"grille\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('400', () => pm.response.to.have.status(400));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "11 Profil – nom vide",
+      "request": {
+        "method": "PATCH",
+        "url": "{{baseUrl}}/me",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"display_name\": \"   \"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('400', () => pm.response.to.have.status(400));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "12 Nouvelle liste sans vue → vue du compte",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/lists",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Liste de test\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const b = pm.response.json();",
+              "pm.test('201 et default_view = sections', () => { pm.response.to.have.status(201); pm.expect(b.default_view).to.eql('sections'); });",
+              "pm.collectionVariables.set('listTest', b.id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "13 Nouvelle liste avec vue explicite",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/lists",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Liste colonnes\",\n  \"default_view\": \"columns\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('la vue demandée gagne', () => pm.expect(pm.response.json().default_view).to.eql('columns'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "14 Profil – langue par défaut",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/me",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ]
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('language = fr', () => pm.expect(pm.response.json().language).to.eql('fr'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "15 Profil – langue invalide",
+      "request": {
+        "method": "PATCH",
+        "url": "{{baseUrl}}/me",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"language\": \"de\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('400', () => pm.response.to.have.status(400));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "16 Profil – passer en anglais",
+      "request": {
+        "method": "PATCH",
+        "url": "{{baseUrl}}/me",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"language\": \"en\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('language = en', () => pm.expect(pm.response.json().language).to.eql('en'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "17 Nouvelle liste en anglais",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/lists",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"English list\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('201', () => pm.response.to.have.status(201));",
+              "pm.collectionVariables.set('listEn', pm.response.json().id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "18 Son groupe par défaut s'appelle Tasks",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/lists/{{listEn}}/board",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ]
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('groupe Tasks', () => pm.expect(pm.response.json().groups.map(g => g.name)).to.eql(['Tasks']));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "19 Profil – jeton inventé",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/me",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer jeton-invente"
+          }
+        ]
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('401 Unauthorized', () => pm.response.to.have.status(401));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "20 Connexion – mauvais mot de passe",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/auth/login",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"mauvais-mot-de-passe\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('401 avec un message générique', () => {",
+              "    pm.response.to.have.status(401);",
+              "    pm.expect(pm.response.json().error).to.eql('Email ou mot de passe incorrect');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "21 Connexion – email inconnu",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/auth/login",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"inconnu@example.test\",\n  \"password\": \"{{password}}\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('401 avec le MÊME message (on ne révèle pas quels emails existent)', () => {",
+              "    pm.response.to.have.status(401);",
+              "    pm.expect(pm.response.json().error).to.eql('Email ou mot de passe incorrect');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "22 Connexion – OK (2e session)",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/auth/login",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const body = pm.response.json();",
+              "pm.test('200 et un nouveau jeton', () => {",
+              "    pm.response.to.have.status(200);",
+              "    pm.expect(body.token).to.not.eql(pm.collectionVariables.get('token'));",
+              "});",
+              "pm.collectionVariables.set('token2', body.token);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "23 Déconnexion (2e session)",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/auth/logout",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token2}}"
+          }
+        ]
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('204 No Content', () => pm.response.to.have.status(204));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "24 Profil – session fermée",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/me",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token2}}"
+          }
+        ]
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('401 : le jeton déconnecté ne marche plus', () => pm.response.to.have.status(401));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "25 Profil – 1re session toujours valide",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/me",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ]
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 : se déconnecter d\\'un appareil ne déconnecte pas les autres', () => pm.response.to.have.status(200));",
+              "// Remet l'email à zéro pour la prochaine exécution",
+              "pm.collectionVariables.unset('email');"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
