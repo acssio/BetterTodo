@@ -12,7 +12,15 @@ type apiList struct {
 	ID        string  `json:"id"`
 	FolderID  *string `json:"folder_id"`
 	Name      string  `json:"name"`
+	Color     string  `json:"color"`
+	Icon      string  `json:"icon"`
 	OpenTasks int     `json:"open_tasks"`
+}
+
+type apiGroup struct {
+	ID     string `json:"id"`
+	ListID string `json:"list_id"`
+	Name   string `json:"name"`
 }
 
 type apiTask struct {

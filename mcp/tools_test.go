@@ -52,3 +52,17 @@ func TestToTaskOut(t *testing.T) {
 		t.Errorf("conversion incorrecte : %+v", out)
 	}
 }
+
+func TestFindFolder(t *testing.T) {
+	folders := []apiFolder{{ID: "f1", Name: "Maison"}, {ID: "f2", Name: "Travail"}}
+
+	if folder, err := findFolder(folders, " travail "); err != nil || folder.ID != "f2" || folder.Name != "Travail" {
+		t.Errorf("« travail » : obtenu %+v, %v", folder, err)
+	}
+	if _, err := findFolder(folders, "Loisirs"); err == nil {
+		t.Error("un groupe de listes inconnu doit donner une erreur")
+	}
+	if _, err := findFolder(nil, "Maison"); err == nil {
+		t.Error("sans groupe de listes, il doit y avoir une erreur")
+	}
+}

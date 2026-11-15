@@ -124,6 +124,7 @@ Observé dans ses autres projets (C++ embarqué, React/TypeScript). Écrire du c
   - un jeton marche partout **sauf** sur les routes sensibles (`RequireSession` → 403) : mot de passe, `/me/tokens`, console admin, déconnexion ;
   - **serveur MCP local (stdio)** en Go, module à part dans `mcp/`, SDK officiel `modelcontextprotocol/go-sdk`. Client de l'API (`BETTERTODO_URL` + `BETTERTODO_TOKEN`), jamais de la base ;
   - outils : lire listes / liste / échéances / tags et urgences, créer et modifier une tâche (cocher compris). **Aucune suppression** ;
+  - ajout validé le 2026-11-15 : **créer et renommer** groupes de listes, listes et groupes de tâches. Couleur et icône d'une liste choisies **dans la palette de la page web** : copie dans `mcp/palette.go`, vérifiée par un test contre `listIcons.ts` (à mettre à jour ensemble) ;
   - l'instance de l'utilisateur tourne sur un **serveur distant** : le binaire tourne sur le Mac et appelle l'API en HTTPS. Tuto : `docs/connecter-claude.md` ;
   - plus tard peut-être : mode MCP distant (HTTP + OAuth) pour claude.ai web / mobile.
 - **2026-11-13 – Maquette web validée** (Figma, page « Web – Maquette v2 »).
