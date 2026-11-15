@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { Columns3, GripVertical, Plus, Rows2, Trash2, X } from 'lucide-react'
 import { api, ApiError } from '../api/ApiClient'
-import type { ListView, Tag, UrgencyLevel, User, UserChanges } from '../api/types'
+import type { Language, ListView, Tag, UrgencyLevel, User, UserChanges } from '../api/types'
 import { computeDropIndex } from '../utils/dragDrop'
 import { moveItem } from '../utils/moveItem'
 import { DismissListener } from '../utils/popover'
@@ -255,6 +255,20 @@ export class SettingsDialog extends React.Component<SettingsDialogProps, Setting
                         onKeyDown={event => { if (event.key === 'Enter') event.currentTarget.blur() }}
                     />
                 </label>
+                <label className="settings-field">
+                    <span>Langue</span>
+                    <select
+                        value={this.props.user.language}
+                        onChange={event => void this.updateUser({ language: event.target.value as Language })}
+                    >
+                        <option value="fr">Français</option>
+                        <option value="en">English</option>
+                    </select>
+                </label>
+                <p className="settings-desc">
+                    La traduction de l'interface arrivera plus tard. La langue sert déjà à nommer
+                    le groupe créé avec chaque nouvelle liste (« Tâches » / « Tasks »).
+                </p>
             </section>
         )
     }

@@ -91,6 +91,19 @@
     opacity: 0.6;
 }
 
+/* Boutons ronds de l'en-tête (tâches faites, options) */
+.header-tool {
+    width: 34px;
+    height: 34px;
+    flex-shrink: 0;
+}
+
+/* Tâches faites masquées : le bouton reste « allumé » pour qu'on le remarque */
+.header-tool.on {
+    background: #EAF1FD;
+    color: var(--accent);
+}
+
 .header-new-group {
     flex-shrink: 0;
     white-space: nowrap;

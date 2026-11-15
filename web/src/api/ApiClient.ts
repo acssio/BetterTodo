@@ -82,6 +82,11 @@ export class ApiClient {
         return this.request('DELETE', `/lists/${id}`)
     }
 
+    /** Supprime toutes les tâches faites de la liste. */
+    clearDoneTasks(listId: string): Promise<{ deleted: number }> {
+        return this.request('DELETE', `/lists/${listId}/done-tasks`)
+    }
+
     getBoard(listId: string): Promise<Board> {
         return this.request('GET', `/lists/${listId}/board`)
     }

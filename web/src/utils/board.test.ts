@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import type { Board, Task } from '../api/types'
-import { appendTask, countOpenTasks, findTask, indexInGroup, moveTask, removeTask, replaceTask } from './board'
+import {
+    appendTask, countDoneTasks, countOpenTasks, findTask, hideDoneTasks, indexInGroup, moveTask, removeTask,
+    replaceTask, visibleToFullIndex,
+} from './board'
 
 /** Crée une tâche minimale pour les tests. */
 function task(id: string, groupId: string, done = false): Task {
@@ -15,7 +18,7 @@ function makeBoard(): Board {
     return {
         list: {
             id: 'l', folder_id: null, name: 'L', color: '#000000', icon: 'list',
-            default_view: 'columns', position: 0, open_tasks: 4,
+            default_view: 'columns', show_done: true, position: 0, open_tasks: 4,
         },
         groups: [
             { id: 'g1', list_id: 'l', name: 'G1', position: 0, tasks: [task('a', 'g1'), task('b', 'g1'), task('c', 'g1')] },
@@ -72,5 +75,26 @@ describe('autres fonctions', () => {
 
     it('countOpenTasks ignore les tâches faites', () => {
         expect(countOpenTasks(makeBoard())).toBe(3)
+    })
+})
+
+describe('tâches faites masquées', () => {
+    // a, x (faite), b, y (faite), c
+    const tasks = [task('a', 'g'), task('x', 'g', true), task('b', 'g'), task('y', 'g', true), task('c', 'g')]
+
+    it('hideDoneTasks et countDoneTasks', () => {
+        expect(ids(hideDoneTasks(makeBoard()), 1)).toEqual([])
+        expect(countDoneTasks(makeBoard())).toBe(1)
+    })
+
+    it('convertit un index visible en index réel', () => {
+        // On déplace c. Visibles sans c : [a, b] ; toutes sans c : [a, x, b, y]
+        expect(visibleToFullIndex(tasks, 'c', 0)).toBe(0) // avant a
+        expect(visibleToFullIndex(tasks, 'c', 1)).toBe(2) // avant b (donc après x)
+        expect(visibleToFullIndex(tasks, 'c', 2)).toBe(3) // après b (avant y)
+    })
+
+    it('groupe sans tâche visible : en tête', () => {
+        expect(visibleToFullIndex([task('x', 'g', true)], 'z', 0)).toBe(0)
     })
 })

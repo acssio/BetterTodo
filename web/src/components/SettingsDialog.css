@@ -87,7 +87,12 @@
     letter-spacing: 0.05em;
 }
 
+.settings-field + .settings-field {
+    margin-top: 12px;
+}
+
 .settings-field input,
+.settings-field select,
 .settings-level-name {
     height: 32px;
     padding: 0 10px;
@@ -97,6 +102,7 @@
     outline: none;
 }
 
+.settings-field select:focus,
 .settings-field input:focus,
 .settings-level-name:focus {
     border-color: var(--accent);

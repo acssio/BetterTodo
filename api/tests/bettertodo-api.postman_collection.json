@@ -417,7 +417,152 @@
       ]
     },
     {
-      "name": "14 Profil – jeton inventé",
+      "name": "14 Profil – langue par défaut",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/me",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ]
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('language = fr', () => pm.expect(pm.response.json().language).to.eql('fr'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "15 Profil – langue invalide",
+      "request": {
+        "method": "PATCH",
+        "url": "{{baseUrl}}/me",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"language\": \"de\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('400', () => pm.response.to.have.status(400));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "16 Profil – passer en anglais",
+      "request": {
+        "method": "PATCH",
+        "url": "{{baseUrl}}/me",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"language\": \"en\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('language = en', () => pm.expect(pm.response.json().language).to.eql('en'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "17 Nouvelle liste en anglais",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/lists",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"English list\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('201', () => pm.response.to.have.status(201));",
+              "pm.collectionVariables.set('listEn', pm.response.json().id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "18 Son groupe par défaut s'appelle Tasks",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/lists/{{listEn}}/board",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ]
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('groupe Tasks', () => pm.expect(pm.response.json().groups.map(g => g.name)).to.eql(['Tasks']));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "19 Profil – jeton inventé",
       "request": {
         "method": "GET",
         "url": "{{baseUrl}}/me",
@@ -441,7 +586,7 @@
       ]
     },
     {
-      "name": "15 Connexion – mauvais mot de passe",
+      "name": "20 Connexion – mauvais mot de passe",
       "request": {
         "method": "POST",
         "url": "{{baseUrl}}/auth/login",
@@ -472,7 +617,7 @@
       ]
     },
     {
-      "name": "16 Connexion – email inconnu",
+      "name": "21 Connexion – email inconnu",
       "request": {
         "method": "POST",
         "url": "{{baseUrl}}/auth/login",
@@ -503,7 +648,7 @@
       ]
     },
     {
-      "name": "17 Connexion – OK (2e session)",
+      "name": "22 Connexion – OK (2e session)",
       "request": {
         "method": "POST",
         "url": "{{baseUrl}}/auth/login",
@@ -536,7 +681,7 @@
       ]
     },
     {
-      "name": "18 Déconnexion (2e session)",
+      "name": "23 Déconnexion (2e session)",
       "request": {
         "method": "POST",
         "url": "{{baseUrl}}/auth/logout",
@@ -560,7 +705,7 @@
       ]
     },
     {
-      "name": "19 Profil – session fermée",
+      "name": "24 Profil – session fermée",
       "request": {
         "method": "GET",
         "url": "{{baseUrl}}/me",
@@ -584,7 +729,7 @@
       ]
     },
     {
-      "name": "20 Profil – 1re session toujours valide",
+      "name": "25 Profil – 1re session toujours valide",
       "request": {
         "method": "GET",
         "url": "{{baseUrl}}/me",

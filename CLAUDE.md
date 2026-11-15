@@ -90,6 +90,14 @@ Observé dans ses autres projets (C++ embarqué, React/TypeScript). Écrire du c
   - **3c-1** : vue sections (glisser-déposer commun aux deux vues), bascule Colonnes/Sections enregistrée sur la liste (`default_view`), overlay « Modifier une liste », renommer / supprimer un groupe de listes ;
   - **3c-2** : écran Paramètres (niveaux d'urgence, tags, vue par défaut). La vue par défaut est une **préférence du compte** : migration 003 `users.default_view` + route `PATCH /me`, qui permet aussi de changer le nom affiché ;
   - **3c-3** : vue scindée (glisser une liste à droite ou Cmd+clic), deux boards dans `Workspace`, **glisser une tâche d'une liste à l'autre** inclus.
+- **2026-11-15 – Nouveaux morceaux, dans cet ordre : 3c-2b, 3c-3, 3d, puis la traduction.**
+  - **3c-2b** :
+    - chaque nouvelle liste reçoit un **groupe par défaut**, créé par le serveur et nommé selon la langue du compte (« Tâches » / « Tasks ») ;
+    - **afficher / masquer les tâches faites**, par liste, retenu sur le serveur (`lists.show_done`) ;
+    - **vider les tâches faites** d'une liste (route dédiée, une seule transaction) ;
+    - **langue du compte** (`users.language`, 'fr' ou 'en', migration 004), choisie dans les Paramètres.
+  - **3d** : listes intelligentes « **Aujourd'hui** » (échéance aujourd'hui **ou en retard**, pas faites) et « **Planifié** » (toutes les tâches avec une échéance), en haut de la barre latérale.
+  - **Traduction complète de l'interface** (fr / en) : étape à part, après la 3d. D'ici là, la langue ne sert qu'au nom du groupe par défaut.
 - **2026-11-13 – Maquette web validée** (Figma, page « Web – Maquette v2 »).
 
 ## Questions ouvertes

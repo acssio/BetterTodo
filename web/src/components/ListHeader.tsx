@@ -1,15 +1,23 @@
 import * as React from 'react'
-import { Columns3, Plus, Rows2, Search } from 'lucide-react'
+import { Columns3, Ellipsis, Eye, EyeOff, Pencil, Plus, Rows2, Search, Trash2 } from 'lucide-react'
 import type { ListView, TodoList } from '../api/types'
 import { ListIcon } from './ListIcon'
+import { Menu } from './Menu'
 import './ListHeader.css'
 
 interface ListHeaderProps {
     list: TodoList
     openTasks: number // Calculé à partir du board, donc toujours à jour
     onNewGroup: () => void
+    doneTasks: number // Tâches faites dans la liste (visibles ou non)
     onChangeView: (view: ListView) => void
     onEditList: (anchor: DOMRect) => void
+    onToggleShowDone: () => void
+    onClearDone: () => void
+}
+
+class ListHeaderState {
+    menuOpen: boolean = false
 }
 
 /**
@@ -19,14 +27,28 @@ interface ListHeaderProps {
  * Quand la place manque (voir ListHeader.css), la recherche disparaît, puis les
  * boutons n'affichent plus que leur icône : les textes sont dans des <span className="btn-label">.
  */
-export class ListHeader extends React.Component<ListHeaderProps> {
+export class ListHeader extends React.Component<ListHeaderProps, ListHeaderState> {
+    private iconRef = React.createRef<HTMLButtonElement>()
+
+    constructor(props: ListHeaderProps) {
+        super(props)
+        this.state = new ListHeaderState()
+    }
+
+    /** Position de l'icône de la liste : l'overlay « Modifier la liste » s'ouvre à côté. */
+    private headerIconRect(): DOMRect {
+        return this.iconRef.current?.getBoundingClientRect() ?? new DOMRect(0, 0, 0, 0)
+    }
+
     render(): React.ReactNode {
-        const { list, openTasks } = this.props
+        const { list, openTasks, doneTasks } = this.props
+        const DoneIcon = list.show_done ? Eye : EyeOff
         const taskWord = openTasks > 1 ? 'tâches à faire' : 'tâche à faire'
 
         return (
             <header className="ListHeader">
                 <button
+                    ref={this.iconRef}
                     className="header-icon"
                     title="Modifier la liste"
                     data-list-edit
@@ -59,6 +81,40 @@ export class ListHeader extends React.Component<ListHeaderProps> {
                     >
                         <Rows2 size={14} /><span className="btn-label">Sections</span>
                     </button>
+                </div>
+
+                <button
+                    className={list.show_done ? 'icon-btn header-tool' : 'icon-btn header-tool on'}
+                    title={list.show_done ? 'Masquer les tâches faites' : `Afficher les tâches faites (${doneTasks})`}
+                    onClick={this.props.onToggleShowDone}
+                >
+                    <DoneIcon size={16} />
+                </button>
+
+                <div className="menu-anchor">
+                    <button className="icon-btn header-tool" title="Options de la liste" onClick={() => this.setState({ menuOpen: true })}>
+                        <Ellipsis size={16} />
+                    </button>
+                    {this.state.menuOpen && (
+                        <Menu
+                            onClose={() => this.setState({ menuOpen: false })}
+                            items={[
+                                {
+                                    label: 'Modifier la liste', icon: Pencil,
+                                    onSelect: () => this.props.onEditList(this.headerIconRect()),
+                                },
+                                {
+                                    label: list.show_done ? 'Masquer les tâches faites' : 'Afficher les tâches faites',
+                                    icon: list.show_done ? EyeOff : Eye,
+                                    onSelect: this.props.onToggleShowDone,
+                                },
+                                {
+                                    label: `Vider les tâches faites (${doneTasks})`, icon: Trash2, danger: true,
+                                    onSelect: this.props.onClearDone,
+                                },
+                            ]}
+                        />
+                    )}
                 </div>
 
                 <button className="btn-primary header-new-group" title="Nouveau groupe" onClick={this.props.onNewGroup}>

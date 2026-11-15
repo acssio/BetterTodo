@@ -17,6 +17,13 @@ const (
 	defaultListView  = "columns"
 )
 
+// Nom du groupe créé avec chaque nouvelle liste, selon la langue du compte.
+// Sert aussi à vérifier qu'une langue est connue (voir UpdateMe).
+var defaultGroupName = map[string]string{
+	"fr": "Tâches",
+	"en": "Tasks",
+}
+
 // ListHandler gère les listes, et la vue complète d'une liste (board).
 type ListHandler struct {
 	pool *pgxpool.Pool
@@ -35,12 +42,13 @@ type list struct {
 	Color       string  `json:"color"`
 	Icon        string  `json:"icon"`
 	DefaultView string  `json:"default_view"`
+	ShowDone    bool    `json:"show_done"` // false = tâches faites masquées dans cette liste
 	Position    int     `json:"position"`
 	OpenTasks   int     `json:"open_tasks"` // Nombre de tâches pas encore faites (pour la barre latérale)
 }
 
 const listSelect = `
-	SELECT l.id, l.folder_id, l.name, l.color, l.icon, l.default_view, l.position,
+	SELECT l.id, l.folder_id, l.name, l.color, l.icon, l.default_view, l.show_done, l.position,
 	       (SELECT count(*) FROM tasks t JOIN task_groups g ON g.id = t.group_id
 	        WHERE g.list_id = l.id AND NOT t.done)
 	FROM lists l`
@@ -55,7 +63,7 @@ var listOrdering = ordering{
 
 func scanList(row pgx.Row) (list, error) {
 	var l list
-	err := row.Scan(&l.ID, &l.FolderID, &l.Name, &l.Color, &l.Icon, &l.DefaultView, &l.Position, &l.OpenTasks)
+	err := row.Scan(&l.ID, &l.FolderID, &l.Name, &l.Color, &l.Icon, &l.DefaultView, &l.ShowDone, &l.Position, &l.OpenTasks)
 	return l, err
 }
 
@@ -141,6 +149,17 @@ func (h *ListHandler) Create(w http.ResponseWriter, r *http.Request) {
 			return err
 		}
 
+		// Groupe par défaut, nommé dans la langue du compte
+		var language string
+		if err := tx.QueryRow(ctx, `SELECT language FROM users WHERE id = $1`, userID).Scan(&language); err != nil {
+			return err
+		}
+		_, err = tx.Exec(ctx, `INSERT INTO task_groups (list_id, name, position) VALUES ($1, $2, 0)`,
+			id, defaultGroupName[language])
+		if err != nil {
+			return err
+		}
+
 		if req.Position != nil {
 			if err := listOrdering.move(ctx, tx, []any{userID, req.FolderID}, id, *req.Position); err != nil {
 				return err
@@ -164,6 +183,7 @@ type updateListRequest struct {
 	Color       Optional[string] `json:"color"`
 	Icon        Optional[string] `json:"icon"`
 	DefaultView Optional[string] `json:"default_view"`
+	ShowDone    Optional[bool]   `json:"show_done"`
 	Position    Optional[int]    `json:"position"`
 }
 
@@ -183,8 +203,8 @@ func (h *ListHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Ces champs ne peuvent pas être null
-	if req.Color.IsNull() || req.Icon.IsNull() || req.DefaultView.IsNull() || req.Position.IsNull() {
-		badRequest(w, "color, icon, default_view et position ne peuvent pas être null")
+	if req.Color.IsNull() || req.Icon.IsNull() || req.DefaultView.IsNull() || req.ShowDone.IsNull() || req.Position.IsNull() {
+		badRequest(w, "color, icon, default_view, show_done et position ne peuvent pas être null")
 		return
 	}
 
@@ -217,6 +237,9 @@ func (h *ListHandler) Update(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		changes.set("default_view", *req.DefaultView.Value)
+	}
+	if req.ShowDone.Set {
+		changes.set("show_done", *req.ShowDone.Value)
 	}
 	if req.FolderID.Set {
 		if req.FolderID.Value != nil &&
@@ -280,6 +303,26 @@ func (h *ListHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// ClearDone : DELETE /api/v1/lists/{id}/done-tasks → supprime toutes les tâches faites de la liste.
+// Une seule requête SQL : soit tout est supprimé, soit rien. Réponse : {"deleted": n}.
+func (h *ListHandler) ClearDone(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r)
+	if !ok {
+		return
+	}
+	if !requireOwned(w, r, h.pool, sqlOwnsList, id) {
+		return
+	}
+
+	result, err := h.pool.Exec(r.Context(),
+		`DELETE FROM tasks WHERE done AND group_id IN (SELECT id FROM task_groups WHERE list_id = $1)`, id)
+	if err != nil {
+		httpjson.ServerError(w, err)
+		return
+	}
+	httpjson.Write(w, http.StatusOK, map[string]int64{"deleted": result.RowsAffected()})
 }
 
 // board : tout ce qu'il faut pour afficher une liste, en un seul appel.

@@ -4,7 +4,8 @@ import type {
     Board as BoardData, BoardGroup, Folder, ListChanges, ListView, Task, TaskChanges, TodoList, UrgencyLevel, User,
 } from '../api/types'
 import {
-    appendTask, countOpenTasks, findTask, indexInGroup, moveTask, removeTask, replaceTask,
+    appendTask, countDoneTasks, countOpenTasks, findTask, hideDoneTasks, indexInGroup, moveTask, removeTask, replaceTask,
+    visibleToFullIndex,
 } from '../utils/board'
 import type { DragState, DropTarget } from '../utils/dragDrop'
 import { SIDEBAR, sidebarMode } from '../utils/sidebarLayout'
@@ -370,10 +371,14 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
     }
 
     /** Déplace une tâche : index compté sans la tâche déplacée (comme l'API). */
-    private async moveTask(taskId: string, groupId: string, index: number): Promise<void> {
+    private async moveTask(taskId: string, groupId: string, visibleIndex: number): Promise<void> {
         const board = this.state.board
         const task = board ? findTask(board, taskId) : undefined
-        if (!board || !task) return
+        const group = board?.groups.find(g => g.id === groupId)
+        if (!board || !task || !group) return
+
+        // Tâches faites masquées : l'index visé est compté parmi les tâches visibles seulement
+        const index = board.list.show_done ? visibleIndex : visibleToFullIndex(group.tasks, taskId, visibleIndex)
 
         const sameGroup = task.group_id === groupId
         if (sameGroup && indexInGroup(board, taskId) === index) return // Reposée à sa place
@@ -409,6 +414,35 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
         }))
         try {
             await api.renameGroup(groupId, name)
+        } catch (error) {
+            this.handleError(error)
+            void this.reloadBoard()
+        }
+    }
+
+    // --- Tâches faites : masquer / vider ----------------------------------------
+
+    onToggleShowDone = (): void => {
+        const list = this.state.board?.list
+        if (list) void this.updateList(list.id, { show_done: !list.show_done })
+    }
+
+    onClearDone = async (): Promise<void> => {
+        const board = this.state.board
+        if (!board) return
+
+        const count = countDoneTasks(board)
+        if (count === 0) {
+            window.alert('Aucune tâche faite à vider dans cette liste.')
+            return
+        }
+        const word = count > 1 ? `les ${count} tâches faites` : 'la tâche faite'
+        if (!window.confirm(`Supprimer définitivement ${word} de « ${board.list.name} » ?`)) return
+
+        this.setState({ openTask: null })
+        this.updateBoard(b => ({ ...b, groups: b.groups.map(g => ({ ...g, tasks: g.tasks.filter(t => !t.done) })) }))
+        try {
+            await api.clearDoneTasks(board.list.id)
         } catch (error) {
             this.handleError(error)
             void this.reloadBoard()
@@ -503,6 +537,9 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
                                 onNewGroup={() => this.setState({ addingGroup: true })}
                                 onChangeView={this.onChangeView}
                                 onEditList={anchor => this.onEditList(board.list, anchor)}
+                                doneTasks={countDoneTasks(board)}
+                                onToggleShowDone={this.onToggleShowDone}
+                                onClearDone={() => void this.onClearDone()}
                             />
                             {this.renderView(board)}
                         </>
@@ -594,7 +631,7 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
     /** Vue colonnes ou sections, selon le choix enregistré sur la liste. */
     private renderView(board: BoardData): React.ReactNode {
         const props: TaskViewProps = {
-            board,
+            board: board.list.show_done ? board : hideDoneTasks(board), // Le board complet reste dans l'état
             urgencyLevels: this.state.urgencyLevels,
             actions: this,
             openTaskId: this.state.openTask?.id ?? null,

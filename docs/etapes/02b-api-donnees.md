@@ -40,10 +40,11 @@ Toutes sous `/api/v1`, et **toutes demandent d'être connecté**.
 | PATCH | `/folders/{id}` | `{name?, position?, collapsed?}` |
 | DELETE | `/folders/{id}` | ses listes passent **hors groupe** (elles ne sont pas supprimées) |
 | GET | `/lists` | toutes les listes, dans l'ordre de la barre latérale, avec `open_tasks` |
-| POST | `/lists` | `{name, folder_id?, color?, icon?, default_view?, position?}` |
+| POST | `/lists` | `{name, folder_id?, color?, icon?, default_view?, position?}` ; crée aussi un groupe par défaut (étape 3c-2b) |
 | PATCH | `/lists/{id}` | mêmes champs ; `folder_id: null` = sortir du groupe |
 | DELETE | `/lists/{id}` | supprime aussi ses groupes et ses tâches |
 | GET | `/lists/{id}/board` | **la liste, ses groupes et leurs tâches, en un seul appel** |
+| DELETE | `/lists/{id}/done-tasks` | supprime les tâches faites de la liste (ajouté à l'étape 3c-2b) |
 | POST | `/lists/{id}/groups` | `{name, position?}` |
 | PATCH | `/groups/{id}` | `{name?, position?}` |
 | DELETE | `/groups/{id}` | supprime aussi ses tâches |

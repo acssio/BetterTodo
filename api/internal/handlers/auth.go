@@ -46,15 +46,16 @@ type userResponse struct {
 	Email       string    `json:"email"`
 	DisplayName string    `json:"display_name"`
 	DefaultView string    `json:"default_view"` // Vue des nouvelles listes : "columns" ou "sections"
+	Language    string    `json:"language"`     // "fr" ou "en"
 	CreatedAt   time.Time `json:"created_at"`
 }
 
 // userColumns : colonnes lues pour construire un userResponse (dans l'ordre de scanTargets).
-const userColumns = `id, email, display_name, default_view, created_at`
+const userColumns = `id, email, display_name, default_view, language, created_at`
 
 // scanTargets : les champs de u, dans l'ordre de userColumns.
 func (u *userResponse) scanTargets() []any {
-	return []any{&u.ID, &u.Email, &u.DisplayName, &u.DefaultView, &u.CreatedAt}
+	return []any{&u.ID, &u.Email, &u.DisplayName, &u.DefaultView, &u.Language, &u.CreatedAt}
 }
 
 // sessionResponse : réponse à une inscription ou une connexion réussie.
@@ -171,6 +172,7 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 type updateMeRequest struct {
 	DisplayName Optional[string] `json:"display_name"`
 	DefaultView Optional[string] `json:"default_view"`
+	Language    Optional[string] `json:"language"`
 }
 
 // UpdateMe : PATCH /api/v1/me (connexion requise) → modifie le nom affiché et/ou la vue par défaut
@@ -179,8 +181,8 @@ func (h *AuthHandler) UpdateMe(w http.ResponseWriter, r *http.Request) {
 	if !httpjson.Read(w, r, &req) {
 		return
 	}
-	if req.DisplayName.IsNull() || req.DefaultView.IsNull() {
-		badRequest(w, "display_name et default_view ne peuvent pas être null")
+	if req.DisplayName.IsNull() || req.DefaultView.IsNull() || req.Language.IsNull() {
+		badRequest(w, "display_name, default_view et language ne peuvent pas être null")
 		return
 	}
 
@@ -199,6 +201,13 @@ func (h *AuthHandler) UpdateMe(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		changes.set("default_view", *req.DefaultView.Value)
+	}
+	if req.Language.Set {
+		if _, ok := defaultGroupName[*req.Language.Value]; !ok {
+			badRequest(w, "language doit valoir fr ou en")
+			return
+		}
+		changes.set("language", *req.Language.Value)
 	}
 
 	ctx := r.Context()

@@ -1,6 +1,6 @@
 {
   "info": {
-    "name": "BetterTodo API – étape 2b (données)",
+    "name": "BetterTodo API – données (étapes 2b et 3c-2b)",
     "description": "Listes, groupes, tâches, tags, niveaux d'urgence, ordre et isolation entre utilisateurs. À lancer dans l'ordre (voir docs/etapes/02b-api-donnees.md).",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
@@ -286,7 +286,35 @@
       ]
     },
     {
-      "name": "09 Liste – couleur invalide",
+      "name": "09 Nouvelle liste : un groupe « Tâches » par défaut",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/lists/{{listId}}/board",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ]
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200', () => pm.response.to.have.status(200));",
+              "const b = pm.response.json();",
+              "pm.test('un seul groupe, nommé Tâches (compte en français)', () => pm.expect(b.groups.map(g => g.name)).to.eql(['Tâches']));",
+              "pm.test('show_done = true par défaut', () => pm.expect(b.list.show_done).to.eql(true));",
+              "pm.collectionVariables.set('groupA', b.groups[0].id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "10 Liste – couleur invalide",
       "request": {
         "method": "POST",
         "url": "{{baseUrl}}/lists",
@@ -318,7 +346,7 @@
       ]
     },
     {
-      "name": "10 Liste – groupe de listes inconnu",
+      "name": "11 Liste – groupe de listes inconnu",
       "request": {
         "method": "POST",
         "url": "{{baseUrl}}/lists",
@@ -350,10 +378,10 @@
       ]
     },
     {
-      "name": "11 Groupe Courses",
+      "name": "12 Renommer le groupe par défaut en Courses",
       "request": {
-        "method": "POST",
-        "url": "{{baseUrl}}/lists/{{listId}}/groups",
+        "method": "PATCH",
+        "url": "{{baseUrl}}/groups/{{groupA}}",
         "header": [
           {
             "key": "Authorization",
@@ -375,16 +403,16 @@
           "script": {
             "type": "text/javascript",
             "exec": [
-              "pm.test('201', () => pm.response.to.have.status(201));",
+              "pm.test('200', () => pm.response.to.have.status(200));",
               "const b = pm.response.json();",
-              "pm.collectionVariables.set('groupA', b.id);"
+              "pm.test('renommé', () => pm.expect(b.name).to.eql('Courses'));"
             ]
           }
         }
       ]
     },
     {
-      "name": "12 Groupe Administratif",
+      "name": "13 Groupe Administratif",
       "request": {
         "method": "POST",
         "url": "{{baseUrl}}/lists/{{listId}}/groups",
@@ -419,7 +447,7 @@
       ]
     },
     {
-      "name": "13 Tâche Pain (complète)",
+      "name": "14 Tâche Pain (complète)",
       "request": {
         "method": "POST",
         "url": "{{baseUrl}}/groups/{{groupA}}/tasks",
@@ -460,7 +488,7 @@
       ]
     },
     {
-      "name": "14 Tâche Lait",
+      "name": "15 Tâche Lait",
       "request": {
         "method": "POST",
         "url": "{{baseUrl}}/groups/{{groupA}}/tasks",
@@ -495,7 +523,7 @@
       ]
     },
     {
-      "name": "15 Tâche Œufs",
+      "name": "16 Tâche Œufs",
       "request": {
         "method": "POST",
         "url": "{{baseUrl}}/groups/{{groupA}}/tasks",
@@ -529,7 +557,7 @@
       ]
     },
     {
-      "name": "16 Tâche – date invalide",
+      "name": "17 Tâche – date invalide",
       "request": {
         "method": "POST",
         "url": "{{baseUrl}}/groups/{{groupA}}/tasks",
@@ -561,7 +589,7 @@
       ]
     },
     {
-      "name": "17 Tâche – titre vide",
+      "name": "18 Tâche – titre vide",
       "request": {
         "method": "POST",
         "url": "{{baseUrl}}/groups/{{groupA}}/tasks",
@@ -593,7 +621,7 @@
       ]
     },
     {
-      "name": "18 Glisser Œufs en tête",
+      "name": "19 Glisser Œufs en tête",
       "request": {
         "method": "PATCH",
         "url": "{{baseUrl}}/tasks/{{task3}}",
@@ -627,7 +655,7 @@
       ]
     },
     {
-      "name": "19 Ordre après le glisser-déposer",
+      "name": "20 Ordre après le glisser-déposer",
       "request": {
         "method": "GET",
         "url": "{{baseUrl}}/lists/{{listId}}/board",
@@ -654,7 +682,7 @@
       ]
     },
     {
-      "name": "20 Cocher Pain",
+      "name": "21 Cocher Pain",
       "request": {
         "method": "PATCH",
         "url": "{{baseUrl}}/tasks/{{task1}}",
@@ -688,7 +716,7 @@
       ]
     },
     {
-      "name": "21 Décocher Pain",
+      "name": "22 Décocher Pain",
       "request": {
         "method": "PATCH",
         "url": "{{baseUrl}}/tasks/{{task1}}",
@@ -722,7 +750,7 @@
       ]
     },
     {
-      "name": "22 Effacer échéance et urgence, remplacer les tags",
+      "name": "23 Effacer échéance et urgence, remplacer les tags",
       "request": {
         "method": "PATCH",
         "url": "{{baseUrl}}/tasks/{{task1}}",
@@ -761,7 +789,7 @@
       ]
     },
     {
-      "name": "23 Déplacer Lait dans Administratif",
+      "name": "24 Déplacer Lait dans Administratif",
       "request": {
         "method": "PATCH",
         "url": "{{baseUrl}}/tasks/{{task2}}",
@@ -795,7 +823,7 @@
       ]
     },
     {
-      "name": "24 Board complet",
+      "name": "25 Board complet",
       "request": {
         "method": "GET",
         "url": "{{baseUrl}}/lists/{{listId}}/board",
@@ -826,7 +854,7 @@
       ]
     },
     {
-      "name": "25 Champ inconnu refusé",
+      "name": "26 Champ inconnu refusé",
       "request": {
         "method": "PATCH",
         "url": "{{baseUrl}}/tasks/{{task1}}",
@@ -858,7 +886,7 @@
       ]
     },
     {
-      "name": "26 Identifiant invalide dans l'URL",
+      "name": "27 Identifiant invalide dans l'URL",
       "request": {
         "method": "GET",
         "url": "{{baseUrl}}/lists/pas-un-uuid/board",
@@ -882,7 +910,7 @@
       ]
     },
     {
-      "name": "27 Liste des tags",
+      "name": "28 Liste des tags",
       "request": {
         "method": "GET",
         "url": "{{baseUrl}}/tags",
@@ -912,7 +940,7 @@
       ]
     },
     {
-      "name": "28 Tag en double",
+      "name": "29 Tag en double",
       "request": {
         "method": "POST",
         "url": "{{baseUrl}}/tags",
@@ -944,7 +972,7 @@
       ]
     },
     {
-      "name": "29 Renommer un tag",
+      "name": "30 Renommer un tag",
       "request": {
         "method": "PATCH",
         "url": "{{baseUrl}}/tags/{{tagUrgent}}",
@@ -978,7 +1006,7 @@
       ]
     },
     {
-      "name": "30 Le tag renommé apparaît sur la tâche",
+      "name": "31 Le tag renommé apparaît sur la tâche",
       "request": {
         "method": "GET",
         "url": "{{baseUrl}}/tasks/{{task1}}",
@@ -1004,7 +1032,7 @@
       ]
     },
     {
-      "name": "31 Nouveau niveau Critique",
+      "name": "32 Nouveau niveau Critique",
       "request": {
         "method": "POST",
         "url": "{{baseUrl}}/urgency-levels",
@@ -1039,7 +1067,7 @@
       ]
     },
     {
-      "name": "32 Critique remonté en rank 0",
+      "name": "33 Critique remonté en rank 0",
       "request": {
         "method": "PATCH",
         "url": "{{baseUrl}}/urgency-levels/{{urgCritique}}",
@@ -1071,7 +1099,7 @@
       ]
     },
     {
-      "name": "33 Ordre des niveaux",
+      "name": "34 Ordre des niveaux",
       "request": {
         "method": "GET",
         "url": "{{baseUrl}}/urgency-levels",
@@ -1098,7 +1126,7 @@
       ]
     },
     {
-      "name": "34 B ne voit aucune liste",
+      "name": "35 B ne voit aucune liste",
       "request": {
         "method": "GET",
         "url": "{{baseUrl}}/lists",
@@ -1123,7 +1151,7 @@
       ]
     },
     {
-      "name": "35 B ne peut pas lire le board de A",
+      "name": "36 B ne peut pas lire le board de A",
       "request": {
         "method": "GET",
         "url": "{{baseUrl}}/lists/{{listId}}/board",
@@ -1147,7 +1175,7 @@
       ]
     },
     {
-      "name": "36 B ne peut pas modifier une tâche de A",
+      "name": "37 B ne peut pas modifier une tâche de A",
       "request": {
         "method": "PATCH",
         "url": "{{baseUrl}}/tasks/{{task1}}",
@@ -1179,7 +1207,7 @@
       ]
     },
     {
-      "name": "37 B ne peut pas ajouter une tâche chez A",
+      "name": "38 B ne peut pas ajouter une tâche chez A",
       "request": {
         "method": "POST",
         "url": "{{baseUrl}}/groups/{{groupA}}/tasks",
@@ -1211,7 +1239,7 @@
       ]
     },
     {
-      "name": "38 B ne peut pas utiliser le groupe de listes de A",
+      "name": "39 B ne peut pas utiliser le groupe de listes de A",
       "request": {
         "method": "POST",
         "url": "{{baseUrl}}/lists",
@@ -1243,7 +1271,7 @@
       ]
     },
     {
-      "name": "39 B crée sa propre liste",
+      "name": "40 B crée sa propre liste",
       "request": {
         "method": "POST",
         "url": "{{baseUrl}}/lists",
@@ -1277,7 +1305,7 @@
       ]
     },
     {
-      "name": "40 B crée un groupe dans sa liste",
+      "name": "41 B crée un groupe dans sa liste",
       "request": {
         "method": "POST",
         "url": "{{baseUrl}}/lists/{{listOfB}}/groups",
@@ -1311,7 +1339,7 @@
       ]
     },
     {
-      "name": "41 B ne peut pas utiliser un niveau d'urgence de A",
+      "name": "42 B ne peut pas utiliser un niveau d'urgence de A",
       "request": {
         "method": "POST",
         "url": "{{baseUrl}}/groups/{{groupOfB}}/tasks",
@@ -1344,7 +1372,7 @@
       ]
     },
     {
-      "name": "42 B ne peut pas déplacer sa tâche dans un groupe de A",
+      "name": "43 B ne peut pas déplacer sa tâche dans un groupe de A",
       "request": {
         "method": "POST",
         "url": "{{baseUrl}}/groups/{{groupOfB}}/tasks",
@@ -1378,7 +1406,7 @@
       ]
     },
     {
-      "name": "43 … le déplacement est refusé",
+      "name": "44 … le déplacement est refusé",
       "request": {
         "method": "PATCH",
         "url": "{{baseUrl}}/tasks/{{taskOfB}}",
@@ -1410,7 +1438,7 @@
       ]
     },
     {
-      "name": "44 B ne peut pas supprimer la liste de A",
+      "name": "45 B ne peut pas supprimer la liste de A",
       "request": {
         "method": "DELETE",
         "url": "{{baseUrl}}/lists/{{listId}}",
@@ -1434,7 +1462,7 @@
       ]
     },
     {
-      "name": "45 La tâche de A est intacte",
+      "name": "46 La tâche de A est intacte",
       "request": {
         "method": "GET",
         "url": "{{baseUrl}}/tasks/{{task1}}",
@@ -1459,7 +1487,185 @@
       ]
     },
     {
-      "name": "46 Supprimer le groupe de listes Personnel",
+      "name": "47 Masquer les tâches faites de la liste",
+      "request": {
+        "method": "PATCH",
+        "url": "{{baseUrl}}/lists/{{listId}}",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"show_done\": false\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200', () => pm.response.to.have.status(200));",
+              "const b = pm.response.json();",
+              "pm.test('show_done = false', () => pm.expect(b.show_done).to.eql(false));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "48 Cocher Pain (pour le vider ensuite)",
+      "request": {
+        "method": "PATCH",
+        "url": "{{baseUrl}}/tasks/{{task1}}",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"done\": true\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200', () => pm.response.to.have.status(200));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "49 Cocher Œufs",
+      "request": {
+        "method": "PATCH",
+        "url": "{{baseUrl}}/tasks/{{task3}}",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"done\": true\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200', () => pm.response.to.have.status(200));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "50 B ne peut pas vider les tâches faites de A",
+      "request": {
+        "method": "DELETE",
+        "url": "{{baseUrl}}/lists/{{listId}}/done-tasks",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{tokenB}}"
+          }
+        ]
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('404', () => pm.response.to.have.status(404));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "51 Vider les tâches faites",
+      "request": {
+        "method": "DELETE",
+        "url": "{{baseUrl}}/lists/{{listId}}/done-tasks",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ]
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200', () => pm.response.to.have.status(200));",
+              "const b = pm.response.json();",
+              "pm.test('2 tâches supprimées', () => pm.expect(b.deleted).to.eql(2));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "52 Il ne reste que les tâches pas faites",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/lists/{{listId}}/board",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ]
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200', () => pm.response.to.have.status(200));",
+              "const b = pm.response.json();",
+              "const tasks = b.groups.flatMap(g => g.tasks);",
+              "pm.test('aucune tâche faite, Lait toujours là', () => {",
+              "    pm.expect(tasks.filter(t => t.done)).to.have.lengthOf(0);",
+              "    pm.expect(tasks.map(t => t.title)).to.include('Lait');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "53 Supprimer le groupe de listes Personnel",
       "request": {
         "method": "DELETE",
         "url": "{{baseUrl}}/folders/{{folderPerso}}",
@@ -1483,7 +1689,7 @@
       ]
     },
     {
-      "name": "47 La liste Perso est passée hors groupe",
+      "name": "54 La liste Perso est passée hors groupe",
       "request": {
         "method": "GET",
         "url": "{{baseUrl}}/lists",
@@ -1509,7 +1715,7 @@
       ]
     },
     {
-      "name": "48 Supprimer le groupe Courses",
+      "name": "55 Supprimer le groupe Courses",
       "request": {
         "method": "DELETE",
         "url": "{{baseUrl}}/groups/{{groupA}}",
@@ -1533,7 +1739,7 @@
       ]
     },
     {
-      "name": "49 Ses tâches sont supprimées",
+      "name": "56 Ses tâches sont supprimées (ou déjà vidées)",
       "request": {
         "method": "GET",
         "url": "{{baseUrl}}/tasks/{{task1}}",
@@ -1557,7 +1763,7 @@
       ]
     },
     {
-      "name": "50 Supprimer la liste",
+      "name": "57 Supprimer la liste",
       "request": {
         "method": "DELETE",
         "url": "{{baseUrl}}/lists/{{listId}}",
@@ -1581,7 +1787,7 @@
       ]
     },
     {
-      "name": "51 La liste n'existe plus",
+      "name": "58 La liste n'existe plus",
       "request": {
         "method": "GET",
         "url": "{{baseUrl}}/lists/{{listId}}/board",
@@ -1605,7 +1811,7 @@
       ]
     },
     {
-      "name": "52 Lait (dans Administratif) est supprimé avec la liste",
+      "name": "59 Lait (dans Administratif) est supprimé avec la liste",
       "request": {
         "method": "GET",
         "url": "{{baseUrl}}/tasks/{{task2}}",

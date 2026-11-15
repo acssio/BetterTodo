@@ -93,6 +93,7 @@ func main() {
 	private("PATCH /api/v1/lists/{id}", listHandler.Update)
 	private("DELETE /api/v1/lists/{id}", listHandler.Delete)
 	private("GET /api/v1/lists/{id}/board", listHandler.Board)
+	private("DELETE /api/v1/lists/{id}/done-tasks", listHandler.ClearDone)
 
 	private("POST /api/v1/lists/{id}/groups", groupHandler.Create)
 	private("PATCH /api/v1/groups/{id}", groupHandler.Update)

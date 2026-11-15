@@ -3,11 +3,15 @@
 // Les noms des champs sont ceux du JSON, en snake_case.
 // =============================================================================
 
+/** Langue du compte. Sert pour l'instant au nom du groupe créé avec chaque nouvelle liste. */
+export type Language = 'fr' | 'en'
+
 export interface User {
     id: string
     email: string
     display_name: string
     default_view: ListView // Vue des nouvelles listes (Paramètres)
+    language: Language
     created_at: string
 }
 
@@ -15,6 +19,7 @@ export interface User {
 export interface UserChanges {
     display_name?: string
     default_view?: ListView
+    language?: Language
 }
 
 /** Réponse à une connexion ou une inscription. */
@@ -42,6 +47,7 @@ export interface TodoList {
     color: string            // "#RRGGBB"
     icon: string             // Nom d'icône Lucide, ex. "briefcase"
     default_view: ListView
+    show_done: boolean       // false = tâches faites masquées
     position: number
     open_tasks: number       // Tâches pas encore faites
 }
@@ -53,6 +59,7 @@ export interface ListChanges {
     color?: string
     icon?: string
     default_view?: ListView
+    show_done?: boolean
     position?: number
 }
 

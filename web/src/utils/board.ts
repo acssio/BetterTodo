@@ -75,3 +75,34 @@ export function indexInGroup(board: Board, taskId: string): number {
 export function countOpenTasks(board: Board): number {
     return board.groups.reduce((sum, group) => sum + group.tasks.filter(t => !t.done).length, 0)
 }
+
+/** Nombre de tâches faites dans tout le board. */
+export function countDoneTasks(board: Board): number {
+    return board.groups.reduce((sum, group) => sum + group.tasks.filter(t => t.done).length, 0)
+}
+
+/** Board sans les tâches faites (affichage quand la liste les masque). */
+export function hideDoneTasks(board: Board): Board {
+    return mapGroups(board, group => ({ ...group, tasks: group.tasks.filter(t => !t.done) }))
+}
+
+/**
+ * Quand les tâches faites sont masquées, l'index de dépôt est compté parmi les tâches
+ * VISIBLES, mais l'API attend un index parmi TOUTES les tâches du groupe (sans la tâche
+ * déplacée). Cette fonction fait la conversion.
+ *
+ * Exemple : [A, x, B] (x faite, masquée), on dépose C en position visible 1 (avant B)
+ * → index réel 2 (après x, avant B).
+ */
+export function visibleToFullIndex(tasks: Task[], movedId: string, visibleIndex: number): number {
+    const others = tasks.filter(t => t.id !== movedId)
+    const visible = others.filter(t => !t.done)
+
+    if (visibleIndex < visible.length) {
+        return others.indexOf(visible[visibleIndex]) // Juste avant la tâche visible visée
+    }
+    if (visible.length === 0) {
+        return 0 // Aucune tâche visible : en tête
+    }
+    return others.indexOf(visible[visible.length - 1]) + 1 // Juste après la dernière visible
+}
