@@ -4,7 +4,7 @@ import type { Task, UrgencyLevel } from '../api/types'
 import { ListIcon } from './ListIcon'
 import { DueDate, UrgencyPill } from './TaskCard'
 import { caretOffsetAt } from '../utils/caret'
-import { LongPress } from '../utils/longPress'
+import { GestureTracker, LongPress } from '../utils/longPress'
 import { TitleEditor } from './TitleEditor'
 import './TaskRow.css'
 
@@ -68,6 +68,9 @@ export class TaskRow extends React.Component<TaskRowProps, TaskRowState> {
         onDragEnd: drop => this.props.onTouchDragEnd?.(drop),
     })
 
+    // Suit le doigt sur toute la fenêtre pendant le geste (voir GestureTracker)
+    private gesture = new GestureTracker(this.longPress, () => this.setState({ lifted: false }))
+
     componentDidMount(): void {
         // Écoute « non passive » : la seule façon d'empêcher le défilement pendant un glisser au doigt
         this.rootRef.current?.addEventListener('touchmove', this.onTouchMove, { passive: false })
@@ -75,6 +78,7 @@ export class TaskRow extends React.Component<TaskRowProps, TaskRowState> {
 
     componentWillUnmount(): void {
         this.rootRef.current?.removeEventListener('touchmove', this.onTouchMove)
+        this.gesture.stop()
         this.longPress.abort()
     }
 
@@ -131,22 +135,9 @@ export class TaskRow extends React.Component<TaskRowProps, TaskRowState> {
 
     // --- Appui long (mode mobile) -----------------------------------------------
 
+    /** Doigt posé : la suite du geste (bouger, lever) est suivie sur toute la fenêtre. */
     onPointerDown = (event: React.PointerEvent<HTMLDivElement>): void => {
-        if (this.props.tapToOpen && event.isPrimary) this.longPress.down(event.clientX, event.clientY)
-    }
-
-    onPointerMove = (event: React.PointerEvent<HTMLDivElement>): void => {
-        this.longPress.move(event.clientX, event.clientY)
-    }
-
-    onPointerUp = (): void => {
-        this.longPress.up()
-    }
-
-    /** Le navigateur a repris la main (défilement, appel entrant…) : glisser annulé. */
-    onPointerCancel = (): void => {
-        this.longPress.abort()
-        this.setState({ lifted: false })
+        if (this.props.tapToOpen && event.isPrimary) this.gesture.start(event.pointerId, event.clientX, event.clientY)
     }
 
     /** Android ouvre un menu sur un appui long : pas sur une tâche. */
@@ -186,9 +177,6 @@ export class TaskRow extends React.Component<TaskRowProps, TaskRowState> {
                 onDragStart={this.onDragStart}
                 onDragEnd={this.props.onDragEnd}
                 onPointerDown={this.onPointerDown}
-                onPointerMove={this.onPointerMove}
-                onPointerUp={this.onPointerUp}
-                onPointerCancel={this.onPointerCancel}
                 onContextMenu={this.onContextMenu}
             >
                 <button
