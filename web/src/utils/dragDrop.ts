@@ -34,3 +34,37 @@ export function computeDropIndex(
     }
     return items.length
 }
+
+// =============================================================================
+// Glisser au doigt (mode mobile) : défilement automatique près des bords
+// =============================================================================
+
+export const AUTO_SCROLL = {
+    edge: 56,         // px : zone près du haut / du bas où la liste défile toute seule
+    maxSpeed: 14,     // px par image au plus près du bord
+    sideEdge: 28,     // px : bord gauche / droit qui fait passer au groupe voisin (vue colonnes)
+    sideDelay: 500,   // ms à garder le doigt sur ce bord
+}
+
+/**
+ * Vitesse de défilement (px par image) quand le doigt est près du haut (négatif)
+ * ou du bas (positif) de la zone [start, end]. 0 au milieu. Plus on est près du bord, plus ça va vite.
+ */
+export function autoScrollSpeed(pointer: number, start: number, end: number): number {
+    if (pointer < start + AUTO_SCROLL.edge) {
+        const depth = Math.min(1, (start + AUTO_SCROLL.edge - pointer) / AUTO_SCROLL.edge)
+        return -Math.ceil(depth * AUTO_SCROLL.maxSpeed)
+    }
+    if (pointer > end - AUTO_SCROLL.edge) {
+        const depth = Math.min(1, (pointer - (end - AUTO_SCROLL.edge)) / AUTO_SCROLL.edge)
+        return Math.ceil(depth * AUTO_SCROLL.maxSpeed)
+    }
+    return 0
+}
+
+/** Le doigt est-il contre le bord gauche (-1), droit (1), ou ni l'un ni l'autre (0) ? */
+export function sideEdge(x: number, left: number, right: number): number {
+    if (x < left + AUTO_SCROLL.sideEdge) return -1
+    if (x > right - AUTO_SCROLL.sideEdge) return 1
+    return 0
+}

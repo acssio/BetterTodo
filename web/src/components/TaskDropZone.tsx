@@ -75,6 +75,7 @@ export class TaskDropZone extends React.Component<TaskDropZoneProps> {
         return (
             <section
                 className={this.props.className + (isDropZone ? ' drop-over' : '')}
+                data-drop-group={groupId} // Glisser au doigt : Workspace retrouve le groupe sous le doigt
                 onDragOver={this.onDragOver}
                 onDragLeave={this.onDragLeave}
                 onDrop={this.onDrop}
