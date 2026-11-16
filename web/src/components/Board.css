@@ -2,10 +2,105 @@
     flex: 1;
     min-height: 0;
     display: flex;
+    position: relative; /* Pour placer les fondus sur les bords */
+}
+
+/* La zone qui défile (horizontalement s'il y a beaucoup de colonnes) */
+.board-scroll {
+    flex: 1;
+    min-width: 0;
+    display: flex;
     align-items: flex-start;
     gap: 16px;
     padding: 24px;
-    overflow: auto; /* Défilement horizontal s'il y a beaucoup de colonnes */
+    overflow: auto;
+}
+
+/* Barre de défilement fine mais toujours visible (macOS la masque par défaut).
+   Chrome / Safari : pseudo-éléments -webkit. Firefox : scrollbar-color, plus limité. */
+.board-scroll::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.board-scroll::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.board-scroll::-webkit-scrollbar-thumb {
+    background: #CFCFCA;
+    border-radius: 4px;
+}
+
+.board-scroll::-webkit-scrollbar-thumb:hover {
+    background: #A3A3A0;
+}
+
+@supports not selector(::-webkit-scrollbar) {
+    .board-scroll {
+        scrollbar-width: thin;
+        scrollbar-color: #CFCFCA transparent;
+    }
+}
+
+/* Fondu sur un bord où des colonnes sont cachées, avec un bouton chevron */
+.board-edge {
+    position: absolute;
+    top: 0;
+    bottom: 8px; /* Laisse la barre de défilement libre */
+    width: 64px;
+    display: flex;
+    align-items: center;
+    pointer-events: none; /* Le fondu ne bloque ni les clics ni le glisser-déposer */
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.board-edge.left {
+    left: 0;
+    justify-content: flex-start;
+    padding-left: 8px;
+    background: linear-gradient(to right, var(--bg) 15%, transparent);
+}
+
+.board-edge.right {
+    right: 0;
+    justify-content: flex-end;
+    padding-right: 8px;
+    background: linear-gradient(to left, var(--bg) 15%, transparent);
+}
+
+.board-edge.visible {
+    opacity: 1;
+}
+
+.board-edge button {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text-soft);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+
+.board-edge.visible button {
+    pointer-events: auto; /* Seul le bouton est cliquable, et seulement quand il est affiché */
+}
+
+.board-edge button:hover {
+    color: var(--accent);
+    border-color: var(--accent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .board-edge {
+        transition: none;
+    }
 }
 
 /* Message « pas encore de groupe » (aussi utilisé par la vue sections) */
@@ -38,7 +133,7 @@
 
 /* Petite zone : un peu moins de marge autour des colonnes */
 @container main (max-width: 640px) {
-    .Board {
+    .board-scroll {
         padding: 16px;
         gap: 12px;
     }
