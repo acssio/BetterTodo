@@ -404,7 +404,7 @@
               "pm.test('200', () => pm.response.to.have.status(200));",
               "const b = pm.response.json();",
               "pm.test('un seul groupe, nommé Tâches (compte en français)', () => pm.expect(b.groups.map(g => g.name)).to.eql(['Tâches']));",
-              "pm.test('show_done = true par défaut', () => pm.expect(b.list.show_done).to.eql(true));",
+              "pm.test('show_done = false par défaut (tâches faites masquées)', () => pm.expect(b.list.show_done).to.eql(false));",
               "pm.collectionVariables.set('groupA', b.groups[0].id);"
             ]
           }
