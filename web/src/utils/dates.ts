@@ -12,6 +12,11 @@ export function todayIso(today: Date = new Date()): string {
     return `${today.getFullYear()}-${month}-${day}`
 }
 
+/** Date de demain au format de l'API, dans le fuseau horaire LOCAL. */
+export function tomorrowIso(today: Date = new Date()): string {
+    return todayIso(new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1))
+}
+
 /** "2026-11-18" → Date au 18 novembre 2026, 00:00 heure locale. */
 export function parseDate(iso: string): Date {
     const [year, month, day] = iso.split('-').map(Number)

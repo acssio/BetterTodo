@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { Calendar, Check, Plus, Trash2, X } from 'lucide-react'
 import type { Group, Task, TaskChanges, UrgencyLevel } from '../api/types'
-import { keyboardInset } from '../utils/mobileLayout'
+import { KeyboardListener } from '../utils/mobileLayout'
 import { DismissListener, popoverPosition } from '../utils/popover'
 import { confirmDialog } from './confirm'
 import './TaskPopover.css'
@@ -47,31 +47,21 @@ export class TaskPopover extends React.Component<TaskPopoverProps, TaskPopoverSt
         this.state = { ...new TaskPopoverState(), title: props.task.title, notes: props.task.notes }
     }
 
+    // Panneau du bas : on le remonte au-dessus du clavier du téléphone
+    private keyboard = new KeyboardListener(keyboard => this.setState(state => (state.keyboard === keyboard ? null : { keyboard })))
+
     componentDidMount(): void {
         this.dismiss.start()
-        if (this.props.sheet) {
-            // Le clavier qui s'ouvre change la partie visible de l'écran
-            window.visualViewport?.addEventListener('resize', this.onViewportChange)
-            window.visualViewport?.addEventListener('scroll', this.onViewportChange)
-        }
+        if (this.props.sheet) this.keyboard.start()
     }
 
     componentWillUnmount(): void {
         this.dismiss.stop()
-        window.visualViewport?.removeEventListener('resize', this.onViewportChange)
-        window.visualViewport?.removeEventListener('scroll', this.onViewportChange)
+        this.keyboard.stop()
         // Enregistre ce qui n'est pas encore parti (fermeture pendant la frappe)
         window.clearTimeout(this.notesTimer)
         this.saveTitle()
         this.saveNotes()
-    }
-
-    /** Panneau du bas : on le remonte au-dessus du clavier. */
-    onViewportChange = (): void => {
-        const viewport = window.visualViewport
-        if (!viewport) return
-        const keyboard = keyboardInset(window.innerHeight, viewport.height, viewport.offsetTop)
-        this.setState(state => (state.keyboard === keyboard ? null : { keyboard }))
     }
 
     // --- Enregistrement --------------------------------------------------------

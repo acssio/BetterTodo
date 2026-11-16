@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { daysFromToday, formatDueDate, isDueOrLate } from './dates'
+import { daysFromToday, formatDueDate, isDueOrLate, tomorrowIso } from './dates'
 
 // « Aujourd'hui » fixé au 13 novembre 2026 à 23h30 (heure locale) :
 // vérifie qu'on ne bascule pas au lendemain à cause de l'heure.
@@ -24,5 +24,11 @@ describe('dates', () => {
         expect(isDueOrLate('2026-11-13', today)).toBe(true)
         expect(isDueOrLate('2026-11-01', today)).toBe(true)
         expect(isDueOrLate('2026-11-14', today)).toBe(false)
+    })
+
+    it('donne la date de demain, même en fin de mois et d\'année', () => {
+        expect(tomorrowIso(today)).toBe('2026-11-14')
+        expect(tomorrowIso(new Date(2026, 10, 30, 23, 30))).toBe('2026-12-01')
+        expect(tomorrowIso(new Date(2026, 11, 31, 8, 0))).toBe('2027-01-01')
     })
 })

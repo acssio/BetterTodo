@@ -2,7 +2,7 @@ import * as React from 'react'
 import { Trash2, X } from 'lucide-react'
 import { api, ApiError } from '../api/ApiClient'
 import type {
-    Board as BoardData, BoardGroup, DueCounts, DueTask, Folder, ListChanges, ListView, Task, TaskChanges, TodoList,
+    Board as BoardData, BoardGroup, DueCounts, DueTask, Folder, Group, ListChanges, ListView, Task, TaskChanges, TodoList,
     UrgencyLevel, User,
 } from '../api/types'
 import {
@@ -20,6 +20,7 @@ import { confirmDialog } from './confirm'
 import { ListEditPopover } from './ListEditPopover'
 import { ListHeader } from './ListHeader'
 import { MobileHome } from './MobileHome'
+import { QuickTaskSheet } from './QuickTaskSheet'
 import { SectionsView } from './SectionsView'
 import { SettingsDialog } from './SettingsDialog'
 import { AdminDialog } from './AdminDialog'
@@ -110,6 +111,7 @@ class WorkspaceState {
     // Mode mobile (utils/mobileLayout.ts)
     mobile: boolean = detectMobileLayout()
     mobileScreen: MobileScreen = 'home'
+    quickTaskOpen: boolean = false // Panneau « Quick task » (accueil mobile)
 }
 
 /**
@@ -176,7 +178,9 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
     // =========================================================================
 
     onWindowResize = (): void => {
-        this.setState({ windowWidth: window.innerWidth, mobile: detectMobileLayout() })
+        const mobile = detectMobileLayout()
+        // La Quick task n'existe qu'en mode mobile : on la ferme en repassant en mode ordinateur
+        this.setState(state => ({ windowWidth: window.innerWidth, mobile, quickTaskOpen: state.quickTaskOpen && mobile }))
     }
 
     /** Pendant qu'on tire la poignée : pas encore enregistré. */
@@ -328,6 +332,41 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
                 ? null
                 : { mobileScreen: 'home', openTask: null, editingList: null, selectedTaskIds: [] }
         ))
+    }
+
+    // --- Quick task (accueil mobile) ------------------------------------------
+
+    onOpenQuickTask = (): void => {
+        this.setState({ quickTaskOpen: true })
+    }
+
+    onCloseQuickTask = (): void => {
+        this.setState({ quickTaskOpen: false })
+    }
+
+    /** Groupes d'une liste, pour le choix du groupe. On passe par le board : c'est la route qui les donne. */
+    loadGroups = async (listId: string): Promise<Group[]> => {
+        try {
+            const board = await api.getBoard(listId)
+            return board.groups.map(group => ({ id: group.id, list_id: group.list_id, name: group.name, position: group.position }))
+        } catch (error) {
+            this.handleError(error)
+            return []
+        }
+    }
+
+    /** Crée la tâche (avec son échéance) ; true si c'est fait. where : « Liste › Groupe » pour le message. */
+    createQuickTask = async (groupId: string, title: string, dueDate: string | null, where: string): Promise<boolean> => {
+        try {
+            const task = await api.createTask(groupId, title, dueDate)
+            this.updateBoards(board => appendTask(board, task)) // Si la liste est déjà chargée
+            void this.refreshLists() // Compteurs de l'accueil
+            this.showNotice(`Tâche ajoutée dans « ${where} »`)
+            return true
+        } catch (error) {
+            this.handleError(error)
+            return false
+        }
     }
 
     closePane = (index: number): void => {
@@ -972,9 +1011,19 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
                         onOpenSettings={this.onOpenSettings}
                         onOpenAdmin={this.onOpenAdmin}
                         onLogout={this.props.onLogout}
+                        onQuickTask={this.onOpenQuickTask}
                     />
                 )}
 
+                {this.state.quickTaskOpen && (
+                    <QuickTaskSheet
+                        folders={this.state.folders}
+                        lists={this.state.lists}
+                        onLoadGroups={this.loadGroups}
+                        onCreate={this.createQuickTask}
+                        onClose={this.onCloseQuickTask}
+                    />
+                )}
                 {this.renderOverlays()}
             </div>
         )

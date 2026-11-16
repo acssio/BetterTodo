@@ -58,12 +58,42 @@
     font-size: 15px;
 }
 
-/* Partie qui défile : tuiles et listes */
-.mhome-scroll {
+/* Entre l'en-tête et le pied : la partie qui défile, et le bouton flottant par-dessus */
+.mhome-main {
     flex: 1;
     min-height: 0;
+    position: relative;
+    display: flex;
+}
+
+/* Partie qui défile : tuiles et listes. En bas, de la place pour ne pas finir sous le bouton flottant. */
+.mhome-scroll {
+    flex: 1;
     overflow-y: auto;
-    padding: 8px 8px 16px;
+    padding: 8px 8px 84px;
+}
+
+/* Bouton flottant « Quick task », centré en bas */
+.mhome-quick {
+    position: absolute;
+    left: 50%;
+    bottom: 16px;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 52px;
+    padding: 0 20px 0 16px;
+    border-radius: 26px;
+    background: var(--text);
+    color: #FFFFFF;
+    font-size: 15px;
+    font-weight: 600;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
+}
+
+.mhome-quick:active {
+    transform: translateX(-50%) scale(0.97); /* Garde le centrage pendant l'appui */
 }
 
 /* Tuiles « Aujourd'hui » / « Planifié » */

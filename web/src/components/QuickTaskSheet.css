@@ -1,0 +1,164 @@
+/* Panneau du bas « Quick task ». Le fond grisé (.sheet-backdrop) et la petite barre
+   (.sheet-handle) viennent de TaskPopover.css. bottom est donné par le composant
+   (0, ou la hauteur du clavier). */
+.QuickTaskSheet {
+    position: fixed;
+    left: 0;
+    right: 0;
+    z-index: 10;
+    max-height: 88dvh;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 8px 20px calc(16px + env(safe-area-inset-bottom));
+    background: var(--surface);
+    border-radius: 18px 18px 0 0;
+    box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.18);
+}
+
+.qt-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.qt-head h2 {
+    font-size: 17px;
+    font-weight: 700;
+}
+
+.qt-close {
+    width: 40px;
+    height: 40px;
+    margin-right: -8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-md);
+    color: var(--muted);
+}
+
+.qt-title {
+    height: 48px;
+    padding: 0 14px;
+    border: 2px solid var(--accent);
+    border-radius: var(--radius-md);
+    background: var(--surface);
+    font-weight: 500;
+    outline: none;
+}
+
+/* Liste et groupe côte à côte */
+.qt-row {
+    display: flex;
+    gap: 12px;
+}
+
+.qt-row .qt-field {
+    flex: 1;
+    min-width: 0;
+}
+
+.qt-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.qt-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--muted);
+}
+
+/* Menu déroulant natif habillé : la flèche est une icône par-dessus */
+.qt-select-box {
+    position: relative;
+    display: flex;
+    color: var(--muted);
+}
+
+.qt-select-box select {
+    width: 100%;
+    height: 44px;
+    padding: 0 34px 0 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--sidebar);
+    color: var(--text);
+    font-weight: 600;
+    text-overflow: ellipsis;
+    appearance: none;
+    outline: none;
+}
+
+.qt-select-box select:focus {
+    border-color: var(--accent);
+}
+
+.qt-select-box select:disabled {
+    color: var(--faint);
+}
+
+.qt-select-box svg {
+    position: absolute;
+    right: 12px;
+    top: 14px;
+    pointer-events: none; /* Le toucher va au menu en dessous */
+}
+
+.qt-hint {
+    margin-top: -8px;
+    font-size: 12px;
+    color: var(--faint);
+}
+
+/* Échéance */
+.qt-chips {
+    display: flex;
+    flex-wrap: wrap; /* Passe à la ligne seulement sur un écran très étroit */
+    gap: 6px;
+}
+
+.qt-chip {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    height: 38px;
+    padding: 0 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--surface);
+    font-size: 14px;
+    color: var(--text-soft);
+    white-space: nowrap;
+}
+
+.qt-chip.on {
+    border-color: var(--accent);
+    background: #EAF1FD;
+    color: var(--accent);
+    font-weight: 600;
+}
+
+/* Le vrai champ date, invisible, couvre toute la pastille */
+.qt-date input {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    cursor: pointer;
+}
+
+.qt-create {
+    height: 48px;
+    font-size: 15px;
+}
