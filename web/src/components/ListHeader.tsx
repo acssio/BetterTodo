@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { Columns3, Ellipsis, Eye, EyeOff, Pencil, Plus, Rows2, Search, Trash2, X } from 'lucide-react'
+import { ChevronLeft, Columns3, Ellipsis, Eye, EyeOff, Pencil, Plus, Rows2, Search, Trash2, X } from 'lucide-react'
 import type { ListView, TodoList } from '../api/types'
 import { ListIcon } from './ListIcon'
 import { Menu } from './Menu'
@@ -15,6 +15,7 @@ interface ListHeaderProps {
     onToggleShowDone: () => void
     onClearDone: () => void
     onClosePane?: () => void // Seulement en vue scindée : ferme cette moitié
+    onBack?: () => void      // Seulement en mode mobile : flèche ‹ vers l'accueil
 }
 
 class ListHeaderState {
@@ -48,6 +49,7 @@ export class ListHeader extends React.Component<ListHeaderProps, ListHeaderState
 
         return (
             <header className="ListHeader">
+                {this.props.onBack && <BackButton onBack={this.props.onBack} />}
                 <button
                     ref={this.iconRef}
                     className="header-icon"
@@ -85,7 +87,7 @@ export class ListHeader extends React.Component<ListHeaderProps, ListHeaderState
                 </div>
 
                 <button
-                    className={list.show_done ? 'icon-btn header-tool' : 'icon-btn header-tool on'}
+                    className={list.show_done ? 'icon-btn header-tool header-done' : 'icon-btn header-tool header-done on'}
                     title={list.show_done ? 'Masquer les tâches faites' : `Afficher les tâches faites (${doneTasks})`}
                     onClick={this.props.onToggleShowDone}
                 >
@@ -128,6 +130,17 @@ export class ListHeader extends React.Component<ListHeaderProps, ListHeaderState
                     <Plus size={14} /><span className="btn-label">Nouveau groupe</span>
                 </button>
             </header>
+        )
+    }
+}
+
+/** Flèche ‹ du mode mobile, au début de l'en-tête (liste ou liste intelligente). */
+export class BackButton extends React.Component<{ onBack: () => void }> {
+    render(): React.ReactNode {
+        return (
+            <button className="header-back" onClick={this.props.onBack} aria-label="Retour aux listes">
+                <ChevronLeft size={24} />
+            </button>
         )
     }
 }

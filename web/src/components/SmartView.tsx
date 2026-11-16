@@ -2,6 +2,7 @@ import * as React from 'react'
 import { X } from 'lucide-react'
 import type { DueTask, Task, UrgencyLevel } from '../api/types'
 import { groupDueTasks, type SmartKind } from '../utils/smartLists'
+import { BackButton } from './ListHeader'
 import { SMART_INFO } from './smartInfo'
 import { TaskRow } from './TaskRow'
 import './ListHeader.css'
@@ -21,6 +22,8 @@ interface SmartViewProps {
     onToggleSelection: (task: Task) => void
     onStartEditing: (task: Task) => void
     onClosePane?: () => void // Vue scindée
+    mobile?: boolean         // Mode mobile : toucher une tâche ouvre l'overlay
+    onBack?: () => void      // Mode mobile : flèche ‹ vers l'accueil
 }
 
 /**
@@ -38,6 +41,7 @@ export class SmartView extends React.Component<SmartViewProps> {
         return (
             <>
                 <header className="ListHeader">
+                    {this.props.onBack && <BackButton onBack={this.props.onBack} />}
                     <span className="ListIcon-box" style={{ background: info.color + '1A' }}>
                         <info.icon size={18} color={info.color} />
                     </span>
@@ -80,6 +84,7 @@ export class SmartView extends React.Component<SmartViewProps> {
                                 dragging={false}
                                 canDrag={false}
                                 leaving={this.props.leavingTaskIds.includes(task.id)}
+                                tapToOpen={this.props.mobile}
                                 listBadge={task.list}
                                 onToggle={this.props.onToggle}
                                 onOpen={this.props.onOpen}

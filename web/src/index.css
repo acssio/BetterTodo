@@ -103,3 +103,13 @@ button:disabled {
 .icon-btn:disabled {
     opacity: 0.5;
 }
+
+/* Téléphone (mêmes seuils que utils/mobileLayout.ts) : champs en 16 px au moins.
+   En dessous, iOS zoome sur la page quand on touche un champ. */
+@media (max-width: 599px), (pointer: coarse) and (max-height: 499px) {
+    input,
+    textarea,
+    select {
+        font-size: max(16px, 1em);
+    }
+}

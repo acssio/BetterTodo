@@ -211,3 +211,116 @@
         display: none;
     }
 }
+
+/* =============================================================================
+   Mode mobile (Workspace.renderMobile) : un écran à la fois, sans barre latérale
+   ============================================================================= */
+
+.Workspace.mobile {
+    height: 100dvh; /* Hauteur réellement visible, barres du navigateur comprises */
+    flex-direction: column;
+    /* Téléphone à l'horizontale : on évite l'encoche sur les côtés */
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+}
+
+.Workspace.mobile .workspace-error {
+    margin: calc(8px + env(safe-area-inset-top)) 12px 0;
+}
+
+/* Tâches : texte plus grand, case à cocher plus facile à toucher */
+.Workspace.mobile .card-title,
+.Workspace.mobile .row-title {
+    font-size: 15px;
+    line-height: 21px;
+}
+
+.Workspace.mobile .card-check {
+    position: relative;
+    width: 20px;
+    height: 20px;
+}
+
+/* Zone tactile invisible autour de la case (44 px environ) */
+.Workspace.mobile .card-check::after {
+    content: '';
+    position: absolute;
+    inset: -12px;
+}
+
+.Workspace.mobile .card-meta {
+    padding-left: 30px;
+}
+
+.Workspace.mobile .card-due {
+    font-size: 13px;
+}
+
+.Workspace.mobile .card-tag {
+    font-size: 12px;
+}
+
+/* Toucher la tâche ouvre déjà l'overlay : pas besoin du bouton */
+.Workspace.mobile .task-open {
+    display: none;
+}
+
+/* Vue sections : une ligne → titre et urgence, puis en dessous liste d'origine et échéance.
+   .row-spacer devient un « retour à la ligne » (pleine largeur, hauteur 0). */
+.Workspace.mobile .TaskRow {
+    flex-wrap: wrap;
+    row-gap: 4px;
+    padding: 11px 14px;
+}
+
+.Workspace.mobile .TaskRow .card-check { order: 1; }
+.Workspace.mobile .row-title { order: 2; flex: 1; }
+.Workspace.mobile .TaskRow .card-note { order: 3; }
+.Workspace.mobile .row-urgency { order: 4; width: auto; }
+.Workspace.mobile .row-spacer { order: 5; flex-basis: 100%; height: 0; }
+.Workspace.mobile .row-list { order: 6; margin-left: 30px; }
+.Workspace.mobile .row-due { order: 7; width: auto; display: flex; } /* Réaffichée (cachée sous 520 px par TaskRow.css) */
+.Workspace.mobile .row-tags { display: none; }
+
+/* Pas d'échéance : rien sur la deuxième ligne */
+.Workspace.mobile .row-due:has(.row-none) {
+    display: none;
+}
+
+/* Sans liste d'origine (liste normale), l'échéance s'aligne sous le titre */
+.Workspace.mobile .TaskRow:not(:has(.row-list)) .row-due {
+    margin-left: 30px;
+}
+
+.Workspace.mobile .SectionsView {
+    padding: 12px 12px calc(16px + env(safe-area-inset-bottom));
+}
+
+.Workspace.mobile .AddTask {
+    min-height: 44px;
+    font-size: 15px;
+}
+
+.Workspace.mobile .GroupHeader .icon-btn {
+    width: 36px;
+    height: 36px;
+}
+
+/* Paramètres et console admin : plein écran */
+.Workspace.mobile .SettingsDialog-backdrop {
+    padding: 0;
+}
+
+.Workspace.mobile .SettingsDialog {
+    max-width: none;
+    height: 100dvh;
+    max-height: 100dvh;
+    border-radius: 0;
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Messages en bas : au-dessus de la barre de geste */
+.Workspace.mobile .workspace-notice {
+    bottom: calc(16px + env(safe-area-inset-bottom));
+}

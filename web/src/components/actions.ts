@@ -35,4 +35,5 @@ export interface TaskViewProps {
     drag: DragState | null    // Glisser-déposer en cours
     addingGroup: boolean      // Champ « nouveau groupe » affiché (bouton de l'en-tête)
     onAddingGroupDone: () => void
+    mobile: boolean           // Mode mobile : toucher une tâche ouvre l'overlay, un groupe par écran (colonnes)
 }

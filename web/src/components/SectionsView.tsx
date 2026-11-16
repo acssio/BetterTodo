@@ -35,6 +35,7 @@ export class SectionsView extends React.Component<TaskViewProps> {
                                 opened={task.id === openTaskId}
                                 selected={selectedTaskIds.includes(task.id)}
                                 dragging={dragging}
+                                tapToOpen={this.props.mobile}
                                 onToggle={actions.toggleTask}
                                 onOpen={actions.openTask}
                                 onRename={actions.renameTask}

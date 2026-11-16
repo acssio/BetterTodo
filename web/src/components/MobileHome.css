@@ -1,0 +1,258 @@
+/* Écran d'accueil du mode mobile (remplace la barre latérale) */
+.MobileHome {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    background: var(--sidebar);
+}
+
+/* En-tête : logo, nom, bouton + (sous la barre d'état du téléphone) */
+.mhome-head {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: calc(10px + env(safe-area-inset-top)) 8px 6px 20px;
+}
+
+.mhome-logo {
+    width: 28px;
+    height: 28px;
+    flex-shrink: 0;
+    border-radius: 7px;
+    background: var(--text);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.mhome-brand {
+    flex: 1;
+    font-size: 20px;
+    font-weight: 700;
+}
+
+/* Bouton icône de 44 px : la taille minimale d'une zone à toucher */
+.mhome-btn {
+    width: 44px;
+    height: 44px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-md);
+    color: var(--text-soft);
+}
+
+.mhome-btn:active {
+    background: var(--hover);
+}
+
+.MobileHome .Menu {
+    top: 44px;
+}
+
+.MobileHome .Menu button {
+    padding: 12px;
+    font-size: 15px;
+}
+
+/* Partie qui défile : tuiles et listes */
+.mhome-scroll {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 8px 8px 16px;
+}
+
+/* Tuiles « Aujourd'hui » / « Planifié » */
+.mhome-smart {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    padding: 0 12px 20px;
+}
+
+.mhome-tile {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 14px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--surface);
+    text-align: left;
+}
+
+.mhome-tile:active {
+    background: var(--hover);
+}
+
+.mhome-tile-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.mhome-tile-icon {
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.mhome-tile-count {
+    font-size: 24px;
+    font-weight: 700;
+}
+
+.mhome-tile-name {
+    font-size: 15px;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.mhome-label {
+    padding: 0 12px 6px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+}
+
+.mhome-lists {
+    display: flex;
+    flex-direction: column;
+}
+
+/* Une ligne : liste, Paramètres, Console admin */
+.mhome-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    min-height: 48px;
+    padding: 0 12px;
+    border-radius: var(--radius-md);
+    text-align: left;
+}
+
+.mhome-row:active {
+    background: var(--hover);
+}
+
+.mhome-row .ListIcon-box {
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+}
+
+.mhome-row-icon {
+    flex-shrink: 0;
+    color: var(--muted);
+}
+
+.mhome-row-name {
+    flex: 1;
+    min-width: 0;
+    font-size: 15px;
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.mhome-count {
+    flex-shrink: 0;
+    font-size: 14px;
+    font-weight: 400;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+}
+
+.mhome-chevron {
+    flex-shrink: 0;
+    color: var(--done);
+}
+
+/* Groupe de listes */
+.mhome-folder {
+    display: flex;
+    flex-direction: column;
+    margin-top: 8px;
+}
+
+.mhome-folder-head {
+    display: flex;
+    align-items: center;
+}
+
+.mhome-folder-toggle {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    height: 44px;
+    padding: 0 12px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-soft);
+    text-align: left;
+}
+
+.mhome-folder-toggle svg {
+    flex-shrink: 0;
+    color: var(--muted);
+}
+
+.mhome-folder-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Champ « nouvelle liste », « nouveau groupe », « renommer » */
+.mhome-adding {
+    padding: 6px 12px;
+}
+
+.mhome-adding .InlineInput {
+    height: 44px;
+}
+
+.mhome-empty {
+    padding: 12px;
+    color: var(--faint);
+}
+
+/* Bas de l'écran : au-dessus de la barre de geste du téléphone */
+.mhome-foot {
+    flex-shrink: 0;
+    padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
+    border-top: 1px solid var(--border);
+}
+
+.mhome-user {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding-left: 12px;
+}
+
+.mhome-user-name {
+    flex: 1;
+    min-width: 0;
+    color: var(--muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}

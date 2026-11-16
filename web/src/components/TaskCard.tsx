@@ -19,6 +19,7 @@ interface TaskCardProps {
     onStartEditing: (task: Task) => void
     onDragStart: (task: Task) => void
     onDragEnd: () => void
+    tapToOpen?: boolean // Mode mobile : toucher la carte ouvre l'overlay (pas de titre sur place ni de glisser)
 }
 
 class TaskCardState {
@@ -42,6 +43,10 @@ export class TaskCard extends React.Component<TaskCardProps, TaskCardState> {
         if (this.state.editing) return
         if (event.metaKey || event.ctrlKey) {
             this.props.onToggleSelection(this.props.task)
+            return
+        }
+        if (this.props.tapToOpen) {
+            this.props.onOpen(this.props.task, event.currentTarget.getBoundingClientRect())
             return
         }
         this.props.onStartEditing(this.props.task)
@@ -98,7 +103,7 @@ export class TaskCard extends React.Component<TaskCardProps, TaskCardState> {
                 data-task-id={task.id}
                 role="button"
                 tabIndex={0}
-                draggable={!editing}
+                draggable={!editing && !this.props.tapToOpen}
                 onClick={this.onClick}
                 onKeyDown={this.onKeyDown}
                 onDragStart={this.onDragStart}
