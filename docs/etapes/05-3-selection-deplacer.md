@@ -109,5 +109,5 @@ Testé dans le navigateur intégré, à 375 × 812, avec de vrais clics, sauf **
 
 ## Limites connues
 
-- Pas de **réordonnancement** au doigt à l'intérieur d'un groupe : « Déplacer » met toujours à la fin. Pourra faire l'objet d'une étape à part.
+- Pas de **réordonnancement** au doigt à l'intérieur d'un groupe : « Déplacer » met toujours à la fin. → Ajouté en 5-4 (glisser au doigt).
 - Pas de « Déplacer » sur ordinateur (le glisser-déposer suffit).

@@ -10,7 +10,7 @@ import {
     moveTask, multiMovePositions, placeTask, removeTask, replaceTask,
 } from '../utils/board'
 import { todayIso } from '../utils/dates'
-import type { DragState, DropTarget } from '../utils/dragDrop'
+import { AUTO_SCROLL, autoScrollSpeed, computeDropIndex, sideEdge, type DragState, type DropTarget } from '../utils/dragDrop'
 import { detectMobileLayout } from '../utils/mobileLayout'
 import { isSmart, SMART_TODAY } from '../utils/smartLists'
 import { SIDEBAR, sidebarMode } from '../utils/sidebarLayout'
@@ -116,6 +116,8 @@ class WorkspaceState {
     mobileScreen: MobileScreen = 'home'
     quickTaskOpen: boolean = false // Panneau « Quick task » (accueil mobile)
     moveOpen: boolean = false      // Panneau « Déplacer » la sélection (mode mobile)
+    // Glisser au doigt : étiquette qui suit le doigt (titre, et nombre de tâches glissées)
+    touchGhost: { x: number, y: number, title: string, count: number } | null = null
 }
 
 /**
@@ -167,6 +169,7 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
     componentWillUnmount(): void {
         window.removeEventListener('resize', this.onWindowResize)
         window.removeEventListener('popstate', this.onPopState)
+        this.stopTouchDrag()
         document.removeEventListener('keydown', this.onDocumentKeyDown)
     }
 
@@ -817,9 +820,7 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
      * Une tâche hors sélection → on ne glisse qu'elle, et la sélection est vidée.
      */
     startTaskDrag = (task: Task): void => {
-        const selected = this.state.selectedTaskIds
-        const withSelection = selected.length > 1 && selected.includes(task.id)
-        const taskIds = withSelection ? this.selectionInOrder(selected) : [task.id]
+        const { taskIds, withSelection } = this.dragTaskIds(task)
 
         // setTimeout : laisse le navigateur faire sa « photo » de la carte avant de la griser
         window.setTimeout(() => this.setState(state => ({
@@ -829,8 +830,106 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
         })), 0)
     }
 
+    /** Tâches glissées : toute la sélection si la tâche en fait partie (et qu'il y en a plusieurs), sinon elle seule. */
+    private dragTaskIds(task: Task): { taskIds: string[], withSelection: boolean } {
+        const selected = this.state.selectedTaskIds
+        const withSelection = selected.length > 1 && selected.includes(task.id)
+        return { taskIds: withSelection ? this.selectionInOrder(selected) : [task.id], withSelection }
+    }
+
     endTaskDrag = (): void => {
         this.setState({ drag: null })
+    }
+
+    // --- Glisser au doigt (mode mobile) -----------------------------------------
+    //
+    // Pas d'API glisser-déposer du navigateur au doigt : TaskCard / TaskRow suivent le doigt
+    // (LongPress) et appellent touchDragStart / Move / End. Pendant le glisser, une boucle
+    // requestAnimationFrame (onTouchDragFrame) cherche le groupe sous le doigt, fait défiler
+    // près des bords, et met à jour la cible (setDropTarget) : la ligne bleue s'affiche comme à la souris.
+
+    private touchPoint: { x: number, y: number } | null = null // Position du doigt
+    private touchFrame: number | undefined                     // Boucle requestAnimationFrame en cours
+    private sideSince: number | null = null                    // Vue colonnes : depuis quand le doigt est contre un bord
+    private sideDirection: number = 0                          // -1 bord gauche, 1 bord droit
+
+    touchDragStart = (task: Task, x: number, y: number): void => {
+        const { taskIds, withSelection } = this.dragTaskIds(task)
+        this.setState(state => ({
+            drag: { taskIds, target: null },
+            openTask: null,
+            selectedTaskIds: withSelection ? state.selectedTaskIds : [],
+            touchGhost: { x, y, title: task.title, count: taskIds.length },
+        }))
+        this.touchPoint = { x, y }
+        this.sideSince = null
+        this.touchFrame = requestAnimationFrame(this.onTouchDragFrame)
+    }
+
+    touchDragMove = (x: number, y: number): void => {
+        this.touchPoint = { x, y }
+        this.setState(state => (state.touchGhost ? { touchGhost: { ...state.touchGhost, x, y } } : null))
+    }
+
+    /** Doigt levé (drop = true) ou geste annulé par le navigateur (drop = false). */
+    touchDragEnd = (drop: boolean): void => {
+        this.stopTouchDrag()
+        this.setState({ touchGhost: null })
+        if (drop) {
+            this.dropTask()
+        } else {
+            this.endTaskDrag()
+        }
+    }
+
+    private stopTouchDrag(): void {
+        if (this.touchFrame !== undefined) cancelAnimationFrame(this.touchFrame)
+        this.touchFrame = undefined
+        this.touchPoint = null
+        this.sideSince = null
+    }
+
+    /** Une image (environ 60 par seconde) pendant le glisser au doigt. */
+    private onTouchDragFrame = (time: number): void => {
+        const point = this.touchPoint
+        if (!point) return
+        const under = document.elementFromPoint(point.x, point.y) // L'étiquette qui suit le doigt est ignorée (pointer-events: none)
+
+        // Près du haut ou du bas : la colonne (vue colonnes) ou la vue sections défile toute seule
+        const scroller = under?.closest<HTMLElement>('.board-column, .SectionsView')
+        if (scroller) {
+            const rect = scroller.getBoundingClientRect()
+            scroller.scrollTop += autoScrollSpeed(point.y, rect.top, rect.bottom)
+        }
+
+        // Vue colonnes : doigt gardé contre le bord gauche ou droit → groupe voisin
+        const board = document.querySelector<HTMLElement>('.Workspace.mobile .board-scroll')
+        if (board) {
+            const rect = board.getBoundingClientRect()
+            const side = sideEdge(point.x, rect.left, rect.right)
+            if (side === 0) {
+                this.sideSince = null
+            } else if (this.sideSince === null || side !== this.sideDirection) {
+                this.sideSince = time
+                this.sideDirection = side
+            } else if (time - this.sideSince >= AUTO_SCROLL.sideDelay) {
+                const column = board.querySelector<HTMLElement>('.board-column')
+                const gap = parseFloat(getComputedStyle(board).columnGap) || 0
+                if (column) board.scrollBy({ left: side * (column.offsetWidth + gap), behavior: 'smooth' })
+                this.sideSince = time // Encore une demi-seconde contre le bord → encore un groupe
+            }
+        }
+
+        // Cible : le groupe sous le doigt, et l'index entre ses tâches
+        const zone = under?.closest<HTMLElement>('[data-drop-group]')
+        const drag = this.state.drag
+        if (zone && drag) {
+            const groupId = zone.dataset.dropGroup!
+            const index = computeDropIndex(zone, point.y, drag.taskIds)
+            if (drag.target?.groupId !== groupId || drag.target.index !== index) this.setDropTarget({ groupId, index })
+        }
+
+        this.touchFrame = requestAnimationFrame(this.onTouchDragFrame)
     }
 
     setDropTarget = (target: DropTarget | null): void => {
@@ -1107,6 +1206,12 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
                         onCreate={this.createQuickTask}
                         onClose={this.onCloseQuickTask}
                     />
+                )}
+                {this.state.touchGhost && (
+                    <div className="touch-drag-ghost" style={{ left: this.state.touchGhost.x, top: this.state.touchGhost.y }}>
+                        <span className="touch-drag-title">{this.state.touchGhost.title}</span>
+                        {this.state.touchGhost.count > 1 && <span className="touch-drag-count">+{this.state.touchGhost.count - 1}</span>}
+                    </div>
                 )}
                 {movePlace && (
                     <MoveTasksSheet

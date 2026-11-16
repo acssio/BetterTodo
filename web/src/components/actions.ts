@@ -23,6 +23,11 @@ export interface TaskViewActions {
     endTaskDrag(): void
     setDropTarget(target: DropTarget | null): void
     dropTask(): void
+
+    // Glisser au doigt (mode mobile, après un appui long) : Workspace cherche la cible sous le doigt
+    touchDragStart(task: Task, x: number, y: number): void
+    touchDragMove(x: number, y: number): void
+    touchDragEnd(drop: boolean): void
 }
 
 /** Props communes à la vue colonnes (Board) et à la vue sections (SectionsView). */

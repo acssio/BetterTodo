@@ -26,9 +26,14 @@ interface TaskRowProps {
     leaving?: boolean  // Tâche cochée qui va disparaître (courte animation)
     tapToOpen?: boolean // Mode mobile : toucher la ligne ouvre l'overlay (pas de titre sur place ni de glisser)
     selecting?: boolean // Mode mobile, sélection en cours : toucher = sélectionner / désélectionner
+    // Mode mobile : glisser au doigt après un appui long (absents = pas de glisser, ex. listes intelligentes)
+    onTouchDragStart?: (task: Task, x: number, y: number) => void
+    onTouchDragMove?: (x: number, y: number) => void
+    onTouchDragEnd?: (drop: boolean) => void
 }
 
 class TaskRowState {
+    lifted: boolean = false      // Mode mobile : appui long, la tâche est « soulevée »
     editing: boolean = false     // Titre en cours de modification
     caret: number | null = null  // Où placer le curseur en commençant
 }
@@ -38,24 +43,49 @@ class TaskRowState {
  * case à cocher, titre, note, puis les colonnes tags / échéance / urgence.
  * Même comportement que TaskCard : clic → titre sur place, Cmd+clic → sélection,
  * bouton au survol → overlay, case → cocher, glissable.
- * Mode mobile : même comportement que TaskCard (toucher, appui long, sélection).
+ * Mode mobile : même comportement que TaskCard (toucher, appui long, glisser au doigt, sélection).
  */
 export class TaskRow extends React.Component<TaskRowProps, TaskRowState> {
     state = new TaskRowState()
     private titleRef = React.createRef<HTMLSpanElement>()
-    // Mode mobile : appui long → sélection (utils/longPress.ts)
-    private longPress = new LongPress(() => {
-        navigator.vibrate?.(15) // Petite vibration sur Android (l'iPhone ne la permet pas)
-        this.props.onToggleSelection(this.props.task)
+    private rootRef = React.createRef<HTMLDivElement>()
+    // Mode mobile : appui long → sélection ; appui long puis glisser → déplacement (utils/longPress.ts)
+    private longPress = new LongPress({
+        onArm: () => {
+            navigator.vibrate?.(15) // Petite vibration sur Android (l'iPhone ne la permet pas)
+            this.setState({ lifted: true })
+        },
+        onLongPress: () => {
+            this.setState({ lifted: false })
+            this.props.onToggleSelection(this.props.task)
+        },
+        canDrag: () => this.props.onTouchDragStart !== undefined,
+        onDragStart: (x, y) => {
+            this.setState({ lifted: false })
+            this.props.onTouchDragStart?.(this.props.task, x, y)
+        },
+        onDragMove: (x, y) => this.props.onTouchDragMove?.(x, y),
+        onDragEnd: drop => this.props.onTouchDragEnd?.(drop),
     })
 
+    componentDidMount(): void {
+        // Écoute « non passive » : la seule façon d'empêcher le défilement pendant un glisser au doigt
+        this.rootRef.current?.addEventListener('touchmove', this.onTouchMove, { passive: false })
+    }
+
     componentWillUnmount(): void {
-        this.longPress.cancel()
+        this.rootRef.current?.removeEventListener('touchmove', this.onTouchMove)
+        this.longPress.abort()
+    }
+
+    /** Tâche soulevée ou glissée : le doigt ne fait pas défiler la page. */
+    private onTouchMove = (event: TouchEvent): void => {
+        if (this.longPress.blocksScroll()) event.preventDefault()
     }
 
     onClick = (event: React.MouseEvent<HTMLDivElement>): void => {
         if (this.state.editing) return
-        if (this.longPress.consumeClick()) return // Ce clic termine un appui long : déjà traité
+        if (this.longPress.consumeClick()) return // Ce clic termine un appui long ou un glisser : déjà traité
         if (event.metaKey || event.ctrlKey || this.props.selecting) {
             this.props.onToggleSelection(this.props.task)
             return
@@ -110,7 +140,13 @@ export class TaskRow extends React.Component<TaskRowProps, TaskRowState> {
     }
 
     onPointerUp = (): void => {
-        this.longPress.up() // Aussi sur pointercancel : le navigateur a commencé à faire défiler
+        this.longPress.up()
+    }
+
+    /** Le navigateur a repris la main (défilement, appel entrant…) : glisser annulé. */
+    onPointerCancel = (): void => {
+        this.longPress.abort()
+        this.setState({ lifted: false })
     }
 
     /** Android ouvre un menu sur un appui long : pas sur une tâche. */
@@ -134,11 +170,13 @@ export class TaskRow extends React.Component<TaskRowProps, TaskRowState> {
         if (selected) classes.push('selected')
         if (dragging) classes.push('dragging')
         if (editing) classes.push('editing')
+        if (this.state.lifted) classes.push('lifted')
         if (this.props.leaving) classes.push('leaving')
 
         return (
             <div
                 className={classes.join(' ')}
+                ref={this.rootRef}
                 data-task-id={task.id}
                 role="button"
                 tabIndex={0}
@@ -150,7 +188,7 @@ export class TaskRow extends React.Component<TaskRowProps, TaskRowState> {
                 onPointerDown={this.onPointerDown}
                 onPointerMove={this.onPointerMove}
                 onPointerUp={this.onPointerUp}
-                onPointerCancel={this.onPointerUp}
+                onPointerCancel={this.onPointerCancel}
                 onContextMenu={this.onContextMenu}
             >
                 <button
