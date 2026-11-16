@@ -107,3 +107,80 @@ export class LongPress {
         this.timer = undefined
     }
 }
+
+/**
+ * Relie un LongPress aux événements du doigt, écoutés sur TOUTE LA FENÊTRE pendant le geste.
+ *
+ * Pourquoi pas sur la tâche elle-même : pendant un glisser, la page change sous le doigt
+ * (ligne bleue, tâche grisée, défilement) et le navigateur peut envoyer le « doigt levé »
+ * à un autre élément (bug vu sur Galaxy Z Flip : le glisser ne se terminait jamais, la
+ * tâche restait « en l'air »). Sur window, on le reçoit toujours.
+ * touchend / touchcancel servent de filet de sécurité si un pointerup se perd quand même.
+ *
+ *   onPointerDown de la tâche → this.gesture.start(event)
+ *   componentWillUnmount      → this.gesture.stop()
+ */
+export class GestureTracker {
+    private press: LongPress
+    private onCancel: () => void      // Geste annulé par le navigateur (le composant remet son affichage)
+    private pointerId: number | null = null
+
+    constructor(press: LongPress, onCancel: () => void) {
+        this.press = press
+        this.onCancel = onCancel
+    }
+
+    /** Doigt posé sur la tâche : on suit ce doigt-là jusqu'à ce qu'il se lève. */
+    start(pointerId: number, x: number, y: number): void {
+        this.stop()
+        this.pointerId = pointerId
+        window.addEventListener('pointermove', this.onPointerMove)
+        window.addEventListener('pointerup', this.onPointerUp)
+        window.addEventListener('pointercancel', this.onPointerCancel)
+        window.addEventListener('touchend', this.onTouchEnd)
+        window.addEventListener('touchcancel', this.onTouchCancel)
+        this.press.down(x, y)
+    }
+
+    /** Arrête d'écouter (geste fini, ou composant démonté). */
+    stop(): void {
+        window.removeEventListener('pointermove', this.onPointerMove)
+        window.removeEventListener('pointerup', this.onPointerUp)
+        window.removeEventListener('pointercancel', this.onPointerCancel)
+        window.removeEventListener('touchend', this.onTouchEnd)
+        window.removeEventListener('touchcancel', this.onTouchCancel)
+        this.pointerId = null
+    }
+
+    private onPointerMove = (event: PointerEvent): void => {
+        if (event.pointerId === this.pointerId) this.press.move(event.clientX, event.clientY)
+    }
+
+    private onPointerUp = (event: PointerEvent): void => {
+        if (event.pointerId !== this.pointerId) return
+        this.stop()
+        this.press.up()
+    }
+
+    private onPointerCancel = (event: PointerEvent): void => {
+        if (event.pointerId !== this.pointerId) return
+        this.cancel()
+    }
+
+    /** Filet de sécurité : le doigt est levé mais aucun pointerup n'est arrivé. */
+    private onTouchEnd = (): void => {
+        if (this.pointerId === null) return
+        this.stop()
+        this.press.up()
+    }
+
+    private onTouchCancel = (): void => {
+        if (this.pointerId !== null) this.cancel()
+    }
+
+    private cancel(): void {
+        this.stop()
+        this.press.abort()
+        this.onCancel()
+    }
+}

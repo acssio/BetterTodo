@@ -20,10 +20,11 @@ Choix validés :
 
 ```
 web/src/
-  utils/longPress.ts (+ tests)   → nouveaux états armed / dragging / consumed
+  utils/longPress.ts (+ tests)   → nouveaux états armed / dragging / consumed, GestureTracker
   utils/dragDrop.ts (+ tests)    → autoScrollSpeed, sideEdge (défilement automatique)
   components/
-    TaskCard.tsx, TaskRow.tsx    → tâche soulevée (lifted), glisser, blocage du défilement
+    TaskCard.tsx, TaskRow.tsx    → tâche soulevée (lifted), glisser, blocage du défilement ;
+                                   suite du geste suivie sur window (GestureTracker)
     TaskDropZone.tsx             → attribut data-drop-group (retrouver le groupe sous le doigt)
     actions.ts                   → touchDragStart / touchDragMove / touchDragEnd
     Board.tsx, SectionsView.tsx  → transmettent le glisser au doigt (pas SmartView)
@@ -53,6 +54,16 @@ Différence avec 5-3 : la sélection se fait **au relâchement** (`up` dans l'é
 Sans précaution, bouger le doigt fait défiler la page, et le navigateur coupe le geste (`pointercancel`). Chaque tâche écoute donc `touchmove` en **« non passive »** (`addEventListener(..., { passive: false })` dans `componentDidMount`, React ne sait pas le faire) et appelle `preventDefault()` **seulement** quand `longPress.blocksScroll()` est vrai (tâche soulevée ou glissée). Avant l'appui long, le doigt fait défiler normalement.
 
 Au doigt, les événements restent envoyés à la tâche touchée au départ, même quand le doigt s'en éloigne : tout le suivi peut rester dans `TaskCard` / `TaskRow`.
+
+## Suivre le doigt sur toute la fenêtre (bug corrigé)
+
+**Bug vu sur Galaxy Z Flip** : en lâchant la tâche, tout se figeait avec la tâche « en l'air » (étiquette affichée, tâche grisée), souvent en glissant dans le même groupe.
+
+**Cause** : au début, `TaskCard` / `TaskRow` écoutaient `pointermove` / `pointerup` **sur la tâche elle-même**. Pendant le glisser, la page change sous le doigt (ligne bleue insérée dans le groupe, tâche grisée, défilement automatique) et Android peut alors envoyer le « doigt levé » à **un autre élément**. La tâche ne le recevait jamais : `LongPress` restait dans l'état `dragging`, la boucle continuait, l'étiquette restait affichée.
+
+**Correctif** : `GestureTracker` (`utils/longPress.ts`). La tâche ne garde que `onPointerDown`, qui appelle `gesture.start(...)` ; la suite du geste (`pointermove`, `pointerup`, `pointercancel`) est écoutée **sur `window`**, filtrée par `pointerId`, puis les écoutes sont retirées. En filet de sécurité, `touchend` / `touchcancel` sur `window` terminent aussi le geste si un `pointerup` se perd quand même.
+
+Vérifié en envoyant les mouvements et le « doigt levé » à un autre élément que la tâche (puis seulement un `touchend`) : avant le correctif, le glisser restait bloqué ; après, la tâche est déposée et l'étiquette disparaît. **À confirmer sur le Flip.**
 
 ## Côté Workspace : la boucle du glisser
 
@@ -90,7 +101,8 @@ Testé dans le navigateur intégré à 375 × 812 : le navigateur de test ne sai
 | Symptôme | Où regarder |
 |---|---|
 | La page défile au lieu de glisser la tâche | `onTouchMove` (écoute non passive) et `blocksScroll()` ; l'écoute est posée dans `componentDidMount` sur `rootRef` |
-| Le glisser s'arrête tout seul | `pointercancel` → `onPointerCancel` ; le navigateur a pris la main (défilement commencé avant l'appui long ?) |
+| Le glisser s'arrête tout seul | `pointercancel` → `GestureTracker.cancel` ; le navigateur a pris la main (défilement commencé avant l'appui long ?) |
+| Tout se fige, tâche « en l'air », en lâchant | le « doigt levé » n'est pas arrivé : écoutes de `GestureTracker` sur `window` (pointerup, touchend) |
 | Faire défiler sélectionne ou soulève une tâche | `LONG_PRESS.tolerance` / `delay` |
 | Pas de ligne bleue | `data-drop-group` sur `TaskDropZone` ; `onTouchDragFrame` (élément sous le doigt) |
 | Le groupe voisin ne vient pas (vue colonnes) | `sideEdge`, `AUTO_SCROLL.sideEdge` / `sideDelay` |
