@@ -23,6 +23,7 @@ interface TaskRowProps {
     listBadge?: { name: string, color: string, icon: string } // Listes intelligentes : liste d'origine
     canDrag?: boolean  // false dans les listes intelligentes (l'ordre vient des dates)
     leaving?: boolean  // Tâche cochée qui va disparaître (courte animation)
+    tapToOpen?: boolean // Mode mobile : toucher la ligne ouvre l'overlay (pas de titre sur place ni de glisser)
 }
 
 class TaskRowState {
@@ -44,6 +45,10 @@ export class TaskRow extends React.Component<TaskRowProps, TaskRowState> {
         if (this.state.editing) return
         if (event.metaKey || event.ctrlKey) {
             this.props.onToggleSelection(this.props.task)
+            return
+        }
+        if (this.props.tapToOpen) {
+            this.props.onOpen(this.props.task, event.currentTarget.getBoundingClientRect())
             return
         }
         this.props.onStartEditing(this.props.task)
@@ -100,7 +105,7 @@ export class TaskRow extends React.Component<TaskRowProps, TaskRowState> {
                 data-task-id={task.id}
                 role="button"
                 tabIndex={0}
-                draggable={(this.props.canDrag ?? true) && !editing}
+                draggable={(this.props.canDrag ?? true) && !editing && !this.props.tapToOpen}
                 onClick={this.onClick}
                 onKeyDown={this.onKeyDown}
                 onDragStart={this.onDragStart}

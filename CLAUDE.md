@@ -132,6 +132,13 @@ Observé dans ses autres projets (C++ embarqué, React/TypeScript). Écrire du c
   - **3g-2** : clic sur une tâche = modifier le titre sur place (`TitleEditor`) ; Cmd/Ctrl+clic = sélection multiple (`Workspace.selectedTaskIds`) pour **supprimer** (Suppr / ⌫ ou barre en bas) et **déplacer** (glisser une tâche sélectionnée) plusieurs tâches ; l'overlay s'ouvre par un **petit bouton affiché au survol** (pas de double-clic) ou Entrée ;
   - déplacement multiple **sans nouvelle route d'API** : un `PATCH /tasks/{id}` par tâche, envoyés **l'un après l'autre** (`dropAnchor` + `multiMovePositions`). Une route en lot reste possible plus tard ;
   - props des tâches : `opened` = overlay ouvert, `selected` = dans la sélection.
+- **2026-11-16 – Étape 5 : version mobile du site** (plan validé le 2026-11-16, avant la traduction) :
+  - maquette : page de maquettes « BetterTodo Mobile » (https://claude.ai/artifact/7kQ8j1JvhKTZ5TkMjEwLDM), pas de version Figma ;
+  - appareils visés : iPhone 13 mini (375 × 812) → Galaxy Z Flip 6 ouvert (~412 × 1000) → iPhone 17 Pro Max (440 × 956). Largeurs fluides, `100dvh`, `env(safe-area-inset-*)`, champs en 16 px minimum (sinon iOS zoome) ;
+  - **même application React** : sous 600 px de large (ou écran tactile de moins de 500 px de haut), `Workspace` passe en mode mobile (`utils/mobileLayout.ts`, classe `.Workspace.mobile`). Il garde toute la logique ; `renderMobile` affiche un écran à la fois, machine d'état `mobileScreen` (home → list), avec une étape dans l'historique du navigateur pour que « retour » revienne à l'accueil. L'accueil est `MobileHome` ; les listes réutilisent `ListHeader` (flèche ‹ via `onBack`), `Board`, `SectionsView`, `SmartView` (prop `mobile`) ; Paramètres et console admin en plein écran ;
+  - en mode mobile, **toucher une tâche ouvre l'overlay** (`tapToOpen`), il n'y a pas de titre modifié sur place ; l'overlay est `TaskPopover` avec `sheet`, remonté au-dessus du clavier (`visualViewport`) ;
+  - navigation par écrans (Accueil → Liste, flèche ‹) ; vue colonnes = un groupe à la fois, pleine largeur, `scroll-snap` + onglets ; overlay de tâche = panneau qui monte du bas ; pas de vue scindée ; pas de glisser-déposer au doigt (on déplace avec « Déplacer ») ;
+  - **5-1** mode mobile et écrans ; **5-2** Quick task (bouton flottant sur l'accueil, liste / groupe / échéance, dernier groupe utilisé retenu dans `localStorage`, par appareil) ; **5-3** sélection par appui long et « Déplacer ».
 - **2026-11-13 – Maquette web validée** (Figma, page « Web – Maquette v2 »).
 
 ## Questions ouvertes

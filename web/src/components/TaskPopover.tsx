@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { Calendar, Check, Plus, Trash2, X } from 'lucide-react'
 import type { Group, Task, TaskChanges, UrgencyLevel } from '../api/types'
+import { keyboardInset } from '../utils/mobileLayout'
 import { DismissListener, popoverPosition } from '../utils/popover'
 import { confirmDialog } from './confirm'
 import './TaskPopover.css'
@@ -13,6 +14,7 @@ interface TaskPopoverProps {
     groups: Group[]           // Pour la liste déroulante « Groupe »
     urgencyLevels: UrgencyLevel[]
     anchor: DOMRect           // Position de la carte : l'overlay s'ouvre à côté
+    sheet?: boolean           // Mode mobile : panneau qui monte du bas de l'écran (anchor ignoré)
     onUpdate: (changes: TaskChanges) => Promise<void>
     onDelete: () => void
     onClose: () => void
@@ -23,6 +25,7 @@ class TaskPopoverState {
     notes: string = ''   // puis envoyés à l'API (voir saveTitle / saveNotes)
     tagInput: string = ''
     pending: number = 0  // Nombre d'enregistrements en cours
+    keyboard: number = 0 // Panneau du bas : hauteur cachée par le clavier du téléphone
 }
 
 /**
@@ -46,14 +49,29 @@ export class TaskPopover extends React.Component<TaskPopoverProps, TaskPopoverSt
 
     componentDidMount(): void {
         this.dismiss.start()
+        if (this.props.sheet) {
+            // Le clavier qui s'ouvre change la partie visible de l'écran
+            window.visualViewport?.addEventListener('resize', this.onViewportChange)
+            window.visualViewport?.addEventListener('scroll', this.onViewportChange)
+        }
     }
 
     componentWillUnmount(): void {
         this.dismiss.stop()
+        window.visualViewport?.removeEventListener('resize', this.onViewportChange)
+        window.visualViewport?.removeEventListener('scroll', this.onViewportChange)
         // Enregistre ce qui n'est pas encore parti (fermeture pendant la frappe)
         window.clearTimeout(this.notesTimer)
         this.saveTitle()
         this.saveNotes()
+    }
+
+    /** Panneau du bas : on le remonte au-dessus du clavier. */
+    onViewportChange = (): void => {
+        const viewport = window.visualViewport
+        if (!viewport) return
+        const keyboard = keyboardInset(window.innerHeight, viewport.height, viewport.offsetTop)
+        this.setState(state => (state.keyboard === keyboard ? null : { keyboard }))
     }
 
     // --- Enregistrement --------------------------------------------------------
@@ -142,115 +160,122 @@ export class TaskPopover extends React.Component<TaskPopoverProps, TaskPopoverSt
     // --- Rendu -----------------------------------------------------------------
 
     render(): React.ReactNode {
-        const { task, groups, urgencyLevels } = this.props
+        const { task, groups, urgencyLevels, sheet } = this.props
+        // Panneau du bas : collé en bas de l'écran, ou au-dessus du clavier
+        const style = sheet ? { bottom: this.state.keyboard } : popoverPosition(this.props.anchor, POPOVER_WIDTH, 540)
 
         return (
-            <div className="TaskPopover" ref={this.rootRef} style={popoverPosition(this.props.anchor, POPOVER_WIDTH, 540)}>
-                <div className="pop-title">
-                    <button
-                        className={task.done ? 'pop-check checked' : 'pop-check'}
-                        onClick={() => void this.update({ done: !task.done })}
-                        aria-label={task.done ? 'Marquer comme à faire' : 'Marquer comme faite'}
-                    >
-                        {task.done && <Check size={10} color="#FFFFFF" strokeWidth={3.5} />}
-                    </button>
-                    <input
-                        className="pop-title-input"
-                        value={this.state.title}
-                        onChange={this.onTitleChanged}
-                        onKeyDown={this.onTitleKeyDown}
-                        onBlur={() => this.saveTitle()}
-                        aria-label="Titre"
-                    />
-                    <button className="icon-btn" onClick={this.props.onClose} aria-label="Fermer">
-                        <X size={14} />
-                    </button>
-                </div>
-
-                <div className="pop-row">
-                    <label className="pop-field">
-                        <span className="pop-label">Échéance</span>
-                        <span className="pop-input">
-                            <Calendar size={14} />
-                            <input type="date" value={task.due_date ?? ''} onChange={this.onDueDateChanged} />
-                        </span>
-                    </label>
-                    <label className="pop-field">
-                        <span className="pop-label">Groupe</span>
-                        <select className="pop-input" value={task.group_id} onChange={this.onGroupChanged}>
-                            {groups.map(group => <option key={group.id} value={group.id}>{group.name}</option>)}
-                        </select>
-                    </label>
-                </div>
-
-                <div className="pop-field">
-                    <span className="pop-label">Urgence</span>
-                    <div className="pop-urgency">
+            <>
+                {/* Fond grisé derrière le panneau du bas ; le toucher ferme (clic en dehors, DismissListener) */}
+                {sheet && <div className="sheet-backdrop" />}
+                <div className={sheet ? 'TaskPopover sheet' : 'TaskPopover'} ref={this.rootRef} style={style}>
+                    {sheet && <div className="sheet-handle" />}
+                    <div className="pop-title">
                         <button
-                            className={task.urgency_id === null ? 'on' : ''}
-                            onClick={() => void this.update({ urgency_id: null })}
+                            className={task.done ? 'pop-check checked' : 'pop-check'}
+                            onClick={() => void this.update({ done: !task.done })}
+                            aria-label={task.done ? 'Marquer comme à faire' : 'Marquer comme faite'}
                         >
-                            Aucune
+                            {task.done && <Check size={10} color="#FFFFFF" strokeWidth={3.5} />}
                         </button>
-                        {urgencyLevels.map(level => (
-                            <button
-                                key={level.id}
-                                className={task.urgency_id === level.id ? 'on' : ''}
-                                style={task.urgency_id === level.id
-                                    ? { color: level.color, borderColor: level.color, background: level.color + '1F' }
-                                    : undefined}
-                                onClick={() => void this.update({ urgency_id: level.id })}
-                            >
-                                {level.name}
-                            </button>
-                        ))}
+                        <input
+                            className="pop-title-input"
+                            value={this.state.title}
+                            onChange={this.onTitleChanged}
+                            onKeyDown={this.onTitleKeyDown}
+                            onBlur={() => this.saveTitle()}
+                            aria-label="Titre"
+                        />
+                        <button className="icon-btn" onClick={this.props.onClose} aria-label="Fermer">
+                            <X size={14} />
+                        </button>
                     </div>
-                </div>
 
-                <div className="pop-field">
-                    <span className="pop-label">Tags</span>
-                    <div className="pop-tags">
-                        {task.tags.map(tag => (
-                            <span key={tag} className="pop-tag">
-                                #{tag}
-                                <button onClick={() => this.removeTag(tag)} aria-label={`Enlever ${tag}`}>
-                                    <X size={11} />
-                                </button>
+                    <div className="pop-row">
+                        <label className="pop-field">
+                            <span className="pop-label">Échéance</span>
+                            <span className="pop-input">
+                                <Calendar size={14} />
+                                <input type="date" value={task.due_date ?? ''} onChange={this.onDueDateChanged} />
                             </span>
-                        ))}
-                        <span className="pop-tag-add">
-                            <Plus size={11} />
-                            <input
-                                value={this.state.tagInput}
-                                placeholder="Ajouter"
-                                onChange={this.onTagInputChanged}
-                                onKeyDown={this.onTagKeyDown}
-                                onBlur={() => this.addTag()}
-                            />
+                        </label>
+                        <label className="pop-field">
+                            <span className="pop-label">Groupe</span>
+                            <select className="pop-input" value={task.group_id} onChange={this.onGroupChanged}>
+                                {groups.map(group => <option key={group.id} value={group.id}>{group.name}</option>)}
+                            </select>
+                        </label>
+                    </div>
+
+                    <div className="pop-field">
+                        <span className="pop-label">Urgence</span>
+                        <div className="pop-urgency">
+                            <button
+                                className={task.urgency_id === null ? 'on' : ''}
+                                onClick={() => void this.update({ urgency_id: null })}
+                            >
+                                Aucune
+                            </button>
+                            {urgencyLevels.map(level => (
+                                <button
+                                    key={level.id}
+                                    className={task.urgency_id === level.id ? 'on' : ''}
+                                    style={task.urgency_id === level.id
+                                        ? { color: level.color, borderColor: level.color, background: level.color + '1F' }
+                                        : undefined}
+                                    onClick={() => void this.update({ urgency_id: level.id })}
+                                >
+                                    {level.name}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="pop-field">
+                        <span className="pop-label">Tags</span>
+                        <div className="pop-tags">
+                            {task.tags.map(tag => (
+                                <span key={tag} className="pop-tag">
+                                    #{tag}
+                                    <button onClick={() => this.removeTag(tag)} aria-label={`Enlever ${tag}`}>
+                                        <X size={11} />
+                                    </button>
+                                </span>
+                            ))}
+                            <span className="pop-tag-add">
+                                <Plus size={11} />
+                                <input
+                                    value={this.state.tagInput}
+                                    placeholder="Ajouter"
+                                    onChange={this.onTagInputChanged}
+                                    onKeyDown={this.onTagKeyDown}
+                                    onBlur={() => this.addTag()}
+                                />
+                            </span>
+                        </div>
+                    </div>
+
+                    <label className="pop-field">
+                        <span className="pop-label">Notes</span>
+                        <textarea
+                            className="pop-notes"
+                            value={this.state.notes}
+                            placeholder="Ajouter une note…"
+                            onChange={this.onNotesChanged}
+                            onBlur={this.onNotesBlur}
+                        />
+                    </label>
+
+                    <div className="pop-foot">
+                        <button className="pop-delete" onClick={this.onDeleteClick}>
+                            <Trash2 size={14} />Supprimer
+                        </button>
+                        <span className="pop-status">
+                            {this.state.pending > 0 ? 'Enregistrement…' : 'Enregistré automatiquement'}
                         </span>
                     </div>
                 </div>
-
-                <label className="pop-field">
-                    <span className="pop-label">Notes</span>
-                    <textarea
-                        className="pop-notes"
-                        value={this.state.notes}
-                        placeholder="Ajouter une note…"
-                        onChange={this.onNotesChanged}
-                        onBlur={this.onNotesBlur}
-                    />
-                </label>
-
-                <div className="pop-foot">
-                    <button className="pop-delete" onClick={this.onDeleteClick}>
-                        <Trash2 size={14} />Supprimer
-                    </button>
-                    <span className="pop-status">
-                        {this.state.pending > 0 ? 'Enregistrement…' : 'Enregistré automatiquement'}
-                    </span>
-                </div>
-            </div>
+            </>
         )
     }
 }

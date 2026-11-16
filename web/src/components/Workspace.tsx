@@ -11,6 +11,7 @@ import {
 } from '../utils/board'
 import { todayIso } from '../utils/dates'
 import type { DragState, DropTarget } from '../utils/dragDrop'
+import { detectMobileLayout } from '../utils/mobileLayout'
 import { isSmart, SMART_TODAY } from '../utils/smartLists'
 import { SIDEBAR, sidebarMode } from '../utils/sidebarLayout'
 import type { TaskViewActions, TaskViewProps } from './actions'
@@ -18,6 +19,7 @@ import { Board } from './Board'
 import { confirmDialog } from './confirm'
 import { ListEditPopover } from './ListEditPopover'
 import { ListHeader } from './ListHeader'
+import { MobileHome } from './MobileHome'
 import { SectionsView } from './SectionsView'
 import { SettingsDialog } from './SettingsDialog'
 import { AdminDialog } from './AdminDialog'
@@ -64,6 +66,19 @@ interface Pane {
 // Durée de l'animation d'une tâche cochée qui quitte une liste intelligente (voir TaskRow.css)
 const LEAVING_DELAY = 650
 
+/**
+ * Écran affiché en mode mobile (pas de barre latérale) :
+ *
+ *   home ──(toucher une liste)──► list
+ *     ▲                             │
+ *     └──(flèche ‹ ou « retour » du téléphone)
+ *
+ * Entrer dans une liste ajoute une étape à l'historique du navigateur : le geste
+ * « retour » du téléphone revient ainsi à l'accueil au lieu de quitter le site.
+ */
+type MobileScreen = 'home' | 'list'
+const MOBILE_HISTORY_STATE = { betterTodo: 'list' } // Marque notre étape dans l'historique
+
 class WorkspaceState {
     folders: Folder[] = []
     lists: TodoList[] = []
@@ -91,6 +106,10 @@ class WorkspaceState {
     windowWidth: number = window.innerWidth
     sidebarPeek: boolean = false           // Ouverte par-dessus le contenu (fenêtre étroite)
     notice: string = ''                    // Message en bas de l'écran (ex. vue scindée impossible)
+
+    // Mode mobile (utils/mobileLayout.ts)
+    mobile: boolean = detectMobileLayout()
+    mobileScreen: MobileScreen = 'home'
 }
 
 /**
@@ -116,6 +135,7 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
 
     async componentDidMount(): Promise<void> {
         window.addEventListener('resize', this.onWindowResize)
+        window.addEventListener('popstate', this.onPopState)
         document.addEventListener('keydown', this.onDocumentKeyDown)
         try {
             // Les trois appels partent en même temps
@@ -140,6 +160,7 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
 
     componentWillUnmount(): void {
         window.removeEventListener('resize', this.onWindowResize)
+        window.removeEventListener('popstate', this.onPopState)
         document.removeEventListener('keydown', this.onDocumentKeyDown)
     }
 
@@ -155,7 +176,7 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
     // =========================================================================
 
     onWindowResize = (): void => {
-        this.setState({ windowWidth: window.innerWidth })
+        this.setState({ windowWidth: window.innerWidth, mobile: detectMobileLayout() })
     }
 
     /** Pendant qu'on tire la poignée : pas encore enregistré. */
@@ -275,6 +296,38 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
         } else {
             void this.openList(listId, this.state.activePane)
         }
+    }
+
+    // --- Mode mobile : écrans Accueil → Liste ---------------------------------
+
+    /** Toucher une liste sur l'accueil : elle s'ouvre, puis on passe à son écran. */
+    onMobileSelectList = (listId: string): void => {
+        void this.openList(listId, this.state.activePane)
+        this.showMobileList()
+    }
+
+    private showMobileList(): void {
+        if (this.state.mobileScreen === 'list') return
+        this.setState({ mobileScreen: 'list' })
+        window.history.pushState(MOBILE_HISTORY_STATE, '')
+    }
+
+    /** Flèche ‹ : on revient en arrière dans l'historique, ce qui déclenche onPopState. */
+    onMobileBack = (): void => {
+        if (window.history.state?.betterTodo === MOBILE_HISTORY_STATE.betterTodo) {
+            window.history.back()
+        } else {
+            this.onPopState() // Notre étape n'est plus dans l'historique : on revient directement
+        }
+    }
+
+    /** « Retour » du navigateur ou du téléphone → accueil. */
+    onPopState = (): void => {
+        this.setState(state => (
+            state.mobileScreen === 'home'
+                ? null
+                : { mobileScreen: 'home', openTask: null, editingList: null, selectedTaskIds: [] }
+        ))
     }
 
     closePane = (index: number): void => {
@@ -414,6 +467,7 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
             const list = await api.createList(name, folderId)
             await this.refreshLists()
             await this.openList(list.id, this.state.activePane)
+            if (this.state.mobile) this.showMobileList()
         } catch (error) {
             this.handleError(error)
         }
@@ -503,6 +557,7 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
             } else {
                 this.setState({ panes: [] })
             }
+            if (this.state.mobile) this.onMobileBack() // Mobile : retour à l'accueil
         }
 
         try {
@@ -847,6 +902,8 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
     }
 
     render(): React.ReactNode {
+        if (this.state.mobile) return this.renderMobile()
+
         const { lists, panes, activePane, error, loading } = this.state
         // Fenêtre trop étroite : seule la moitié active est affichée (l'autre reste ouverte)
         const shown = this.splitVisible() ? [0, 1] : panes.length > 0 ? [Math.min(activePane, panes.length - 1)] : []
@@ -873,6 +930,60 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
                     )}
                 </main>
 
+                {this.renderOverlays()}
+            </div>
+        )
+    }
+
+    /**
+     * Mode mobile : un seul écran à la fois (accueil, ou la liste de la moitié active).
+     * Mêmes données et mêmes actions qu'en mode bureau, seul l'affichage change.
+     */
+    private renderMobile(): React.ReactNode {
+        const { panes, activePane, error, mobileScreen } = this.state
+        const paneIndex = Math.min(activePane, panes.length - 1)
+        const showList = mobileScreen === 'list' && paneIndex >= 0
+
+        return (
+            <div className="Workspace mobile">
+                {error && (
+                    <div className="workspace-error">
+                        {error}
+                        <button onClick={() => this.setState({ error: '' })}>Fermer</button>
+                    </div>
+                )}
+
+                {showList ? (
+                    <main className="workspace-main">
+                        <div className="panes">{this.renderPane(paneIndex)}</div>
+                    </main>
+                ) : (
+                    <MobileHome
+                        user={this.props.user}
+                        folders={this.state.folders}
+                        lists={this.state.lists}
+                        dueCounts={this.state.dueCounts}
+                        onSelectList={this.onMobileSelectList}
+                        onToggleFolder={this.onToggleFolder}
+                        onCreateList={this.onCreateList}
+                        onCreateFolder={this.onCreateFolder}
+                        onRenameFolder={this.onRenameFolder}
+                        onDeleteFolder={this.onDeleteFolder}
+                        onOpenSettings={this.onOpenSettings}
+                        onOpenAdmin={this.onOpenAdmin}
+                        onLogout={this.props.onLogout}
+                    />
+                )}
+
+                {this.renderOverlays()}
+            </div>
+        )
+    }
+
+    /** Ce qui s'affiche par-dessus l'écran, dans les deux modes. */
+    private renderOverlays(): React.ReactNode {
+        return (
+            <>
                 {this.state.notice && (
                     <div className="workspace-notice" role="status">
                         {this.state.notice}
@@ -892,8 +1003,13 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
                     />
                 )}
                 {this.state.adminOpen && <AdminDialog user={this.props.user} onClose={this.onCloseAdmin} />}
-            </div>
+            </>
         )
+    }
+
+    /** Bouton « Fermer cette moitié » : deux listes ouvertes (jamais en mode mobile, une seule y est visible). */
+    private canClosePane(): boolean {
+        return this.state.panes.length === 2 && !this.state.mobile
     }
 
     /** Une moitié : en-tête de la liste + vue colonnes ou sections. */
@@ -924,7 +1040,9 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
                         onRename={this.renameTask}
                         onToggleSelection={this.toggleSelection}
                         onStartEditing={this.startEditing}
-                        onClosePane={this.state.panes.length === 2 ? () => this.closePane(index) : undefined}
+                        onClosePane={this.canClosePane() ? () => this.closePane(index) : undefined}
+                        mobile={this.state.mobile}
+                        onBack={this.state.mobile ? this.onMobileBack : undefined}
                     />
                 )}
                 {board && board.list.id === pane.listId && (
@@ -938,7 +1056,8 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
                             onEditList={anchor => this.onEditList(board.list, anchor)}
                             onToggleShowDone={() => this.onToggleShowDone(board.list)}
                             onClearDone={() => void this.onClearDone(board)}
-                            onClosePane={this.state.panes.length === 2 ? () => this.closePane(index) : undefined}
+                            onClosePane={this.canClosePane() ? () => this.closePane(index) : undefined}
+                            onBack={this.state.mobile ? this.onMobileBack : undefined}
                         />
                         {this.renderView(board)}
                     </>
@@ -1071,6 +1190,7 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
             drag: this.state.drag,
             addingGroup: this.state.addingGroupListId === board.list.id,
             onAddingGroupDone: () => this.setState({ addingGroupListId: null }),
+            mobile: this.state.mobile,
         }
         return board.list.default_view === 'sections' ? <SectionsView {...props} /> : <Board {...props} />
     }
@@ -1143,6 +1263,7 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
                 groups={groups}
                 urgencyLevels={this.state.urgencyLevels}
                 anchor={open.anchor}
+                sheet={this.state.mobile}
                 onUpdate={changes => this.updateTask(task.id, changes)}
                 onDelete={() => void this.deleteTask(task.id)}
                 onClose={() => this.setState({ openTask: null })}

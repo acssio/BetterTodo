@@ -213,3 +213,84 @@ select.pop-input {
     font-size: 12px;
     color: var(--faint);
 }
+
+/* =============================================================================
+   Mode mobile : panneau qui monte du bas de l'écran (TaskPopover sheet)
+   ============================================================================= */
+
+.sheet-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 9; /* Sous le panneau (z-index 10) */
+    background: rgba(20, 20, 18, 0.38);
+}
+
+/* bottom est donné par le composant : 0, ou la hauteur du clavier */
+.TaskPopover.sheet {
+    left: 0;
+    right: 0;
+    width: auto;
+    max-height: 88dvh;
+    gap: 16px;
+    padding: 8px 20px calc(16px + env(safe-area-inset-bottom));
+    border: none;
+    border-radius: 18px 18px 0 0;
+    box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.18);
+}
+
+/* Petite barre en haut du panneau */
+.sheet-handle {
+    flex-shrink: 0;
+    align-self: center;
+    width: 40px;
+    height: 5px;
+    border-radius: 3px;
+    background: #D4D4D0;
+}
+
+/* Au doigt : zones plus grandes, texte plus lisible */
+.TaskPopover.sheet .pop-check {
+    width: 24px;
+    height: 24px;
+}
+
+.TaskPopover.sheet .pop-title-input {
+    font-size: 18px;
+}
+
+.TaskPopover.sheet .icon-btn {
+    width: 40px;
+    height: 40px;
+}
+
+.TaskPopover.sheet .pop-input {
+    height: 44px;
+}
+
+.TaskPopover.sheet .pop-urgency button {
+    min-height: 40px;
+    font-size: 14px;
+}
+
+.TaskPopover.sheet .pop-tag,
+.TaskPopover.sheet .pop-tag-add {
+    min-height: 36px;
+    font-size: 14px;
+}
+
+.TaskPopover.sheet .pop-tag button {
+    padding: 6px;
+}
+
+.TaskPopover.sheet .pop-tag-add input {
+    width: 110px;
+}
+
+.TaskPopover.sheet .pop-notes {
+    line-height: 22px;
+    resize: none;
+}
+
+.TaskPopover.sheet .pop-delete {
+    min-height: 44px;
+}

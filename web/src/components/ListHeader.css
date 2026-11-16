@@ -140,3 +140,48 @@
         padding: 0;
     }
 }
+
+/* =============================================================================
+   Mode mobile : flèche ‹ au début, en-tête sous la barre d'état du téléphone
+   ============================================================================= */
+
+.header-back {
+    width: 44px;
+    height: 44px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-md);
+    color: var(--text-soft);
+}
+
+.header-back:active {
+    background: var(--hover);
+}
+
+.Workspace.mobile .ListHeader {
+    height: auto;
+    min-height: 60px;
+    gap: 4px;
+    padding: calc(6px + env(safe-area-inset-top)) 8px 6px 4px;
+}
+
+.Workspace.mobile .header-title {
+    margin-left: 4px;
+}
+
+.Workspace.mobile .header-tool,
+.Workspace.mobile .header-new-group {
+    width: 40px;
+    height: 40px;
+}
+
+/* « Afficher / masquer les tâches faites » reste dans le menu « … » : on gagne de la place */
+.Workspace.mobile .header-done {
+    display: none;
+}
+
+.Workspace.mobile .header-views button {
+    padding: 7px 9px;
+}
