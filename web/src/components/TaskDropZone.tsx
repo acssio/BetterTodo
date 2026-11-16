@@ -30,7 +30,7 @@ export class TaskDropZone extends React.Component<TaskDropZoneProps> {
         event.preventDefault()    // Sans ça, le navigateur refuse le dépôt
         event.dataTransfer.dropEffect = 'move'
 
-        const index = computeDropIndex(event.currentTarget, event.clientY, drag.taskId)
+        const index = computeDropIndex(event.currentTarget, event.clientY, drag.taskIds)
         const target = drag.target
         if (!target || target.groupId !== groupId || target.index !== index) {
             this.props.actions.setDropTarget({ groupId, index })
@@ -55,11 +55,11 @@ export class TaskDropZone extends React.Component<TaskDropZoneProps> {
         const target = drag?.target
         const isDropZone = target !== undefined && target !== null && target.groupId === groupId
 
-        // On insère la ligne de dépôt à l'index visé, en sautant la tâche glissée
+        // On insère la ligne de dépôt à l'index visé, en sautant les tâches glissées
         const items: React.ReactNode[] = []
         let visibleIndex = 0
         for (const task of tasks) {
-            const dragging = task.id === drag?.taskId
+            const dragging = drag?.taskIds.includes(task.id) ?? false
             if (!dragging) {
                 if (isDropZone && target.index === visibleIndex) {
                     items.push(<div key="drop" className="drop-indicator" />)

@@ -57,7 +57,7 @@ export class Board extends React.Component<TaskViewProps, BoardState> {
     onNextClick = (): void => this.scrollByColumn(1)
 
     render(): React.ReactNode {
-        const { board, urgencyLevels, actions, openTaskId, drag } = this.props
+        const { board, urgencyLevels, actions, openTaskId, selectedTaskIds, drag } = this.props
         const { edges } = this.state
         const leftHidden = edges === 'left' || edges === 'both'
         const rightHidden = edges === 'right' || edges === 'both'
@@ -80,10 +80,14 @@ export class Board extends React.Component<TaskViewProps, BoardState> {
                                     key={task.id}
                                     task={task}
                                     urgency={urgencyLevels.find(level => level.id === task.urgency_id)}
-                                    selected={task.id === openTaskId}
+                                    opened={task.id === openTaskId}
+                                    selected={selectedTaskIds.includes(task.id)}
                                     dragging={dragging}
                                     onToggle={actions.toggleTask}
                                     onOpen={actions.openTask}
+                                    onRename={actions.renameTask}
+                                    onToggleSelection={actions.toggleSelection}
+                                    onStartEditing={actions.startEditing}
                                     onDragStart={actions.startTaskDrag}
                                     onDragEnd={actions.endTaskDrag}
                                 />

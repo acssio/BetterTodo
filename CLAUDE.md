@@ -129,7 +129,9 @@ Observé dans ses autres projets (C++ embarqué, React/TypeScript). Écrire du c
   - plus tard peut-être : mode MCP distant (HTTP + OAuth) pour claude.ai web / mobile.
 - **2026-11-16 – Étape 3g : édition rapide et sélection**, en deux morceaux :
   - **3g-1** : colonnes cachées signalées par une **barre de défilement fine toujours visible** et un **fondu + bouton chevron** sur le bord (`utils/scrollEdges.ts`, états none / left / right / both) ;
-  - **3g-2** (à planifier) : clic sur une tâche = modifier le titre sur place ; Cmd/Ctrl+clic = sélection multiple pour **supprimer et déplacer** plusieurs tâches ; l'overlay s'ouvre par un **petit bouton affiché au survol** (plus de double-clic).
+  - **3g-2** : clic sur une tâche = modifier le titre sur place (`TitleEditor`) ; Cmd/Ctrl+clic = sélection multiple (`Workspace.selectedTaskIds`) pour **supprimer** (Suppr / ⌫ ou barre en bas) et **déplacer** (glisser une tâche sélectionnée) plusieurs tâches ; l'overlay s'ouvre par un **petit bouton affiché au survol** (pas de double-clic) ou Entrée ;
+  - déplacement multiple **sans nouvelle route d'API** : un `PATCH /tasks/{id}` par tâche, envoyés **l'un après l'autre** (`dropAnchor` + `multiMovePositions`). Une route en lot reste possible plus tard ;
+  - props des tâches : `opened` = overlay ouvert, `selected` = dans la sélection.
 - **2026-11-13 – Maquette web validée** (Figma, page « Web – Maquette v2 »).
 
 ## Questions ouvertes

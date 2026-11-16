@@ -8,6 +8,11 @@ import type { DragState, DropTarget } from '../utils/dragDrop'
 export interface TaskViewActions {
     toggleTask(task: Task): void
     openTask(task: Task, anchor: DOMRect): void
+    renameTask(task: Task, title: string): void
+
+    // Sélection (Cmd+clic / Ctrl+clic) et modification du titre sur place
+    toggleSelection(task: Task): void
+    startEditing(task: Task): void // Vide la sélection et ferme l'overlay
     createTask(groupId: string, title: string): Promise<void>
     createGroup(listId: string, name: string): Promise<void>
     renameGroup(groupId: string, name: string): Promise<void>
@@ -26,6 +31,7 @@ export interface TaskViewProps {
     urgencyLevels: UrgencyLevel[]
     actions: TaskViewActions
     openTaskId: string | null // Tâche dont l'overlay est ouvert
+    selectedTaskIds: string[] // Tâches sélectionnées
     drag: DragState | null    // Glisser-déposer en cours
     addingGroup: boolean      // Champ « nouveau groupe » affiché (bouton de l'en-tête)
     onAddingGroupDone: () => void

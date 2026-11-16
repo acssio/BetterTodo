@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import type { Board, Task } from '../api/types'
 import {
-    appendTask, boardWithGroup, boardWithTask, countDoneTasks, countOpenTasks, findTask, hideDoneTasks, indexInGroup,
-    moveTask, placeTask, removeTask, replaceTask, visibleToFullIndex,
+    appendTask, boardWithGroup, boardWithTask, countDoneTasks, countOpenTasks, dropAnchor, findTask, hideDoneTasks,
+    indexInGroup, moveTask, multiMovePositions, placeTask, removeTask, replaceTask, visibleToFullIndex,
 } from './board'
 
 /** Crée une tâche minimale pour les tests. */
@@ -125,5 +125,40 @@ describe('vue scindée : placeTask entre deux boards', () => {
         expect(boardWithGroup(boards, 'h')?.list.id).toBe('m')
         expect(boardWithTask(boards, 'a')?.list.id).toBe('l')
         expect(boardWithTask(boards, 'zz')).toBeUndefined()
+    })
+})
+
+describe('déplacer plusieurs tâches', () => {
+    it('trouve la tâche qui suivra le dépôt', () => {
+        const tasks = [task('a', 'g'), task('b', 'g'), task('c', 'g')]
+        expect(dropAnchor(tasks, ['a'], 0, true)).toBe('b')     // [b, c] : avant b
+        expect(dropAnchor(tasks, ['a', 'c'], 1, true)).toBe(null) // [b] : à la fin
+        expect(dropAnchor([], ['x'], 0, true)).toBe(null)          // Groupe vide
+    })
+
+    it('se place après la dernière tâche visible quand les faites sont masquées', () => {
+        const tasks = [task('a', 'g'), task('x', 'g', true), task('b', 'g'), task('y', 'g', true)]
+        expect(dropAnchor(tasks, ['m'], 2, false)).toBe('y') // Après b, avant y (masquée)
+        expect(dropAnchor([task('x', 'g', true)], ['m'], 0, false)).toBe('x') // Rien de visible : en tête
+    })
+
+    it('calcule les positions une par une', () => {
+        // Deux tâches d'un autre groupe, déposées avant b dans [a, b, c]
+        expect(multiMovePositions(['a', 'b', 'c'], ['m', 'n'], 'b')).toEqual([1, 2])
+        // À la fin
+        expect(multiMovePositions(['a'], ['m', 'n'], null)).toEqual([1, 2])
+    })
+
+    it('gère des tâches qui sont déjà dans le groupe cible', () => {
+        // [a, b, c, d] : on dépose d puis a avant c → [b, d, a, c]
+        const positions = multiMovePositions(['a', 'b', 'c', 'd'], ['d', 'a'], 'c')
+        expect(positions).toEqual([2, 2])
+        // Rejoue comme l'API (position comptée sans la tâche) pour vérifier l'ordre final
+        let order = ['a', 'b', 'c', 'd']
+        ;['d', 'a'].forEach((id, i) => {
+            order = order.filter(x => x !== id)
+            order.splice(positions[i], 0, id)
+        })
+        expect(order).toEqual(['b', 'd', 'a', 'c'])
     })
 })

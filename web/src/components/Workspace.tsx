@@ -1,12 +1,13 @@
 import * as React from 'react'
+import { Trash2, X } from 'lucide-react'
 import { api, ApiError } from '../api/ApiClient'
 import type {
     Board as BoardData, BoardGroup, DueCounts, DueTask, Folder, ListChanges, ListView, Task, TaskChanges, TodoList,
     UrgencyLevel, User,
 } from '../api/types'
 import {
-    appendTask, boardWithGroup, boardWithTask, countDoneTasks, countOpenTasks, findTask, hideDoneTasks, indexInGroup,
-    moveTask, placeTask, removeTask, replaceTask, visibleToFullIndex,
+    appendTask, boardWithGroup, boardWithTask, countDoneTasks, countOpenTasks, dropAnchor, findTask, hideDoneTasks,
+    moveTask, multiMovePositions, placeTask, removeTask, replaceTask,
 } from '../utils/board'
 import { todayIso } from '../utils/dates'
 import type { DragState, DropTarget } from '../utils/dragDrop'
@@ -72,6 +73,7 @@ class WorkspaceState {
     panes: Pane[] = []          // 1 liste affichée, ou 2 en vue scindée (gauche, droite)
     activePane: number = 0      // Moitié où s'ouvre une liste cliquée dans la barre latérale
     openTask: OpenPopover | null = null    // Overlay d'une tâche
+    selectedTaskIds: string[] = []         // Tâches sélectionnées (Cmd+clic / Ctrl+clic)
     editingList: OpenPopover | null = null // Overlay « Modifier une liste »
     drag: DragState | null = null          // Glisser-déposer d'une tâche en cours
     listDrag: string | null = null         // Liste glissée depuis la barre latérale
@@ -105,6 +107,8 @@ class WorkspaceState {
  * board, les autres ne changent pas. C'est ce qui rend le glisser d'une liste à l'autre simple.
  */
 export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> implements TaskViewActions {
+    private confirmingDelete: boolean = false // Fenêtre « Supprimer les tâches ? » ouverte (évite de la rouvrir)
+
     constructor(props: WorkspaceProps) {
         super(props)
         this.state = new WorkspaceState()
@@ -112,6 +116,7 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
 
     async componentDidMount(): Promise<void> {
         window.addEventListener('resize', this.onWindowResize)
+        document.addEventListener('keydown', this.onDocumentKeyDown)
         try {
             // Les trois appels partent en même temps
             const [folders, lists, urgencyLevels] = await Promise.all([
@@ -135,6 +140,7 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
 
     componentWillUnmount(): void {
         window.removeEventListener('resize', this.onWindowResize)
+        document.removeEventListener('keydown', this.onDocumentKeyDown)
     }
 
     /** Les listes ouvertes ont changé → on les retient pour la prochaine visite. */
@@ -251,7 +257,10 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
             const panes = [...state.panes]
             const index = Math.min(paneIndex, panes.length) // Pas de « trou » : au plus une moitié de plus
             panes[index] = { listId, board: null, due: null }
-            return { ...state, panes, activePane: index, openTask: null, addingGroupListId: null, error: '', sidebarPeek: false }
+            return {
+                ...state, panes, activePane: index, openTask: null, selectedTaskIds: [], addingGroupListId: null, error: '',
+                sidebarPeek: false,
+            }
         })
         await this.reloadBoard(listId)
     }
@@ -269,7 +278,9 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
     }
 
     closePane = (index: number): void => {
-        this.setState(state => ({ panes: state.panes.filter((_, i) => i !== index), activePane: 0, openTask: null }))
+        this.setState(state => ({
+            panes: state.panes.filter((_, i) => i !== index), activePane: 0, openTask: null, selectedTaskIds: [],
+        }))
     }
 
     // --- Glisser une liste de la barre latérale vers une moitié ----------------
@@ -539,6 +550,91 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
         this.setState({ openTask: { id: task.id, anchor } })
     }
 
+    /** Titre modifié sur la carte : l'écran d'abord, puis l'API. */
+    renameTask = (task: Task, title: string): void => {
+        this.updateBoards(board => {
+            const current = findTask(board, task.id)
+            return current ? replaceTask(board, { ...current, title }) : board
+        })
+        this.updateDue(tasks => tasks.map(t => (t.id === task.id ? { ...t, title } : t)))
+        void this.updateTask(task.id, { title })
+    }
+
+    // --- Sélection -------------------------------------------------------------
+
+    toggleSelection = (task: Task): void => {
+        this.setState(state => ({
+            selectedTaskIds: state.selectedTaskIds.includes(task.id)
+                ? state.selectedTaskIds.filter(id => id !== task.id)
+                : [...state.selectedTaskIds, task.id],
+        }))
+    }
+
+    clearSelection = (): void => {
+        this.setState(state => (state.selectedTaskIds.length > 0 ? { selectedTaskIds: [] } : null))
+    }
+
+    /** Un clic simple sur une tâche commence la modification du titre : plus de sélection, plus d'overlay. */
+    startEditing = (): void => {
+        this.setState(state => (
+            state.selectedTaskIds.length > 0 || state.openTask ? { selectedTaskIds: [], openTask: null } : null
+        ))
+    }
+
+    /** Tâches sélectionnées, dans l'ordre d'affichage (liste de gauche puis de droite, groupe par groupe). */
+    private selectionInOrder(selectedIds: string[]): string[] {
+        return this.boards()
+            .flatMap(board => board.groups.flatMap(group => group.tasks))
+            .filter(task => selectedIds.includes(task.id))
+            .map(task => task.id)
+    }
+
+    /** Échap → vide la sélection. Suppr / ⌫ → supprime les tâches sélectionnées (sauf dans un champ). */
+    onDocumentKeyDown = (event: KeyboardEvent): void => {
+        if (this.state.selectedTaskIds.length === 0 || event.defaultPrevented) return
+        const target = event.target as Element
+        if (target.closest('input, textarea, select, [contenteditable="true"], [data-keep-popovers]')) return
+
+        if (event.key === 'Escape') {
+            this.clearSelection()
+        } else if (event.key === 'Delete' || event.key === 'Backspace') {
+            event.preventDefault() // ⌫ ne doit rien faire d'autre (ancien « retour arrière » de certains navigateurs)
+            void this.deleteSelection()
+        }
+    }
+
+    /** Clic dans le vide d'une liste (pas sur une tâche) → vide la sélection. */
+    onPaneMouseDown = (event: React.MouseEvent<HTMLElement>, index: number): void => {
+        if (this.state.activePane !== index) this.setState({ activePane: index })
+        const onTask = (event.target as Element).closest('[data-task-id]') !== null
+        if (!onTask && !event.metaKey && !event.ctrlKey) this.clearSelection()
+    }
+
+    deleteSelection = async (): Promise<void> => {
+        const ids = this.state.selectedTaskIds
+        if (ids.length === 0 || this.confirmingDelete) return
+
+        this.confirmingDelete = true
+        const message = ids.length === 1 ? 'Supprimer la tâche sélectionnée ?' : `Supprimer les ${ids.length} tâches sélectionnées ?`
+        const confirmed = await confirmDialog.ask(message)
+        this.confirmingDelete = false
+        if (!confirmed) return
+
+        this.setState(state => ({
+            selectedTaskIds: [],
+            openTask: state.openTask && ids.includes(state.openTask.id) ? null : state.openTask,
+        }))
+        this.updateBoards(board => ids.reduce((b, id) => removeTask(b, id), board))
+        this.updateDue(tasks => tasks.filter(t => !ids.includes(t.id)))
+        try {
+            await Promise.all(ids.map(id => api.deleteTask(id)))
+        } catch (error) {
+            this.handleError(error)
+            void this.reloadBoard()
+        }
+        void this.refreshLists()
+    }
+
     createTask = async (groupId: string, title: string): Promise<void> => {
         try {
             const task = await api.createTask(groupId, title)
@@ -551,9 +647,21 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
 
     // --- Glisser-déposer : l'état est ici, au-dessus des deux moitiés -----------
 
+    /**
+     * Une tâche de la sélection → on glisse toute la sélection.
+     * Une tâche hors sélection → on ne glisse qu'elle, et la sélection est vidée.
+     */
     startTaskDrag = (task: Task): void => {
+        const selected = this.state.selectedTaskIds
+        const withSelection = selected.length > 1 && selected.includes(task.id)
+        const taskIds = withSelection ? this.selectionInOrder(selected) : [task.id]
+
         // setTimeout : laisse le navigateur faire sa « photo » de la carte avant de la griser
-        window.setTimeout(() => this.setState({ drag: { taskId: task.id, target: null }, openTask: null }), 0)
+        window.setTimeout(() => this.setState(state => ({
+            drag: { taskIds, target: null },
+            openTask: null,
+            selectedTaskIds: withSelection ? state.selectedTaskIds : [],
+        })), 0)
     }
 
     endTaskDrag = (): void => {
@@ -568,39 +676,54 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
         const drag = this.state.drag
         this.setState({ drag: null })
         if (drag?.target) {
-            void this.moveTask(drag.taskId, drag.target.groupId, drag.target.index)
+            void this.moveTasks(drag.taskIds, drag.target.groupId, drag.target.index)
         }
     }
 
     /**
-     * Déplace une tâche dans un groupe, éventuellement d'une AUTRE liste (vue scindée).
-     * visibleIndex : index sous la souris, compté parmi les tâches affichées sans la tâche déplacée.
+     * Déplace une ou plusieurs tâches dans un groupe, éventuellement d'une AUTRE liste (vue scindée).
+     * Elles arrivent côte à côte, dans l'ordre de taskIds.
+     * visibleIndex : index sous la souris, compté parmi les tâches affichées sans les tâches déplacées.
      */
-    private async moveTask(taskId: string, groupId: string, visibleIndex: number): Promise<void> {
+    private async moveTasks(taskIds: string[], groupId: string, visibleIndex: number): Promise<void> {
         const boards = this.boards()
-        const source = boardWithTask(boards, taskId)
         const target = boardWithGroup(boards, groupId)
-        const task = source ? findTask(source, taskId) : undefined
         const group = target?.groups.find(g => g.id === groupId)
-        if (!source || !target || !task || !group) return
+        const tasks = taskIds
+            .map(id => boardWithTask(boards, id))
+            .map((board, i) => (board ? findTask(board, taskIds[i]) : undefined))
+            .filter(task => task !== undefined)
+        if (!target || !group || tasks.length === 0) return
 
-        // Tâches faites masquées dans la liste cible : l'index est compté parmi les tâches visibles
-        const index = target.list.show_done ? visibleIndex : visibleToFullIndex(group.tasks, taskId, visibleIndex)
+        // Les tâches iront juste avant beforeId : on calcule la position de chacune pour l'API
+        const movedIds = tasks.map(task => task.id)
+        const beforeId = dropAnchor(group.tasks, movedIds, visibleIndex, target.list.show_done)
+        const positions = multiMovePositions(group.tasks.map(t => t.id), movedIds, beforeId)
 
-        const sameGroup = task.group_id === groupId
-        if (sameGroup && indexInGroup(source, taskId) === index) return // Reposée à sa place
+        // Reposées à leur place : rien à faire
+        let order = group.tasks.map(t => t.id)
+        movedIds.forEach((id, i) => {
+            order = order.filter(other => other !== id)
+            order.splice(positions[i], 0, id)
+        })
+        const sameGroup = tasks.every(task => task.group_id === groupId)
+        if (sameGroup && order.join() === group.tasks.map(t => t.id).join()) return
 
-        this.updateBoards(board => placeTask(board, task, groupId, index))
-        const changes: TaskChanges = { position: index }
-        if (!sameGroup) changes.group_id = groupId
+        this.updateBoards(board => tasks.reduce((b, task, i) => placeTask(b, task, groupId, positions[i]), board))
+        const fromOtherList = tasks.some(task => boardWithTask(boards, task.id)?.list.id !== target.list.id)
 
+        // Une requête après l'autre : chaque position suppose que les précédentes sont déjà faites
         try {
-            await api.updateTask(taskId, changes)
+            for (let i = 0; i < tasks.length; i++) {
+                const changes: TaskChanges = { position: positions[i] }
+                if (tasks[i].group_id !== groupId) changes.group_id = groupId
+                await api.updateTask(tasks[i].id, changes)
+            }
         } catch (error) {
             this.handleError(error)
         }
         void this.reloadBoard() // Récupère les positions renumérotées par le serveur
-        if (source.list.id !== target.list.id) void this.refreshLists() // Compteurs des deux listes
+        if (fromOtherList) void this.refreshLists() // Compteurs des listes
     }
 
     createGroup = async (listId: string, name: string): Promise<void> => {
@@ -756,6 +879,7 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
                         <button onClick={() => this.setState({ notice: '' })}>OK</button>
                     </div>
                 )}
+                {this.renderSelectionBar()}
                 {this.renderPopover()}
                 {this.renderListEditor()}
                 {this.state.settingsOpen && (
@@ -785,7 +909,7 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
             <section
                 key={pane.listId}
                 className={classes.join(' ')}
-                onMouseDown={() => { if (this.state.activePane !== index) this.setState({ activePane: index }) }}
+                onMouseDown={event => this.onPaneMouseDown(event, index)}
             >
                 {isSmart(pane.listId) && (
                     <SmartView
@@ -793,9 +917,13 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
                         tasks={pane.due}
                         urgencyLevels={this.state.urgencyLevels}
                         openTaskId={this.state.openTask?.id ?? null}
+                        selectedTaskIds={this.state.selectedTaskIds}
                         leavingTaskIds={this.state.leavingTaskIds}
                         onToggle={this.toggleTask}
                         onOpen={this.openTask}
+                        onRename={this.renameTask}
+                        onToggleSelection={this.toggleSelection}
+                        onStartEditing={this.startEditing}
                         onClosePane={this.state.panes.length === 2 ? () => this.closePane(index) : undefined}
                     />
                 )}
@@ -939,11 +1067,40 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
             urgencyLevels: this.state.urgencyLevels,
             actions: this,
             openTaskId: this.state.openTask?.id ?? null,
+            selectedTaskIds: this.state.selectedTaskIds,
             drag: this.state.drag,
             addingGroup: this.state.addingGroupListId === board.list.id,
             onAddingGroupDone: () => this.setState({ addingGroupListId: null }),
         }
         return board.list.default_view === 'sections' ? <SectionsView {...props} /> : <Board {...props} />
+    }
+
+    /** Barre en bas de l'écran tant que des tâches sont sélectionnées. */
+    private renderSelectionBar(): React.ReactNode {
+        const count = this.state.selectedTaskIds.length
+        if (count === 0 || this.state.drag) return null
+        // Dans une liste intelligente, on ne glisse pas : pas d'astuce
+        const canDrag = this.state.selectedTaskIds.some(id => boardWithTask(this.boards(), id) !== undefined)
+
+        return (
+            <div className="selection-bar" role="status">
+                <span className="selection-count">
+                    {count > 1 ? `${count} tâches sélectionnées` : '1 tâche sélectionnée'}
+                </span>
+                {canDrag && (
+                    <span className="selection-hint">
+                        {count > 1 ? 'Glisse-les pour les déplacer' : 'Glisse-la pour la déplacer'}
+                    </span>
+                )}
+                <button className="selection-delete" onClick={() => void this.deleteSelection()}>
+                    <Trash2 size={14} />
+                    Supprimer
+                </button>
+                <button className="selection-close" onClick={this.clearSelection} title="Tout désélectionner (Échap)" aria-label="Tout désélectionner">
+                    <X size={16} />
+                </button>
+            </div>
+        )
     }
 
     private renderListEditor(): React.ReactNode {
