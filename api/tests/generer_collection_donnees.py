@@ -78,7 +78,7 @@ req("Liste Perso", "POST", "/lists",
 req("Nouvelle liste : un groupe « Tâches » par défaut", "GET", "/lists/{{listId}}/board", tests=[
     status(200), J,
     "pm.test('un seul groupe, nommé Tâches (compte en français)', () => pm.expect(b.groups.map(g => g.name)).to.eql(['Tâches']));",
-    "pm.test('show_done = true par défaut', () => pm.expect(b.list.show_done).to.eql(true));",
+    "pm.test('show_done = false par défaut (tâches faites masquées)', () => pm.expect(b.list.show_done).to.eql(false));",
     "pm.collectionVariables.set('groupA', b.groups[0].id);"])
 req("Liste – couleur invalide", "POST", "/lists", body={"name": "X", "color": "rouge"}, tests=[status(400)])
 req("Liste – groupe de listes inconnu", "POST", "/lists",

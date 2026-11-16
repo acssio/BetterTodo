@@ -322,5 +322,22 @@
 
 /* Messages en bas : au-dessus de la barre de geste */
 .Workspace.mobile .workspace-notice {
+    left: 16px;
+    right: 16px;
     bottom: calc(16px + env(safe-area-inset-bottom));
+    transform: none;
+    max-width: none;
+    justify-content: space-between;
+}
+
+/* Sélection (appui long) : SelectionHeader remplace l'en-tête de la liste */
+.Workspace.mobile.selecting .ListHeader {
+    display: none;
+}
+
+/* Appui long sur une tâche : pas de loupe ni de menu « Copier / Partager » d'iOS */
+.Workspace.mobile .TaskCard,
+.Workspace.mobile .TaskRow {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
 }

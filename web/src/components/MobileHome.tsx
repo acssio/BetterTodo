@@ -24,6 +24,7 @@ interface MobileHomeProps {
     onOpenSettings: () => void
     onOpenAdmin: () => void
     onLogout: () => void
+    onQuickTask: () => void // Bouton flottant « Quick task »
 }
 
 /** Ce qu'on est en train d'ajouter (même principe que la barre latérale). */
@@ -80,37 +81,46 @@ export class MobileHome extends React.Component<MobileHomeProps, MobileHomeState
                     </div>
                 </header>
 
-                <div className="mhome-scroll">
-                    <nav className="mhome-smart">
-                        {this.renderSmart(SMART_TODAY)}
-                        {this.renderSmart(SMART_SCHEDULED)}
-                    </nav>
+                <div className="mhome-main">
+                    <div className="mhome-scroll">
+                        <nav className="mhome-smart">
+                            {this.renderSmart(SMART_TODAY)}
+                            {this.renderSmart(SMART_SCHEDULED)}
+                        </nav>
 
-                    <div className="mhome-label">Listes</div>
+                        <div className="mhome-label">Listes</div>
 
-                    <nav className="mhome-lists">
-                        {adding?.kind === 'folder' && (
-                            <div className="mhome-adding">
-                                <InlineInput
-                                    placeholder="Nom du groupe de listes"
-                                    onSubmit={async name => {
-                                        await this.props.onCreateFolder(name)
-                                        this.onAddingDone()
-                                    }}
-                                    onCancel={this.onAddingDone}
-                                />
-                            </div>
-                        )}
+                        <nav className="mhome-lists">
+                            {adding?.kind === 'folder' && (
+                                <div className="mhome-adding">
+                                    <InlineInput
+                                        placeholder="Nom du groupe de listes"
+                                        onSubmit={async name => {
+                                            await this.props.onCreateFolder(name)
+                                            this.onAddingDone()
+                                        }}
+                                        onCancel={this.onAddingDone}
+                                    />
+                                </div>
+                            )}
 
-                        {ungrouped.map(list => this.renderList(list))}
-                        {adding?.kind === 'list' && adding.folderId === null && this.renderNewList(null)}
+                            {ungrouped.map(list => this.renderList(list))}
+                            {adding?.kind === 'list' && adding.folderId === null && this.renderNewList(null)}
 
-                        {folders.map(folder => this.renderFolder(folder, lists.filter(list => list.folder_id === folder.id)))}
+                            {folders.map(folder => this.renderFolder(folder, lists.filter(list => list.folder_id === folder.id)))}
 
-                        {lists.length === 0 && adding === null && (
-                            <p className="mhome-empty">Aucune liste : touche + en haut pour en créer une.</p>
-                        )}
-                    </nav>
+                            {lists.length === 0 && adding === null && (
+                                <p className="mhome-empty">Aucune liste : touche + en haut pour en créer une.</p>
+                            )}
+                        </nav>
+                    </div>
+
+                    {/* Bouton flottant : centré en bas, reste en place pendant que les listes défilent */}
+                    {lists.length > 0 && (
+                        <button className="mhome-quick" onClick={this.props.onQuickTask}>
+                            <Plus size={20} strokeWidth={2.5} />Quick task
+                        </button>
+                    )}
                 </div>
 
                 <footer className="mhome-foot">

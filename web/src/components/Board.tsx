@@ -132,6 +132,7 @@ export class Board extends React.Component<TaskViewProps, BoardState> {
                                     selected={selectedTaskIds.includes(task.id)}
                                     dragging={dragging}
                                     tapToOpen={this.props.mobile}
+                                    selecting={this.props.mobile && selectedTaskIds.length > 0}
                                     onToggle={actions.toggleTask}
                                     onOpen={actions.openTask}
                                     onRename={actions.renameTask}

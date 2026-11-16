@@ -151,8 +151,9 @@ export class ApiClient {
         return this.request('DELETE', `/groups/${groupId}`)
     }
 
-    createTask(groupId: string, title: string): Promise<Task> {
-        return this.request('POST', `/groups/${groupId}/tasks`, { title })
+    /** dueDate : échéance facultative ("AAAA-MM-JJ"), utilisée par la Quick task. */
+    createTask(groupId: string, title: string, dueDate: string | null = null): Promise<Task> {
+        return this.request('POST', `/groups/${groupId}/tasks`, dueDate ? { title, due_date: dueDate } : { title })
     }
 
     updateTask(taskId: string, changes: TaskChanges): Promise<Task> {

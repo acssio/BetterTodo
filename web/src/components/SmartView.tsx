@@ -85,6 +85,7 @@ export class SmartView extends React.Component<SmartViewProps> {
                                 canDrag={false}
                                 leaving={this.props.leavingTaskIds.includes(task.id)}
                                 tapToOpen={this.props.mobile}
+                                selecting={(this.props.mobile ?? false) && this.props.selectedTaskIds.length > 0}
                                 listBadge={task.list}
                                 onToggle={this.props.onToggle}
                                 onOpen={this.props.onOpen}

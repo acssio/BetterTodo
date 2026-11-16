@@ -34,3 +34,33 @@ export function detectMobileLayout(): boolean {
 export function keyboardInset(windowHeight: number, visibleHeight: number, visibleTop: number): number {
     return Math.max(0, Math.round(windowHeight - visibleHeight - visibleTop))
 }
+
+/**
+ * Prévient quand le clavier du téléphone s'ouvre ou se ferme, avec sa hauteur.
+ * Pour les panneaux du bas (overlay d'une tâche, Quick task) :
+ *
+ *   componentDidMount    → this.keyboard.start()
+ *   componentWillUnmount → this.keyboard.stop()
+ */
+export class KeyboardListener {
+    private onChange: (inset: number) => void
+
+    constructor(onChange: (inset: number) => void) {
+        this.onChange = onChange
+    }
+
+    start(): void {
+        window.visualViewport?.addEventListener('resize', this.onViewportChange)
+        window.visualViewport?.addEventListener('scroll', this.onViewportChange)
+    }
+
+    stop(): void {
+        window.visualViewport?.removeEventListener('resize', this.onViewportChange)
+        window.visualViewport?.removeEventListener('scroll', this.onViewportChange)
+    }
+
+    private onViewportChange = (): void => {
+        const viewport = window.visualViewport
+        if (viewport) this.onChange(keyboardInset(window.innerHeight, viewport.height, viewport.offsetTop))
+    }
+}
