@@ -20,9 +20,32 @@
     outline-offset: -2px;
 }
 
+/* Tâche sélectionnée (Cmd+clic) : fond bleuté */
 .TaskRow.selected {
     background: #EAF1FD;
+}
+
+/* Overlay ouvert, ou titre en cours de modification : trait bleu à gauche */
+.TaskRow.opened,
+.TaskRow.editing {
     box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.TaskRow.editing {
+    cursor: text;
+}
+
+/* Bouton « Ouvrir le détail » (style dans TaskCard.css) : au bout de la ligne,
+   sa place est gardée pour que les colonnes ne bougent pas au survol */
+.TaskRow .task-open {
+    position: static;
+    flex-shrink: 0;
+}
+
+.TaskRow:hover .task-open,
+.TaskRow:focus-within .task-open,
+.TaskRow.opened .task-open {
+    opacity: 1;
 }
 
 .TaskRow.dragging {

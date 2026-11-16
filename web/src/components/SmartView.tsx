@@ -13,16 +13,21 @@ interface SmartViewProps {
     tasks: DueTask[] | null // null pendant le chargement
     urgencyLevels: UrgencyLevel[]
     openTaskId: string | null
+    selectedTaskIds: string[]
     leavingTaskIds: string[] // Tâches cochées en train de disparaître
     onToggle: (task: Task) => void
     onOpen: (task: Task, anchor: DOMRect) => void
+    onRename: (task: Task, title: string) => void
+    onToggleSelection: (task: Task) => void
+    onStartEditing: (task: Task) => void
     onClosePane?: () => void // Vue scindée
 }
 
 /**
  * Liste intelligente « Aujourd'hui » ou « Planifié » : les tâches à faire avec une
  * échéance, toutes listes confondues, rangées en sections par date (utils/smartLists.ts).
- * On peut cocher et ouvrir l'overlay, mais pas réordonner ni ajouter : l'ordre vient des dates.
+ * On peut cocher, renommer, sélectionner (pour supprimer) et ouvrir l'overlay, mais pas
+ * réordonner, ajouter ni glisser : l'ordre vient des dates.
  */
 export class SmartView extends React.Component<SmartViewProps> {
     render(): React.ReactNode {
@@ -70,13 +75,17 @@ export class SmartView extends React.Component<SmartViewProps> {
                                 key={task.id}
                                 task={task}
                                 urgency={this.props.urgencyLevels.find(level => level.id === task.urgency_id)}
-                                selected={task.id === this.props.openTaskId}
+                                opened={task.id === this.props.openTaskId}
+                                selected={this.props.selectedTaskIds.includes(task.id)}
                                 dragging={false}
                                 canDrag={false}
                                 leaving={this.props.leavingTaskIds.includes(task.id)}
                                 listBadge={task.list}
                                 onToggle={this.props.onToggle}
                                 onOpen={this.props.onOpen}
+                                onRename={this.props.onRename}
+                                onToggleSelection={this.props.onToggleSelection}
+                                onStartEditing={this.props.onStartEditing}
                                 onDragStart={() => {}}
                                 onDragEnd={() => {}}
                             />

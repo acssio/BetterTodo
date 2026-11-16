@@ -1,0 +1,28 @@
+/* Titre modifié sur place : même police et même place que le texte qu'il remplace */
+.TitleEditor {
+    flex: 1;
+    min-width: 0;
+    display: block;
+    padding: 0;
+    margin: 0;
+    border: none;
+    outline: none;
+    resize: none;
+    overflow: hidden;
+    background: transparent;
+    color: var(--text);
+    font: inherit;
+    font-weight: 500;
+    line-height: 18px;
+    user-select: text;
+}
+
+/* Vue sections : une seule ligne, le texte défile au lieu de passer à la ligne */
+.TitleEditor.single {
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+
+.TitleEditor.single::-webkit-scrollbar {
+    display: none;
+}

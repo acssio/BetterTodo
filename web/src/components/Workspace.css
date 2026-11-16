@@ -151,3 +151,63 @@
     font-weight: 600;
     text-decoration: underline;
 }
+
+/* Barre de la sélection (Cmd+clic / Ctrl+clic sur des tâches), en bas de l'écran */
+.selection-bar {
+    position: fixed;
+    left: 50%;
+    bottom: 20px;
+    transform: translateX(-50%);
+    z-index: 40;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    max-width: calc(100vw - 32px);
+    padding: 8px 8px 8px 16px;
+    border-radius: var(--radius-md);
+    background: var(--text);
+    color: #FFFFFF;
+    box-shadow: var(--shadow-pop);
+    white-space: nowrap;
+}
+
+.selection-count {
+    font-weight: 600;
+}
+
+.selection-hint {
+    color: #B5B5B1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.selection-delete {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+    padding: 6px 10px;
+    border-radius: var(--radius-sm);
+    background: var(--danger);
+    color: #FFFFFF;
+    font-weight: 600;
+}
+
+.selection-close {
+    display: flex;
+    flex-shrink: 0;
+    padding: 6px;
+    border-radius: var(--radius-sm);
+    color: #FFFFFF;
+}
+
+.selection-close:hover {
+    background: rgba(255, 255, 255, 0.12);
+}
+
+/* Fenêtre étroite : on retire l'astuce */
+@media (max-width: 560px) {
+    .selection-hint {
+        display: none;
+    }
+}

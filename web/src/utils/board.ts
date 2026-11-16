@@ -133,3 +133,38 @@ export function boardWithGroup(boards: Board[], groupId: string): Board | undefi
 export function boardWithTask(boards: Board[], taskId: string): Board | undefined {
     return boards.find(board => findTask(board, taskId) !== undefined)
 }
+
+/**
+ * Plusieurs tâches déposées dans un groupe : la tâche qui restera juste APRÈS elles
+ * (null = elles vont à la fin du groupe).
+ * visibleIndex est compté parmi les tâches affichées, sans les tâches déplacées.
+ * Si les tâches faites sont masquées (showDone = false), on se place juste après la
+ * dernière tâche visible, comme visibleToFullIndex.
+ */
+export function dropAnchor(tasks: Task[], movedIds: string[], visibleIndex: number, showDone: boolean): string | null {
+    const others = tasks.filter(t => !movedIds.includes(t.id))
+    const visible = showDone ? others : others.filter(t => !t.done)
+
+    if (visibleIndex < visible.length) return visible[visibleIndex].id
+    if (visible.length === 0) return others[0]?.id ?? null // Aucune tâche visible : en tête
+    return others[others.indexOf(visible[visible.length - 1]) + 1]?.id ?? null
+}
+
+/**
+ * Positions à envoyer à l'API pour déplacer les tâches UNE PAR UNE, dans l'ordre de movedIds,
+ * juste avant beforeId (null = à la fin). groupTaskIds : les tâches actuelles du groupe cible.
+ *
+ * L'API compte la position SANS la tâche déplacée. Comme les tâches arrivent l'une après
+ * l'autre, on rejoue les déplacements sur une copie pour connaître la position de chacune.
+ */
+export function multiMovePositions(groupTaskIds: string[], movedIds: string[], beforeId: string | null): number[] {
+    let current = [...groupTaskIds]
+    const positions: number[] = []
+    for (const id of movedIds) {
+        current = current.filter(other => other !== id) // Sans elle (si elle était déjà dans ce groupe)
+        const position = beforeId === null ? current.length : current.indexOf(beforeId)
+        current.splice(position, 0, id)
+        positions.push(position)
+    }
+    return positions
+}

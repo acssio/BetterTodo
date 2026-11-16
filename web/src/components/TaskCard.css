@@ -1,4 +1,5 @@
 .TaskCard {
+    position: relative; /* Pour le bouton « Ouvrir le détail » */
     display: flex;
     flex-direction: column;
     gap: 8px;
@@ -20,8 +21,16 @@
     outline-offset: 1px;
 }
 
-/* Overlay ouvert : bordure bleue de 2 px (padding réduit d'1 px pour ne pas bouger) */
+/* Tâche sélectionnée (Cmd+clic) : fond bleuté */
 .TaskCard.selected {
+    background: #EAF1FD;
+    border-color: #B9CEF6;
+}
+
+/* Overlay ouvert, ou titre en cours de modification : bordure bleue de 2 px
+   (padding réduit d'1 px pour ne pas bouger) */
+.TaskCard.opened,
+.TaskCard.editing {
     border: 2px solid var(--accent);
     padding: 9px 11px;
 }
@@ -121,4 +130,46 @@
 .card-note {
     display: flex;
     color: var(--muted);
+}
+
+.TaskCard.editing {
+    cursor: text;
+}
+
+/* Bouton « Ouvrir le détail » : affiché au survol, dans le coin haut droit.
+   Partagé avec TaskRow (vue sections). */
+.task-open {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--muted);
+    box-shadow: var(--shadow-card);
+    opacity: 0;
+}
+
+.TaskCard:hover .task-open,
+.TaskCard:focus-within .task-open,
+.TaskCard.opened .task-open {
+    opacity: 1;
+}
+
+.task-open:hover {
+    color: var(--accent);
+    border-color: var(--accent);
+}
+
+/* Écran tactile : pas de survol, le bouton reste visible (discret) */
+@media (hover: none) {
+    .task-open {
+        opacity: 0.6;
+    }
 }

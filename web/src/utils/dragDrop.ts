@@ -4,7 +4,7 @@
 // vues : c'est ce qui permettra de glisser d'une liste à l'autre (vue scindée).
 // =============================================================================
 
-/** Où la tâche glissée serait déposée : groupe + index (compté SANS la tâche glissée). */
+/** Où les tâches glissées seraient déposées : groupe + index (compté SANS les tâches glissées). */
 export interface DropTarget {
     groupId: string
     index: number
@@ -12,19 +12,19 @@ export interface DropTarget {
 
 /** Glisser-déposer en cours. */
 export interface DragState {
-    taskId: string
+    taskIds: string[]         // Tâches déplacées : celle qu'on tient, ou toute la sélection (dans l'ordre d'affichage)
     target: DropTarget | null // null tant que la souris n'est au-dessus d'aucun groupe
 }
 
 /**
  * Index de dépôt dans un conteneur : avant le premier élément portant attribute
- * (par défaut data-task-id) dont le milieu est sous la souris. L'élément glissé est ignoré.
+ * (par défaut data-task-id) dont le milieu est sous la souris. Les éléments glissés sont ignorés.
  */
 export function computeDropIndex(
-    container: HTMLElement, mouseY: number, dragId: string, attribute: string = 'data-task-id',
+    container: HTMLElement, mouseY: number, dragIds: string[], attribute: string = 'data-task-id',
 ): number {
     const items = Array.from(container.querySelectorAll<HTMLElement>(`[${attribute}]`))
-        .filter(item => item.getAttribute(attribute) !== dragId)
+        .filter(item => !dragIds.includes(item.getAttribute(attribute) ?? ''))
 
     for (let i = 0; i < items.length; i++) {
         const rect = items[i].getBoundingClientRect()

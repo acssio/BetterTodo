@@ -186,7 +186,7 @@ export class SettingsDialog extends React.Component<SettingsDialogProps, Setting
         const dragId = this.state.dragLevelId
         if (dragId === null) return
         event.preventDefault()
-        const index = computeDropIndex(event.currentTarget, event.clientY, dragId, 'data-level-id')
+        const index = computeDropIndex(event.currentTarget, event.clientY, [dragId], 'data-level-id')
         if (index !== this.state.dropIndex) this.setState({ dropIndex: index })
     }
 

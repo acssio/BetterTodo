@@ -1,17 +1,23 @@
 import * as React from 'react'
-import { Check, StickyNote } from 'lucide-react'
+import { Check, PanelRightOpen, StickyNote } from 'lucide-react'
 import type { Task, UrgencyLevel } from '../api/types'
 import { ListIcon } from './ListIcon'
 import { DueDate, UrgencyPill } from './TaskCard'
+import { caretOffsetAt } from '../utils/caret'
+import { TitleEditor } from './TitleEditor'
 import './TaskRow.css'
 
 interface TaskRowProps {
     task: Task
     urgency: UrgencyLevel | undefined
-    selected: boolean
+    opened: boolean   // Son overlay est ouvert
+    selected: boolean // Fait partie de la sélection (Cmd+clic)
     dragging: boolean
     onToggle: (task: Task) => void
     onOpen: (task: Task, anchor: DOMRect) => void
+    onRename: (task: Task, title: string) => void
+    onToggleSelection: (task: Task) => void
+    onStartEditing: (task: Task) => void
     onDragStart: (task: Task) => void
     onDragEnd: () => void
     listBadge?: { name: string, color: string, icon: string } // Listes intelligentes : liste d'origine
@@ -19,25 +25,55 @@ interface TaskRowProps {
     leaving?: boolean  // Tâche cochée qui va disparaître (courte animation)
 }
 
+class TaskRowState {
+    editing: boolean = false     // Titre en cours de modification
+    caret: number | null = null  // Où placer le curseur en commençant
+}
+
 /**
  * Une tâche dans la vue sections : une ligne avec, de gauche à droite,
  * case à cocher, titre, note, puis les colonnes tags / échéance / urgence.
- * Même comportement que TaskCard (clic → overlay, case → cocher, glissable).
+ * Même comportement que TaskCard : clic → titre sur place, Cmd+clic → sélection,
+ * bouton au survol → overlay, case → cocher, glissable.
  */
-export class TaskRow extends React.Component<TaskRowProps> {
+export class TaskRow extends React.Component<TaskRowProps, TaskRowState> {
+    state = new TaskRowState()
+    private titleRef = React.createRef<HTMLSpanElement>()
+
     onClick = (event: React.MouseEvent<HTMLDivElement>): void => {
-        this.props.onOpen(this.props.task, event.currentTarget.getBoundingClientRect())
+        if (this.state.editing) return
+        if (event.metaKey || event.ctrlKey) {
+            this.props.onToggleSelection(this.props.task)
+            return
+        }
+        this.props.onStartEditing(this.props.task)
+        this.setState({ editing: true, caret: caretOffsetAt(this.titleRef.current, event.clientX, event.clientY) })
     }
 
     onKeyDown = (event: React.KeyboardEvent<HTMLDivElement>): void => {
-        if (event.key === 'Enter') {
+        if (event.key === 'Enter' && !this.state.editing) {
             this.props.onOpen(this.props.task, event.currentTarget.getBoundingClientRect())
         }
     }
 
+    onOpenClick = (event: React.MouseEvent<HTMLButtonElement>): void => {
+        event.stopPropagation() // Ne pas commencer à modifier le titre
+        const row = event.currentTarget.closest('.TaskRow')
+        if (row) this.props.onOpen(this.props.task, row.getBoundingClientRect())
+    }
+
     onCheckClick = (event: React.MouseEvent<HTMLButtonElement>): void => {
-        event.stopPropagation() // Ne pas ouvrir l'overlay en même temps
+        event.stopPropagation() // Ne pas modifier le titre en même temps
         this.props.onToggle(this.props.task)
+    }
+
+    onTitleSave = (title: string): void => {
+        this.setState({ editing: false })
+        this.props.onRename(this.props.task, title)
+    }
+
+    onTitleCancel = (): void => {
+        this.setState({ editing: false })
     }
 
     onDragStart = (event: React.DragEvent<HTMLDivElement>): void => {
@@ -47,12 +83,15 @@ export class TaskRow extends React.Component<TaskRowProps> {
     }
 
     render(): React.ReactNode {
-        const { task, urgency, selected, dragging } = this.props
+        const { task, urgency, opened, selected, dragging } = this.props
+        const { editing } = this.state
 
         const classes = ['TaskRow']
         if (task.done) classes.push('done')
+        if (opened) classes.push('opened')
         if (selected) classes.push('selected')
         if (dragging) classes.push('dragging')
+        if (editing) classes.push('editing')
         if (this.props.leaving) classes.push('leaving')
 
         return (
@@ -61,7 +100,7 @@ export class TaskRow extends React.Component<TaskRowProps> {
                 data-task-id={task.id}
                 role="button"
                 tabIndex={0}
-                draggable={this.props.canDrag ?? true}
+                draggable={(this.props.canDrag ?? true) && !editing}
                 onClick={this.onClick}
                 onKeyDown={this.onKeyDown}
                 onDragStart={this.onDragStart}
@@ -74,7 +113,9 @@ export class TaskRow extends React.Component<TaskRowProps> {
                 >
                     {task.done && <Check size={10} color="#FFFFFF" strokeWidth={3.5} />}
                 </button>
-                <span className="row-title">{task.title}</span>
+                {editing
+                    ? <TitleEditor value={task.title} caret={this.state.caret} multiline={false} onSave={this.onTitleSave} onCancel={this.onTitleCancel} />
+                    : <span className="row-title" ref={this.titleRef}>{task.title}</span>}
                 {task.notes !== '' && <span className="card-note" title={task.notes}><StickyNote size={12} /></span>}
                 {this.props.listBadge && (
                     <span className="row-list" title={`Liste « ${this.props.listBadge.name} »`}>
@@ -93,6 +134,9 @@ export class TaskRow extends React.Component<TaskRowProps> {
                 <span className="row-urgency">
                     {urgency && <UrgencyPill urgency={urgency} />}
                 </span>
+                <button className="task-open" onClick={this.onOpenClick} title="Ouvrir le détail" aria-label="Ouvrir le détail">
+                    <PanelRightOpen size={14} />
+                </button>
             </div>
         )
     }
