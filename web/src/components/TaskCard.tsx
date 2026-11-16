@@ -3,6 +3,7 @@ import { Calendar, Check, PanelRightOpen, StickyNote } from 'lucide-react'
 import type { Task, UrgencyLevel } from '../api/types'
 import { formatDueDate, isDueOrLate } from '../utils/dates'
 import { caretOffsetAt } from '../utils/caret'
+import { LongPress } from '../utils/longPress'
 import { TitleEditor } from './TitleEditor'
 import './TaskCard.css'
 
@@ -20,6 +21,7 @@ interface TaskCardProps {
     onDragStart: (task: Task) => void
     onDragEnd: () => void
     tapToOpen?: boolean // Mode mobile : toucher la carte ouvre l'overlay (pas de titre sur place ni de glisser)
+    selecting?: boolean // Mode mobile, sélection en cours : toucher = sélectionner / désélectionner
 }
 
 class TaskCardState {
@@ -33,15 +35,27 @@ class TaskCardState {
  *   Cmd+clic / Ctrl+clic      → ajouter à la sélection ou l'en retirer
  *   bouton au survol, Entrée  → overlay d'édition
  *   case                      → cocher / décocher
+ * En mode mobile (tapToOpen) : toucher → overlay, appui long → sélection, et pendant
+ * une sélection (selecting) toucher ajoute / retire de la sélection.
  * La carte peut être glissée (API glisser-déposer native du navigateur), sauf pendant la modification.
  */
 export class TaskCard extends React.Component<TaskCardProps, TaskCardState> {
     state = new TaskCardState()
     private titleRef = React.createRef<HTMLSpanElement>()
+    // Mode mobile : appui long → sélection (utils/longPress.ts)
+    private longPress = new LongPress(() => {
+        navigator.vibrate?.(15) // Petite vibration sur Android (l'iPhone ne la permet pas)
+        this.props.onToggleSelection(this.props.task)
+    })
+
+    componentWillUnmount(): void {
+        this.longPress.cancel()
+    }
 
     onClick = (event: React.MouseEvent<HTMLDivElement>): void => {
         if (this.state.editing) return
-        if (event.metaKey || event.ctrlKey) {
+        if (this.longPress.consumeClick()) return // Ce clic termine un appui long : déjà traité
+        if (event.metaKey || event.ctrlKey || this.props.selecting) {
             this.props.onToggleSelection(this.props.task)
             return
         }
@@ -67,7 +81,12 @@ export class TaskCard extends React.Component<TaskCardProps, TaskCardState> {
 
     onCheckClick = (event: React.MouseEvent<HTMLButtonElement>): void => {
         event.stopPropagation() // Ne pas modifier le titre en même temps
-        this.props.onToggle(this.props.task)
+        if (this.longPress.consumeClick()) return
+        if (this.props.selecting) {
+            this.props.onToggleSelection(this.props.task) // En sélection, toute la tâche sert à sélectionner
+        } else {
+            this.props.onToggle(this.props.task)
+        }
     }
 
     onTitleSave = (title: string): void => {
@@ -77,6 +96,25 @@ export class TaskCard extends React.Component<TaskCardProps, TaskCardState> {
 
     onTitleCancel = (): void => {
         this.setState({ editing: false })
+    }
+
+    // --- Appui long (mode mobile) -----------------------------------------------
+
+    onPointerDown = (event: React.PointerEvent<HTMLDivElement>): void => {
+        if (this.props.tapToOpen && event.isPrimary) this.longPress.down(event.clientX, event.clientY)
+    }
+
+    onPointerMove = (event: React.PointerEvent<HTMLDivElement>): void => {
+        this.longPress.move(event.clientX, event.clientY)
+    }
+
+    onPointerUp = (): void => {
+        this.longPress.up() // Aussi sur pointercancel : le navigateur a commencé à faire défiler
+    }
+
+    /** Android ouvre un menu sur un appui long : pas sur une tâche. */
+    onContextMenu = (event: React.MouseEvent<HTMLDivElement>): void => {
+        if (this.props.tapToOpen) event.preventDefault()
     }
 
     onDragStart = (event: React.DragEvent<HTMLDivElement>): void => {
@@ -108,6 +146,11 @@ export class TaskCard extends React.Component<TaskCardProps, TaskCardState> {
                 onKeyDown={this.onKeyDown}
                 onDragStart={this.onDragStart}
                 onDragEnd={this.props.onDragEnd}
+                onPointerDown={this.onPointerDown}
+                onPointerMove={this.onPointerMove}
+                onPointerUp={this.onPointerUp}
+                onPointerCancel={this.onPointerUp}
+                onContextMenu={this.onContextMenu}
             >
                 <div className="card-top">
                     <button

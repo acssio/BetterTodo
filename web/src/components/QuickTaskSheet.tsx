@@ -1,10 +1,11 @@
 import * as React from 'react'
-import { CalendarDays, ChevronDown, Layers, List, X } from 'lucide-react'
+import { CalendarDays, X } from 'lucide-react'
 import type { Folder, Group, TodoList } from '../api/types'
 import { formatDueDate, todayIso, tomorrowIso } from '../utils/dates'
 import { KeyboardListener } from '../utils/mobileLayout'
 import { DismissListener } from '../utils/popover'
-import { chooseGroup, chooseList, readQuickTaskMemory, writeQuickTaskMemory, type QuickTaskMemory } from '../utils/quickTask'
+import { chooseList, readQuickTaskMemory, writeQuickTaskMemory, type QuickTaskMemory } from '../utils/quickTask'
+import { ListGroupPicker, type PickedPlace } from './ListGroupPicker'
 import './QuickTaskSheet.css'
 
 interface QuickTaskSheetProps {
@@ -18,19 +19,16 @@ interface QuickTaskSheetProps {
 
 class QuickTaskSheetState {
     title: string = ''
-    listId: string | null = null
-    groupId: string | null = null
-    groups: Group[] = []              // Groupes de la liste choisie
-    loadingGroups: boolean = false
+    place: PickedPlace | null = null    // Liste et groupe choisis (null pendant le chargement)
     dueDate: string | null = todayIso() // « Aujourd'hui » proposé par défaut
-    busy: boolean = false             // Création en cours : évite un double envoi
-    keyboard: number = 0              // Hauteur cachée par le clavier du téléphone
+    busy: boolean = false               // Création en cours : évite un double envoi
+    keyboard: number = 0                // Hauteur cachée par le clavier du téléphone
 }
 
 /**
  * Quick task : créer une tâche depuis l'accueil mobile, sans ouvrir de liste.
- * Panneau du bas avec le titre, la liste et le groupe (préremplis avec ceux de la
- * dernière Quick task, voir utils/quickTask.ts) et l'échéance.
+ * Panneau du bas avec le titre, la liste et le groupe (ListGroupPicker, préremplis avec
+ * ceux de la dernière Quick task, voir utils/quickTask.ts) et l'échéance.
  *
  *   Entrée ou « Créer la tâche » → création, mémoire mise à jour, panneau fermé
  *   Échap, la croix ou toucher le fond → fermé sans rien créer
@@ -45,13 +43,12 @@ export class QuickTaskSheet extends React.Component<QuickTaskSheetProps, QuickTa
 
     constructor(props: QuickTaskSheetProps) {
         super(props)
-        this.state = { ...new QuickTaskSheetState(), listId: chooseList(this.memory?.listId ?? null, props.lists) }
+        this.state = new QuickTaskSheetState()
     }
 
     componentDidMount(): void {
         this.dismiss.start()
         this.keyboard.start()
-        if (this.state.listId) void this.loadGroups(this.state.listId)
     }
 
     componentWillUnmount(): void {
@@ -59,31 +56,12 @@ export class QuickTaskSheet extends React.Component<QuickTaskSheetProps, QuickTa
         this.keyboard.stop()
     }
 
-    /** Charge les groupes d'une liste, puis choisit le groupe retenu (ou le premier). */
-    private async loadGroups(listId: string): Promise<void> {
-        this.setState({ loadingGroups: true })
-        const groups = await this.props.onLoadGroups(listId)
-        // Fermé entre-temps, ou une autre liste a été choisie pendant le chargement : on ignore
-        if (!this.rootRef.current) return
-        this.setState(state => (
-            state.listId === listId
-                ? { groups, groupId: chooseGroup(this.memory?.groupId ?? null, groups), loadingGroups: false }
-                : null
-        ))
-    }
-
     onTitleChanged = (event: React.ChangeEvent<HTMLInputElement>): void => {
         this.setState({ title: event.target.value })
     }
 
-    onListChanged = (event: React.ChangeEvent<HTMLSelectElement>): void => {
-        const listId = event.target.value
-        this.setState({ listId, groups: [], groupId: null })
-        void this.loadGroups(listId)
-    }
-
-    onGroupChanged = (event: React.ChangeEvent<HTMLSelectElement>): void => {
-        this.setState({ groupId: event.target.value })
+    onPlaceChanged = (place: PickedPlace | null): void => {
+        this.setState({ place })
     }
 
     onDateChanged = (event: React.ChangeEvent<HTMLInputElement>): void => {
@@ -92,33 +70,27 @@ export class QuickTaskSheet extends React.Component<QuickTaskSheetProps, QuickTa
 
     onSubmit = async (event: React.FormEvent<HTMLFormElement>): Promise<void> => {
         event.preventDefault()
-        const { title, listId, groupId, dueDate, busy } = this.state
+        const { title, place, dueDate, busy } = this.state
         const trimmed = title.trim()
-        if (trimmed === '' || !listId || !groupId || busy) return
+        if (trimmed === '' || !place || busy) return
 
         this.setState({ busy: true })
-        const ok = await this.props.onCreate(groupId, trimmed, dueDate, this.whereLabel())
+        const ok = await this.props.onCreate(place.groupId, trimmed, dueDate, place.where)
         if (ok) {
-            writeQuickTaskMemory({ listId, groupId })
+            writeQuickTaskMemory({ listId: place.listId, groupId: place.groupId })
             this.props.onClose()
         } else if (this.rootRef.current) {
             this.setState({ busy: false }) // Erreur affichée par Workspace : on peut réessayer
         }
     }
 
-    /** « Travail › À faire » */
-    private whereLabel(): string {
-        const list = this.props.lists.find(l => l.id === this.state.listId)
-        const group = this.state.groups.find(g => g.id === this.state.groupId)
-        return `${list?.name ?? ''} › ${group?.name ?? ''}`
-    }
-
     render(): React.ReactNode {
-        const { title, listId, groupId, groups, loadingGroups, dueDate, busy } = this.state
+        const { title, place, dueDate, busy } = this.state
         const today = todayIso()
         const tomorrow = tomorrowIso()
         const otherDate = dueDate !== null && dueDate !== today && dueDate !== tomorrow
-        const canCreate = title.trim() !== '' && groupId !== null && !busy
+        const canCreate = title.trim() !== '' && place !== null && !busy
+        const fromMemory = this.memory !== null && place?.listId === this.memory.listId && place.groupId === this.memory.groupId
 
         return (
             <>
@@ -144,31 +116,15 @@ export class QuickTaskSheet extends React.Component<QuickTaskSheetProps, QuickTa
                         onChange={this.onTitleChanged}
                     />
 
-                    <div className="qt-row">
-                        <label className="qt-field">
-                            <span className="qt-label"><List size={15} />Liste</span>
-                            <span className="qt-select-box">
-                                <select value={listId ?? ''} onChange={this.onListChanged}>
-                                    {this.renderListOptions()}
-                                </select>
-                                <ChevronDown size={16} />
-                            </span>
-                        </label>
-                        <label className="qt-field">
-                            <span className="qt-label"><Layers size={15} />Groupe</span>
-                            <span className="qt-select-box">
-                                <select value={groupId ?? ''} onChange={this.onGroupChanged} disabled={loadingGroups || groups.length === 0}>
-                                    {loadingGroups && <option value="">Chargement…</option>}
-                                    {!loadingGroups && groups.length === 0 && <option value="">Aucun groupe</option>}
-                                    {groups.map(group => <option key={group.id} value={group.id}>{group.name}</option>)}
-                                </select>
-                                <ChevronDown size={16} />
-                            </span>
-                        </label>
-                    </div>
-                    {this.memory && listId === this.memory.listId && groupId === this.memory.groupId && (
-                        <span className="qt-hint">Dernier endroit utilisé</span>
-                    )}
+                    <ListGroupPicker
+                        folders={this.props.folders}
+                        lists={this.props.lists}
+                        initialListId={chooseList(this.memory?.listId ?? null, this.props.lists)}
+                        preferredGroupId={this.memory?.groupId ?? null}
+                        onLoadGroups={this.props.onLoadGroups}
+                        onChange={this.onPlaceChanged}
+                    />
+                    {fromMemory && <span className="qt-hint">Dernier endroit utilisé</span>}
 
                     <div className="qt-field">
                         <span className="qt-label"><CalendarDays size={15} />Échéance</span>
@@ -201,27 +157,6 @@ export class QuickTaskSheet extends React.Component<QuickTaskSheetProps, QuickTa
                         {busy ? 'Création…' : 'Créer la tâche'}
                     </button>
                 </form>
-            </>
-        )
-    }
-
-    /** Listes hors groupe d'abord, puis une rubrique par groupe de listes (comme sur l'accueil). */
-    private renderListOptions(): React.ReactNode {
-        const { folders, lists } = this.props
-        return (
-            <>
-                {lists.filter(list => list.folder_id === null).map(list => (
-                    <option key={list.id} value={list.id}>{list.name}</option>
-                ))}
-                {folders.map(folder => {
-                    const folderLists = lists.filter(list => list.folder_id === folder.id)
-                    if (folderLists.length === 0) return null
-                    return (
-                        <optgroup key={folder.id} label={folder.name}>
-                            {folderLists.map(list => <option key={list.id} value={list.id}>{list.name}</option>)}
-                        </optgroup>
-                    )
-                })}
             </>
         )
     }

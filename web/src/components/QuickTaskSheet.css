@@ -49,17 +49,6 @@
     outline: none;
 }
 
-/* Liste et groupe côte à côte */
-.qt-row {
-    display: flex;
-    gap: 12px;
-}
-
-.qt-row .qt-field {
-    flex: 1;
-    min-width: 0;
-}
-
 .qt-field {
     display: flex;
     flex-direction: column;
@@ -77,41 +66,7 @@
     color: var(--muted);
 }
 
-/* Menu déroulant natif habillé : la flèche est une icône par-dessus */
-.qt-select-box {
-    position: relative;
-    display: flex;
-    color: var(--muted);
-}
-
-.qt-select-box select {
-    width: 100%;
-    height: 44px;
-    padding: 0 34px 0 12px;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-md);
-    background: var(--sidebar);
-    color: var(--text);
-    font-weight: 600;
-    text-overflow: ellipsis;
-    appearance: none;
-    outline: none;
-}
-
-.qt-select-box select:focus {
-    border-color: var(--accent);
-}
-
-.qt-select-box select:disabled {
-    color: var(--faint);
-}
-
-.qt-select-box svg {
-    position: absolute;
-    right: 12px;
-    top: 14px;
-    pointer-events: none; /* Le toucher va au menu en dessous */
-}
+/* Liste et groupe : voir ListGroupPicker.css */
 
 .qt-hint {
     margin-top: -8px;

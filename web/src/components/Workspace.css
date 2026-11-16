@@ -329,3 +329,15 @@
     max-width: none;
     justify-content: space-between;
 }
+
+/* Sélection (appui long) : SelectionHeader remplace l'en-tête de la liste */
+.Workspace.mobile.selecting .ListHeader {
+    display: none;
+}
+
+/* Appui long sur une tâche : pas de loupe ni de menu « Copier / Partager » d'iOS */
+.Workspace.mobile .TaskCard,
+.Workspace.mobile .TaskRow {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+}

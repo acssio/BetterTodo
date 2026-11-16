@@ -19,7 +19,10 @@ import { Board } from './Board'
 import { confirmDialog } from './confirm'
 import { ListEditPopover } from './ListEditPopover'
 import { ListHeader } from './ListHeader'
+import { type PickedPlace } from './ListGroupPicker'
 import { MobileHome } from './MobileHome'
+import { SelectionActions, SelectionHeader } from './MobileSelection'
+import { MoveTasksSheet } from './MoveTasksSheet'
 import { QuickTaskSheet } from './QuickTaskSheet'
 import { SectionsView } from './SectionsView'
 import { SettingsDialog } from './SettingsDialog'
@@ -112,6 +115,7 @@ class WorkspaceState {
     mobile: boolean = detectMobileLayout()
     mobileScreen: MobileScreen = 'home'
     quickTaskOpen: boolean = false // Panneau « Quick task » (accueil mobile)
+    moveOpen: boolean = false      // Panneau « Déplacer » la sélection (mode mobile)
 }
 
 /**
@@ -367,6 +371,73 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
             this.handleError(error)
             return false
         }
+    }
+
+    // --- Sélection en mode mobile : « Tout » et « Déplacer » ------------------
+
+    /** Tâches affichées de la liste ouverte (sans les tâches faites masquées). */
+    selectAllVisible = (): void => {
+        const pane = this.state.panes[this.state.activePane]
+        if (!pane) return
+        let ids: string[] = []
+        if (pane.board) {
+            const board = pane.board.list.show_done ? pane.board : hideDoneTasks(pane.board)
+            ids = board.groups.flatMap(group => group.tasks.map(task => task.id))
+        } else if (pane.due) {
+            ids = pane.due.map(task => task.id)
+        }
+        this.setState({ selectedTaskIds: ids })
+    }
+
+    /** Une tâche sélectionnée, cherchée dans les boards puis dans les listes intelligentes. */
+    private findAnyTask(taskId: string): Task | DueTask | undefined {
+        const board = boardWithTask(this.boards(), taskId)
+        if (board) return findTask(board, taskId)
+        return this.state.panes.flatMap(pane => pane.due ?? []).find(task => task.id === taskId)
+    }
+
+    /** Sélection dans l'ordre d'affichage : boards d'abord, puis listes intelligentes. */
+    private orderedSelection(): string[] {
+        const selected = this.state.selectedTaskIds
+        const inBoards = this.selectionInOrder(selected)
+        return [...inBoards, ...selected.filter(id => !inBoards.includes(id))]
+    }
+
+    /** Destination proposée par « Déplacer » : la liste et le groupe de la première tâche sélectionnée. */
+    private firstSelectedPlace(): { listId: string, groupId: string } | null {
+        const taskId = this.orderedSelection()[0]
+        if (!taskId) return null
+        const board = boardWithTask(this.boards(), taskId)
+        const task = this.findAnyTask(taskId)
+        if (!task) return null
+        const listId = board ? board.list.id : (task as DueTask).list.id
+        return { listId, groupId: task.group_id }
+    }
+
+    /**
+     * Déplace la sélection à la fin d'un groupe (même d'une autre liste), dans l'ordre d'affichage.
+     * Comme le glisser de plusieurs tâches : un PATCH par tâche, l'un après l'autre.
+     */
+    moveSelection = async (place: PickedPlace): Promise<void> => {
+        const tasks = this.orderedSelection()
+            .map(id => this.findAnyTask(id))
+            .filter(task => task !== undefined)
+            .filter(task => task.group_id !== place.groupId) // Déjà dans ce groupe : on ne touche à rien
+
+        this.setState({ moveOpen: false, selectedTaskIds: [] })
+        this.updateBoards(board => tasks.reduce((b, task) => placeTask(b, task, place.groupId, Number.MAX_SAFE_INTEGER), board))
+
+        try {
+            for (const task of tasks) {
+                await api.updateTask(task.id, { group_id: place.groupId })
+            }
+            const count = tasks.length
+            if (count > 0) this.showNotice(`${count > 1 ? `${count} tâches déplacées` : 'Tâche déplacée'} vers « ${place.where} »`)
+        } catch (error) {
+            this.handleError(error)
+        }
+        void this.reloadBoard()  // Positions renumérotées par le serveur
+        void this.refreshLists() // Compteurs, listes intelligentes (liste d'origine affichée)
     }
 
     closePane = (index: number): void => {
@@ -979,12 +1050,15 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
      * Mêmes données et mêmes actions qu'en mode bureau, seul l'affichage change.
      */
     private renderMobile(): React.ReactNode {
-        const { panes, activePane, error, mobileScreen } = this.state
+        const { panes, activePane, error, mobileScreen, selectedTaskIds } = this.state
         const paneIndex = Math.min(activePane, panes.length - 1)
         const showList = mobileScreen === 'list' && paneIndex >= 0
+        // Sélection (appui long) : l'en-tête de la liste est remplacé, une barre d'actions apparaît en bas
+        const selecting = showList && selectedTaskIds.length > 0
+        const movePlace = this.state.moveOpen && selecting ? this.firstSelectedPlace() : null
 
         return (
-            <div className="Workspace mobile">
+            <div className={selecting ? 'Workspace mobile selecting' : 'Workspace mobile'}>
                 {error && (
                     <div className="workspace-error">
                         {error}
@@ -994,7 +1068,17 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
 
                 {showList ? (
                     <main className="workspace-main">
+                        {selecting && (
+                            <SelectionHeader count={selectedTaskIds.length} onCancel={this.clearSelection} onSelectAll={this.selectAllVisible} />
+                        )}
                         <div className="panes">{this.renderPane(paneIndex)}</div>
+                        {selecting && (
+                            <SelectionActions
+                                canMove={this.state.lists.length > 0}
+                                onMove={() => this.setState({ moveOpen: true })}
+                                onDelete={() => void this.deleteSelection()}
+                            />
+                        )}
                     </main>
                 ) : (
                     <MobileHome
@@ -1022,6 +1106,18 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
                         onLoadGroups={this.loadGroups}
                         onCreate={this.createQuickTask}
                         onClose={this.onCloseQuickTask}
+                    />
+                )}
+                {movePlace && (
+                    <MoveTasksSheet
+                        count={selectedTaskIds.length}
+                        folders={this.state.folders}
+                        lists={this.state.lists}
+                        initialListId={movePlace.listId}
+                        initialGroupId={movePlace.groupId}
+                        onLoadGroups={this.loadGroups}
+                        onMove={this.moveSelection}
+                        onClose={() => this.setState({ moveOpen: false })}
                     />
                 )}
                 {this.renderOverlays()}
@@ -1247,7 +1343,7 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
     /** Barre en bas de l'écran tant que des tâches sont sélectionnées. */
     private renderSelectionBar(): React.ReactNode {
         const count = this.state.selectedTaskIds.length
-        if (count === 0 || this.state.drag) return null
+        if (count === 0 || this.state.drag || this.state.mobile) return null // Mobile : SelectionActions (renderMobile)
         // Dans une liste intelligente, on ne glisse pas : pas d'astuce
         const canDrag = this.state.selectedTaskIds.some(id => boardWithTask(this.boards(), id) !== undefined)
 
