@@ -93,14 +93,49 @@ data class UrgencyLevel(
     val rank: Int, // 0 = le moins urgent
 )
 
+/** La liste d'origine d'une tâche d'Aujourd'hui / Planifié. */
+@Serializable
+data class ListRef(
+    val id: String,
+    val name: String,
+    val color: String,
+    val icon: String,
+)
+
+/**
+ * Ce que GET /tasks/due ajoute à chaque tâche : sa liste et le nom de son groupe.
+ * Lu séparément du même JSON que Task (voir ApiClient.dueTasks), pour ne pas recopier tous les champs.
+ */
+@Serializable
+data class DueInfo(
+    val list: ListRef,
+    @SerialName("group_name") val groupName: String,
+)
+
+/** Une tâche d'Aujourd'hui / Planifié, avec sa liste et son groupe d'origine. */
+data class DueTask(val task: Task, val list: ListRef, val groupName: String)
+
+/** GET /tasks/due/counts : compteurs des tuiles de l'accueil. */
+@Serializable
+data class DueCounts(
+    val today: Int = 0,     // Échéance aujourd'hui ou en retard
+    val scheduled: Int = 0, // Toutes les tâches avec une échéance
+)
+
 // --- Corps de requête et petites réponses ----------------------------------------
 
 @Serializable
 data class LoginRequest(val email: String, val password: String)
 
-/** POST /groups/{id}/tasks : seul le titre (le reste se règle ensuite dans le panneau). */
+/**
+ * POST /groups/{id}/tasks : le titre, et l'échéance pour la Quick task.
+ * dueDate à null n'est pas envoyé (Json n'écrit pas les valeurs par défaut).
+ */
 @Serializable
-data class CreateTaskRequest(val title: String)
+data class CreateTaskRequest(
+    val title: String,
+    @SerialName("due_date") val dueDate: String? = null,
+)
 
 @Serializable
 data class SetupStatus(@SerialName("needs_setup") val needsSetup: Boolean)

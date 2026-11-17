@@ -30,6 +30,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.composables.icons.lucide.R // Icônes de la bibliothèque icons-lucide-android
+import io.github.acssio.bettertodo.api.ListRef
 import io.github.acssio.bettertodo.api.Task
 import io.github.acssio.bettertodo.api.UrgencyLevel
 import io.github.acssio.bettertodo.ui.theme.Palette
@@ -42,6 +43,7 @@ import io.github.acssio.bettertodo.ui.theme.Palette
  *
  * @param card true = carte avec bord (vue colonnes), false = ligne (vue sections)
  * @param urgency le niveau d'urgence de la tâche, ou null
+ * @param origin la liste d'origine, affichée dans Aujourd'hui / Planifié (null dans une liste)
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -52,6 +54,7 @@ fun TaskItem(
     onToggleDone: () -> Unit,
     onOpen: () -> Unit,
     modifier: Modifier = Modifier,
+    origin: ListRef? = null,
 ) {
     val shape = RoundedCornerShape(10.dp)
     val frame = if (card) {
@@ -86,8 +89,9 @@ fun TaskItem(
                 }
             }
 
-            if (task.tags.isNotEmpty() || task.dueDate != null || urgency != null) {
+            if (origin != null || task.tags.isNotEmpty() || task.dueDate != null || urgency != null) {
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    origin?.let { ListOrigin(it) }
                     task.tags.forEach { tag -> TagChip(tag) }
                     task.dueDate?.let { DueDate(it, task.done) }
                     urgency?.let { UrgencyPill(it) }
@@ -117,6 +121,16 @@ fun CheckCircle(done: Boolean, onToggle: () -> Unit) {
         } else {
             Box(circle.border(1.5.dp, Palette.checkBorder, CircleShape))
         }
+    }
+}
+
+/** Liste d'origine : petite icône dans sa couleur et nom (Aujourd'hui / Planifié). */
+@Composable
+private fun ListOrigin(list: ListRef) {
+    val color = ListIcons.color(list.color)
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        Icon(painterResource(ListIcons.drawable(list.icon)), contentDescription = null, tint = color, modifier = Modifier.size(12.dp))
+        Text(list.name, fontSize = 12.sp, color = Palette.muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 

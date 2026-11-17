@@ -1,6 +1,17 @@
 package io.github.acssio.bettertodo.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.border
+import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.FabPosition
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import io.github.acssio.bettertodo.api.DueCounts
+import io.github.acssio.bettertodo.data.QuickTaskMemory
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -63,19 +74,22 @@ enum class LoadState { Loading, Ready, Failed }
 /**
  * Page affichée une fois connecté (comme mobileScreen sur le site) :
  *
- *   Home ──(toucher une liste)──→ OpenList ──(‹ ou bouton retour)──→ Home (rechargé)
+ *   Home ──(toucher une liste)───────────→ OpenList  ──(‹ ou bouton retour)──→ Home (rechargé)
+ *        ──(toucher Aujourd'hui/Planifié)→ OpenSmart ──(‹ ou bouton retour)──→ Home (rechargé)
  */
 sealed class HomePage {
     data object Home : HomePage()
     data class OpenList(val board: BoardModel) : HomePage()
+    data class OpenSmart(val smart: SmartModel) : HomePage()
 }
 
 /**
- * Données de l'accueil : groupes de listes et listes, et la page affichée.
- * Seuls AppViewModel et HomeViewModel (avec ses BoardModel) parlent à l'API,
- * comme App et Workspace sur le site.
+ * Données de l'accueil : compteurs d'Aujourd'hui / Planifié, groupes de listes et listes,
+ * la page affichée et la Quick task.
+ * Seuls AppViewModel et HomeViewModel (avec ses BoardModel, SmartModel et QuickTaskModel)
+ * parlent à l'API, comme App et Workspace sur le site.
  */
-class HomeViewModel(private val api: ApiClient) : ViewModel() {
+class HomeViewModel(private val api: ApiClient, private val quickTaskMemory: QuickTaskMemory) : ViewModel() {
     var page by mutableStateOf<HomePage>(HomePage.Home)
         private set
 
@@ -91,6 +105,16 @@ class HomeViewModel(private val api: ApiClient) : ViewModel() {
     var folders by mutableStateOf<List<Folder>>(emptyList())
         private set
     var lists by mutableStateOf<List<TodoList>>(emptyList())
+        private set
+    var dueCounts by mutableStateOf(DueCounts())
+        private set
+
+    /** Panneau Quick task ouvert (null = fermé). */
+    var quickTask by mutableStateOf<QuickTaskModel?>(null)
+        private set
+
+    /** Message court affiché en bas (Snackbar), ex. après une Quick task. */
+    var message by mutableStateOf<String?>(null)
         private set
 
     /** Groupes de listes repliés. Pour l'instant seulement sur ce téléphone (pas envoyé au serveur). */
@@ -122,6 +146,38 @@ class HomeViewModel(private val api: ApiClient) : ViewModel() {
         page = HomePage.OpenList(BoardModel(api, list, viewModelScope, onUnauthorized = { sessionExpired = true }))
     }
 
+    /** Toucher « Aujourd'hui » ou « Planifié ». */
+    fun openSmart(kind: SmartKind) {
+        page = HomePage.OpenSmart(SmartModel(api, kind, viewModelScope, onUnauthorized = { sessionExpired = true }))
+    }
+
+    /** Les listes dans l'ordre de l'accueil : hors groupe, puis groupe de listes par groupe de listes. */
+    val orderedLists: List<TodoList>
+        get() = lists.filter { it.folderId == null } + folders.flatMap { folder -> lists.filter { it.folderId == folder.id } }
+
+    fun openQuickTask() {
+        quickTask = QuickTaskModel(
+            api,
+            orderedLists,
+            quickTaskMemory,
+            viewModelScope,
+            onUnauthorized = { sessionExpired = true },
+            onCreated = { where ->
+                quickTask = null
+                message = "Tâche ajoutée dans $where"
+                fetch() // Compteurs à jour
+            },
+        )
+    }
+
+    fun closeQuickTask() {
+        quickTask = null
+    }
+
+    fun messageShown() {
+        message = null
+    }
+
     /** Retour à l'accueil : rechargé sans indicateur, pour mettre à jour les compteurs. */
     fun closeList() {
         page = HomePage.Home
@@ -131,14 +187,16 @@ class HomeViewModel(private val api: ApiClient) : ViewModel() {
     private fun fetch() {
         viewModelScope.launch {
             try {
-                // Les deux requêtes partent en même temps. coroutineScope est obligatoire :
+                // Les trois requêtes partent en même temps. coroutineScope est obligatoire :
                 // sans lui, une erreur dans un async remonte à launch sans passer par ce try (plantage)
-                val (newFolders, newLists) = coroutineScope {
+                val newFolders = coroutineScope {
                     val foldersCall = async { api.folders() }
                     val listsCall = async { api.lists() }
-                    foldersCall.await().sortedBy { it.position } to listsCall.await().sortedBy { it.position }
+                    val countsCall = async { api.dueCounts(DueDates.todayIso()) } // Date du jour du téléphone
+                    lists = listsCall.await().sortedBy { it.position }
+                    dueCounts = countsCall.await()
+                    foldersCall.await().sortedBy { it.position }
                 }
-                lists = newLists
                 if (state != LoadState.Ready) {
                     collapsedIds = newFolders.filter { it.collapsed }.map { it.id }.toSet() // Comme sur le site
                 }
@@ -175,7 +233,9 @@ fun HomeScreen(
     onLogout: () -> Unit,
     onSessionExpired: () -> Unit,
 ) {
-    val model: HomeViewModel = viewModel(key = sessionKey) { HomeViewModel(api) }
+    val context = LocalContext.current
+    val model: HomeViewModel = viewModel(key = sessionKey) { HomeViewModel(api, QuickTaskMemory(context)) }
+    val snackbar = remember { SnackbarHostState() }
 
     LaunchedEffect(model.sessionExpired) {
         if (model.sessionExpired) {
@@ -183,12 +243,27 @@ fun HomeScreen(
         }
     }
 
-    // Liste ouverte : son écran remplace l'accueil, et le bouton retour d'Android y ramène
-    val page = model.page
-    if (page is HomePage.OpenList) {
-        BackHandler(onBack = model::closeList)
-        ListScreen(page.board, onBack = model::closeList)
-        return
+    // Message court en bas de l'écran (Quick task créée)
+    LaunchedEffect(model.message) {
+        model.message?.let {
+            snackbar.showSnackbar(it)
+            model.messageShown()
+        }
+    }
+
+    // Liste ou liste intelligente ouverte : son écran remplace l'accueil, et le bouton retour d'Android y ramène
+    when (val page = model.page) {
+        is HomePage.OpenList -> {
+            BackHandler(onBack = model::closeList)
+            ListScreen(page.board, onBack = model::closeList)
+            return
+        }
+        is HomePage.OpenSmart -> {
+            BackHandler(onBack = model::closeList)
+            SmartScreen(page.smart, onBack = model::closeList)
+            return
+        }
+        HomePage.Home -> {}
     }
 
     Scaffold(
@@ -211,6 +286,23 @@ fun HomeScreen(
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Palette.background),
             )
         },
+        snackbarHost = { SnackbarHost(snackbar) },
+        floatingActionButton = {
+            // Bouton flottant centré en bas, seulement s'il y a une liste où ajouter
+            if (model.state == LoadState.Ready && model.lists.isNotEmpty()) {
+                ExtendedFloatingActionButton(
+                    onClick = model::openQuickTask,
+                    icon = { Icon(painterResource(R.drawable.lucide_ic_plus), contentDescription = null, modifier = Modifier.size(20.dp)) },
+                    text = { Text("Quick task", fontWeight = FontWeight.SemiBold) },
+                    containerColor = Palette.text,
+                    contentColor = Color.White,
+                    // Le texte du bouton n'arrivait pas aux services d'accessibilité (vu avec uiautomator) :
+                    // on le donne explicitement, pour TalkBack
+                    modifier = Modifier.semantics { contentDescription = "Quick task" },
+                )
+            }
+        },
+        floatingActionButtonPosition = FabPosition.Center,
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
             when (model.state) {
@@ -226,17 +318,29 @@ fun HomeScreen(
             }
         }
     }
+
+    model.quickTask?.let { quick ->
+        QuickTaskSheet(quick, onClose = model::closeQuickTask)
+    }
 }
 
 /** Le contenu défilant de l'accueil. */
 @Composable
 private fun HomeLists(model: HomeViewModel, user: User) {
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)) {
+    // En bas : de la place pour que le bouton Quick task ne cache pas la dernière liste
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 88.dp)) {
         if (user.mustChangePassword) {
             item { Notice("Ton mot de passe a été donné par l'administrateur : change-le depuis le site (Paramètres › Mot de passe).") }
         }
         if (model.error != null) {
             item { Notice(model.error ?: "") }
+        }
+
+        item {
+            Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                SmartTile(SmartKind.TODAY, model.dueCounts.today, Modifier.weight(1f), onClick = { model.openSmart(SmartKind.TODAY) })
+                SmartTile(SmartKind.SCHEDULED, model.dueCounts.scheduled, Modifier.weight(1f), onClick = { model.openSmart(SmartKind.SCHEDULED) })
+            }
         }
 
         item { SectionLabel("Listes") }
@@ -320,6 +424,27 @@ private fun ListRow(list: TodoList, onOpen: (TodoList) -> Unit) {
         if (list.openTasks > 0) {
             Text(list.openTasks.toString(), color = Palette.faint, fontSize = 13.sp)
         }
+    }
+}
+
+/** Tuile « Aujourd'hui » ou « Planifié » : icône, compteur, nom (comme les tuiles de MobileHome). */
+@Composable
+private fun SmartTile(kind: SmartKind, count: Int, modifier: Modifier, onClick: () -> Unit) {
+    val shape = RoundedCornerShape(12.dp)
+    Column(
+        modifier
+            .clip(shape)
+            .background(Palette.surface)
+            .border(1.dp, Palette.border, shape)
+            .clickable(onClick = onClick)
+            .padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            SmartIconBox(kind)
+            Text(count.toString(), fontSize = 22.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.End, modifier = Modifier.weight(1f))
+        }
+        Text(kind.title, fontWeight = FontWeight.SemiBold, color = Palette.muted)
     }
 }
 

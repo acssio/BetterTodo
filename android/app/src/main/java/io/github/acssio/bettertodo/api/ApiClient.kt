@@ -65,9 +65,12 @@ class ApiClient(private val serverUrl: String, private val token: String? = null
 
     // --- Tâches --------------------------------------------------------------
 
-    /** Crée une tâche à la fin du groupe. */
-    suspend fun createTask(groupId: String, title: String): Task {
-        val body = json.encodeToString(CreateTaskRequest(title))
+    /**
+     * Crée une tâche à la fin du groupe.
+     * @param dueDate "2026-11-18", ou null pour une tâche sans échéance
+     */
+    suspend fun createTask(groupId: String, title: String, dueDate: String? = null): Task {
+        val body = json.encodeToString(CreateTaskRequest(title, dueDate))
         return json.decodeFromString(send("POST", "/groups/$groupId/tasks", body))
     }
 
@@ -78,6 +81,25 @@ class ApiClient(private val serverUrl: String, private val token: String? = null
 
     suspend fun deleteTask(taskId: String) {
         send("DELETE", "/tasks/$taskId")
+    }
+
+    // --- Listes intelligentes (Aujourd'hui, Planifié) --------------------------
+
+    /**
+     * Tâches à faire avec une échéance, de toutes les listes, triées par date.
+     * @param until "AAAA-MM-JJ" : seulement jusqu'à cette date (Aujourd'hui), ou null pour toutes (Planifié)
+     */
+    suspend fun dueTasks(until: String?): List<DueTask> {
+        val text = send("GET", if (until != null) "/tasks/due?until=$until" else "/tasks/due")
+        // Le même JSON lu deux fois : les champs de Task, puis la liste et le groupe (ignoreUnknownKeys)
+        val tasks = json.decodeFromString<List<Task>>(text)
+        val infos = json.decodeFromString<List<DueInfo>>(text)
+        return tasks.zip(infos) { task, info -> DueTask(task, info.list, info.groupName) }
+    }
+
+    /** @param today date du jour du téléphone ("AAAA-MM-JJ") : c'est l'app qui connaît le fuseau horaire */
+    suspend fun dueCounts(today: String): DueCounts {
+        return json.decodeFromString(send("GET", "/tasks/due/counts?today=$today"))
     }
 
     // --- Paramètres ----------------------------------------------------------

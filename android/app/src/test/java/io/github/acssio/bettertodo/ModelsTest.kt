@@ -1,6 +1,7 @@
 package io.github.acssio.bettertodo
 
 import io.github.acssio.bettertodo.api.ApiClient
+import io.github.acssio.bettertodo.api.CreateTaskRequest
 import io.github.acssio.bettertodo.api.Session
 import io.github.acssio.bettertodo.api.TodoList
 import org.junit.Assert.assertEquals
@@ -34,5 +35,11 @@ class ModelsTest {
         val list = ApiClient.json.decodeFromString<List<TodoList>>(text).first()
         assertNull(list.folderId)
         assertEquals(3, list.openTasks)
+    }
+
+    @Test
+    fun creationSansEcheanceNEnvoiePasNull() {
+        assertEquals("""{"title":"Pain"}""", ApiClient.json.encodeToString(CreateTaskRequest("Pain")))
+        assertEquals("""{"title":"Pain","due_date":"2026-11-18"}""", ApiClient.json.encodeToString(CreateTaskRequest("Pain", "2026-11-18")))
     }
 }

@@ -19,15 +19,12 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.InputChip
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -50,7 +47,6 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.composables.icons.lucide.R // Icônes de la bibliothèque icons-lucide-android
@@ -62,7 +58,8 @@ import kotlinx.coroutines.delay
 private const val NOTES_SAVE_DELAY_MS = 800L
 
 /**
- * Panneau du bas pour modifier une tâche (comme TaskPopover en mode « sheet » sur le site mobile).
+ * Panneau du bas pour modifier une tâche (comme TaskPopover en mode « sheet » sur le site mobile),
+ * depuis une liste (BoardModel) ou Aujourd'hui / Planifié (SmartModel) : il ne connaît que TaskStore.
  * Chaque champ s'enregistre tout seul, il n'y a pas de bouton « Enregistrer » :
  *  - titre : à ↵, en quittant le champ, ou à la fermeture ;
  *  - notes : 0,8 s après la dernière frappe, et à la fermeture ;
@@ -72,7 +69,7 @@ private const val NOTES_SAVE_DELAY_MS = 800L
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-fun TaskSheet(model: BoardModel, task: Task, onClose: () -> Unit) {
+fun TaskSheet(model: TaskStore, task: Task, onClose: () -> Unit) {
     val current by rememberUpdatedState(task) // La tâche à jour, pour les enregistrements différés
     var title by rememberSaveable(task.id) { mutableStateOf(task.title) }
     var notes by rememberSaveable(task.id) { mutableStateOf(task.notes) }
@@ -145,7 +142,7 @@ fun TaskSheet(model: BoardModel, task: Task, onClose: () -> Unit) {
                 }
             }
 
-            Field("Échéance") { DueDateChips(task, onChange = { model.setDueDate(task, it) }) }
+            Field("Échéance") { DueDateChips(task.dueDate, onChange = { model.setDueDate(task, it) }) }
             Field("Groupe") { GroupPicker(model, task) }
             Field("Urgence") { UrgencyChips(model, task) }
             Field("Tags") { TagsEditor(model, task) }
@@ -197,30 +194,32 @@ private fun Field(label: String, content: @Composable () -> Unit) {
 
 /**
  * Aujourd'hui / Demain / Choisir… / Aucune. Une autre date s'affiche à la place de « Choisir… ».
+ * Aussi utilisé par la Quick task.
+ * @param dueDate la date actuelle ("AAAA-MM-JJ"), ou null
  * @param onChange reçoit "AAAA-MM-JJ", ou null pour enlever l'échéance
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-private fun DueDateChips(task: Task, onChange: (String?) -> Unit) {
+fun DueDateChips(dueDate: String?, onChange: (String?) -> Unit) {
     var picking by rememberSaveable { mutableStateOf(false) }
     val today = DueDates.todayIso()
     val tomorrow = DueDates.tomorrowIso()
-    val other = task.dueDate != null && task.dueDate != today && task.dueDate != tomorrow
+    val other = dueDate != null && dueDate != today && dueDate != tomorrow
 
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        FilterChip(task.dueDate == today, onClick = { onChange(today) }, label = { Text("Aujourd'hui") })
-        FilterChip(task.dueDate == tomorrow, onClick = { onChange(tomorrow) }, label = { Text("Demain") })
+        FilterChip(dueDate == today, onClick = { onChange(today) }, label = { Text("Aujourd'hui") })
+        FilterChip(dueDate == tomorrow, onClick = { onChange(tomorrow) }, label = { Text("Demain") })
         FilterChip(
             other,
             onClick = { picking = true },
-            label = { Text(if (other) DueDates.format(task.dueDate) else "Choisir…") },
+            label = { Text(if (other) DueDates.format(dueDate) else "Choisir…") },
             leadingIcon = { Icon(painterResource(R.drawable.lucide_ic_calendar), contentDescription = null, modifier = Modifier.size(16.dp)) },
         )
-        FilterChip(task.dueDate == null, onClick = { onChange(null) }, label = { Text("Aucune") })
+        FilterChip(dueDate == null, onClick = { onChange(null) }, label = { Text("Aucune") })
     }
 
     if (picking) {
-        val state = rememberDatePickerState(initialSelectedDateMillis = task.dueDate?.let { DueDates.toPickerMillis(it) })
+        val state = rememberDatePickerState(initialSelectedDateMillis = dueDate?.let { DueDates.toPickerMillis(it) })
         DatePickerDialog(
             onDismissRequest = { picking = false },
             confirmButton = {
@@ -236,36 +235,28 @@ private fun DueDateChips(task: Task, onChange: (String?) -> Unit) {
     }
 }
 
-/** Menu des groupes de la liste. Choisir un autre groupe y envoie la tâche, à la fin. */
+/**
+ * Menu des groupes de la liste : choisir un autre groupe y envoie la tâche, à la fin.
+ * Depuis Aujourd'hui / Planifié, on ne connaît pas les autres groupes : « Liste › Groupe » en lecture seule.
+ */
 @Composable
-private fun GroupPicker(model: BoardModel, task: Task) {
-    var open by rememberSaveable { mutableStateOf(false) }
-    val groups = model.board?.groups ?: emptyList()
-    val currentName = groups.firstOrNull { it.id == task.groupId }?.name ?: ""
-
-    Box {
-        OutlinedButton(onClick = { open = true }) {
-            Text(currentName, color = Palette.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Icon(painterResource(R.drawable.lucide_ic_chevron_down), contentDescription = null, tint = Palette.muted, modifier = Modifier.padding(start = 6.dp).size(16.dp))
-        }
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-            groups.forEach { group ->
-                DropdownMenuItem(
-                    text = { Text(group.name, fontWeight = if (group.id == task.groupId) FontWeight.SemiBold else null) },
-                    onClick = {
-                        open = false
-                        model.moveToGroup(task, group.id)
-                    },
-                )
-            }
-        }
+private fun GroupPicker(model: TaskStore, task: Task) {
+    val groups = model.groupsFor(task)
+    if (groups == null) {
+        Text(model.placeOf(task), color = Palette.text, fontSize = 15.sp)
+        return
     }
+    Dropdown(
+        options = groups.map { it.id to it.name },
+        selectedId = task.groupId,
+        onSelect = { model.moveToGroup(task, it) },
+    )
 }
 
 /** Aucune + les niveaux d'urgence (du moins au plus urgent), avec leur point de couleur. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun UrgencyChips(model: BoardModel, task: Task) {
+private fun UrgencyChips(model: TaskStore, task: Task) {
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         FilterChip(task.urgencyId == null, onClick = { model.setUrgency(task, null) }, label = { Text("Aucune") })
         model.urgencies.values.sortedBy { it.rank }.forEach { level ->
@@ -283,7 +274,7 @@ private fun UrgencyChips(model: BoardModel, task: Task) {
 /** Les tags (✕ pour enlever) et un champ pour en ajouter (↵ ajoute, le clavier reste ouvert). */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun TagsEditor(model: BoardModel, task: Task) {
+private fun TagsEditor(model: TaskStore, task: Task) {
     var input by rememberSaveable(task.id) { mutableStateOf("") }
 
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {

@@ -5,6 +5,7 @@ import io.github.acssio.bettertodo.api.BoardGroup
 import io.github.acssio.bettertodo.api.Task
 import io.github.acssio.bettertodo.api.TodoList
 import io.github.acssio.bettertodo.ui.BoardModel
+import io.github.acssio.bettertodo.ui.TaskStore
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -60,8 +61,8 @@ class BoardModelTest {
 
     @Test
     fun nettoyerUnTag() {
-        assertEquals("Courses", BoardModel.cleanTag("  #Courses "))
-        assertEquals("bio", BoardModel.cleanTag("bio"))
-        assertNull(BoardModel.cleanTag(" # "))
+        assertEquals("Courses", TaskStore.cleanTag("  #Courses "))
+        assertEquals("bio", TaskStore.cleanTag("bio"))
+        assertNull(TaskStore.cleanTag(" # "))
     }
 }
