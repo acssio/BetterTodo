@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Version debug seulement (remplace celle de src/main) : HTTP autorisé vers le Docker local.
+    10.0.2.2 = le Mac vu depuis l'émulateur ; localhost = le téléphone lui-même (avec « adb reverse »).
+    Partout ailleurs, HTTPS reste obligatoire.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false" />
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">10.0.2.2</domain>
+        <domain includeSubdomains="false">localhost</domain>
+    </domain-config>
+</network-security-config>

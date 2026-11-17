@@ -52,6 +52,7 @@ Observé dans ses autres projets (C++ embarqué, React/TypeScript). Écrire du c
 ## Pistes techniques (à confirmer étape par étape)
 
 - **macOS / iOS** : app native avec Xcode (Swift).
+- **Android** : Kotlin + Jetpack Compose (décidé, voir étape 6).
 - **Linux / Windows** : C++, probablement avec Qt.
 - **Web** : un site aussi.
 - **Serveur** : Docker, avec une base de données open source, et certainement une image pour le serveur web.
@@ -143,6 +144,16 @@ Observé dans ses autres projets (C++ embarqué, React/TypeScript). Écrire du c
   - **5-3 (validé le 2026-11-16)** : appui long = machine d'état `LongPress` (`utils/longPress.ts`, 500 ms, annulé au-delà de 10 px) ; mode sélection = mode mobile + `selectedTaskIds` non vide (`SelectionHeader` / `SelectionActions`, prop `selecting` des tâches) ; « Déplacer » = `MoveTasksSheet` avec `ListGroupPicker` (commun avec la Quick task), destination proposée = groupe de la première tâche sélectionnée, un PATCH `group_id` par tâche l'un après l'autre (fin du groupe, ordre d'affichage) ; rien de nouveau sur ordinateur.
   - **5-4 (validé le 2026-11-16) : glisser au doigt.** Appui long sans bouger → sélection (au relâchement) ; appui long puis glisser → déplacement. `LongPress` : états armed / dragging / consumed ; `touchmove` non passif pour bloquer le défilement ; **suite du geste écoutée sur `window`** (`GestureTracker`, + `touchend` en secours), jamais sur la tâche : sinon Android peut perdre le « doigt levé » et le glisser reste bloqué (bug Z Flip) ; `Workspace.touchDragStart/Move/End` + boucle `requestAnimationFrame` (cible via `elementFromPoint` + `data-drop-group` + `computeDropIndex`, défilement auto, bord gauche/droit 0,5 s = groupe voisin en vue colonnes) ; même dépôt qu'à la souris (`dropTask`). Sélection de plusieurs tâches glissée ensemble ; pas de glisser dans les listes intelligentes.
 - **2026-11-16 – Tâches faites masquées par défaut** : une nouvelle liste est créée avec `show_done = false` (migration 008, valeur par défaut seulement : les listes existantes gardent leur réglage).
+- **2026-11-17 – Étape 6 : app Android native** (dossier `android/`, plan validé le 2026-11-17) :
+  - **Kotlin + Jetpack Compose** (Material 3), identifiant `io.github.acssio.bettertodo` (définitif), `minSdk 26` ;
+  - réseau : **OkHttp + kotlinx.serialization** dans une classe `ApiClient` (une méthode par route, comme `ApiClient.ts`), jeton en `Authorization: Bearer` ;
+  - écrans : **machine d'état maison** `sealed class Screen` dans `AppViewModel` (pas de Navigation Compose pour l'instant) ; seuls `AppViewModel` et les ViewModels d'écran (`HomeViewModel`…) parlent à l'API ;
+  - adresse du serveur tapée à la connexion, gardée avec le jeton dans **DataStore** ; `allowBackup="false"` ;
+  - HTTPS obligatoire, sauf en debug vers `10.0.2.2` / `localhost` (`src/debug/res/xml/network_security_config.xml`) ;
+  - icônes : **`com.composables:icons-lucide-android`** (drawables, `import com.composables.icons.lucide.R`) ; `ui/ListIcons.kt` vérifié contre `listIcons.ts` par `ListIconsTest` (à mettre à jour ensemble, comme `mcp/palette.go`) ;
+  - tests : `./gradlew test` (JUnit, fonctions pures) + vrais appuis sur l'émulateur (`adb shell input`) ;
+  - plusieurs `async` en parallèle : **toujours dans `coroutineScope { }`**, sinon une erreur fait planter l'app au lieu d'aller dans le `try` (bug rencontré) ;
+  - **6-1** (2026-11-17) : connexion + accueil en lecture seule (groupes de listes repliables localement, listes, compteurs).
 - **2026-11-13 – Maquette web validée** (Figma, page « Web – Maquette v2 »).
 
 ## Questions ouvertes

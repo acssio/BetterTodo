@@ -1,0 +1,6 @@
+<resources>
+    <!-- Thème de la fenêtre seulement (avant que Compose dessine) : l'interface utilise ui/theme/Theme.kt -->
+    <style name="Theme.BetterTodo" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">#FBFBFA</item>
+    </style>
+</resources>
