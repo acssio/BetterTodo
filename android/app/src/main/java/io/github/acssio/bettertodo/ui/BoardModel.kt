@@ -8,6 +8,7 @@ import io.github.acssio.bettertodo.api.ApiError
 import io.github.acssio.bettertodo.api.Board
 import io.github.acssio.bettertodo.api.BoardGroup
 import io.github.acssio.bettertodo.api.Task
+import io.github.acssio.bettertodo.api.TaskChanges
 import io.github.acssio.bettertodo.api.TodoList
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -69,6 +70,11 @@ class BoardModel(
         }
     }
 
+    /** Pour chaque groupe, les ids des tâches affichées dans l'ordre (cible d'un glisser). */
+    fun visibleIdsByGroup(): Map<String, List<String>> {
+        return board?.groups?.associate { group -> group.id to visibleTasks(group).map { it.id } } ?: emptyMap()
+    }
+
     /** Les tâches à afficher dans un groupe (sans les faites si la liste les masque). */
     fun visibleTasks(group: BoardGroup): List<Task> {
         return visibleTasks(group.tasks, currentList.showDone, leavingIds)
@@ -89,7 +95,54 @@ class BoardModel(
         }
     }
 
+    /**
+     * Dépôt d'un glisser : les tâches movedIds (dans l'ordre de l'écran) vont dans groupId,
+     * à la place visibleIndex parmi les tâches affichées (comptée sans elles).
+     * L'écran d'abord, puis un PATCH {group_id, position} par tâche, l'un après l'autre (comme le site).
+     */
+    fun dropTasks(movedIds: List<String>, groupId: String, visibleIndex: Int) {
+        val before = board ?: return
+        val group = before.groups.firstOrNull { it.id == groupId } ?: return
+        val beforeId = DragDrop.dropAnchor(group.tasks, movedIds, visibleIndex, currentList.showDone)
+        val positions = DragDrop.multiMovePositions(group.tasks.map { it.id }, movedIds, beforeId)
+        val after = reorder(before, movedIds, groupId, beforeId)
+
+        clearSelection()
+        if (after == before) {
+            return // Déposée à sa place : rien à envoyer
+        }
+        board = after
+        scope.launch {
+            try {
+                movedIds.zip(positions).forEach { (id, position) ->
+                    api.updateTask(id, TaskChanges().groupId(groupId).position(position))
+                }
+            } catch (e: ApiError) {
+                handleFailure(e) { board = before }
+            }
+        }
+    }
+
     companion object {
+        /**
+         * Copie du board où les tâches movedIds (dans cet ordre) sont dans le groupe groupId,
+         * juste avant beforeId (null = à la fin).
+         */
+        fun reorder(board: Board, movedIds: List<String>, groupId: String, beforeId: String?): Board {
+            val byId = board.groups.flatMap { it.tasks }.associateBy { it.id }
+            val moved = movedIds.mapNotNull { byId[it]?.copy(groupId = groupId) }
+            val groups = board.groups.map { group ->
+                val others = group.tasks.filter { it.id !in movedIds }
+                if (group.id != groupId) {
+                    group.copy(tasks = others)
+                } else {
+                    val index = if (beforeId == null) others.size else others.indexOfFirst { it.id == beforeId }.let { if (it < 0) others.size else it }
+                    group.copy(tasks = others.take(index) + moved + others.drop(index))
+                }
+            }
+            return board.copy(groups = groups)
+        }
+
         /**
          * Tâches visibles : toutes si la liste montre les faites, sinon les « à faire »
          * plus celles qui viennent d'être cochées (leaving).

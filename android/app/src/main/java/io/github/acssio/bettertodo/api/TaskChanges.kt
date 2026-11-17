@@ -23,7 +23,10 @@ class TaskChanges {
     fun title(title: String) = apply { fields["title"] = JsonPrimitive(title) }
     fun notes(notes: String) = apply { fields["notes"] = JsonPrimitive(notes) }
     fun done(done: Boolean) = apply { fields["done"] = JsonPrimitive(done) }
-    fun groupId(groupId: String) = apply { fields["group_id"] = JsonPrimitive(groupId) } // À la fin du groupe
+    fun groupId(groupId: String) = apply { fields["group_id"] = JsonPrimitive(groupId) } // À la fin du groupe, sauf si position
+
+    /** Place dans le groupe, comptée SANS la tâche déplacée (0 = en tête). */
+    fun position(position: Int) = apply { fields["position"] = JsonPrimitive(position) }
 
     /** @param dueDate "2026-11-18", ou null pour enlever l'échéance */
     fun dueDate(dueDate: String?) = apply { fields["due_date"] = dueDate?.let { JsonPrimitive(it) } ?: JsonNull }

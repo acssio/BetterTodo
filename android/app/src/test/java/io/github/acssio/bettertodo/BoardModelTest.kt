@@ -84,4 +84,21 @@ class BoardModelTest {
         val moved = listOf(todo, done).fold(board) { current, task -> BoardModel.applyTask(current, task.copy(groupId = "g2")) }
         assertEquals(listOf(emptyList(), listOf("Autre groupe", "À faire", "Faite")), titles(moved))
     }
+
+    @Test
+    fun reordonnerDansLeGroupe() {
+        // Remonter « Faite » avant « À faire »
+        assertEquals(listOf(listOf("Faite", "À faire"), listOf("Autre groupe")), titles(BoardModel.reorder(board, listOf("b"), "g", "a")))
+    }
+
+    @Test
+    fun deposerPlusieursTachesDansUnAutreGroupe() {
+        // a et b avant c, dans g2 : elles gardent leur ordre
+        assertEquals(listOf(emptyList(), listOf("À faire", "Faite", "Autre groupe")), titles(BoardModel.reorder(board, listOf("a", "b"), "g2", "c")))
+    }
+
+    @Test
+    fun deposerALaPlaceDOrigineNeChangeRien() {
+        assertEquals(board, BoardModel.reorder(board, listOf("a"), "g", "b"))
+    }
 }

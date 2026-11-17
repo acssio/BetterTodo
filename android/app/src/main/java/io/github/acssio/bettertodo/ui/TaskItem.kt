@@ -44,7 +44,7 @@ import io.github.acssio.bettertodo.ui.theme.Palette
  * Comme TaskCard (vue colonnes) et TaskRow (vue sections) du site, en un seul composable.
  *
  * Toucher la tâche ouvre le panneau du bas (onOpen) ; toucher la case la coche ;
- * appui long = sélection (onLongPress, avec une petite vibration).
+ * appui long = sélection (onLongPress, avec une petite vibration ; dans une liste, c'est TaskDrag qui s'en occupe).
  *
  * @param card true = carte avec bord (vue colonnes), false = ligne (vue sections)
  * @param urgency le niveau d'urgence de la tâche, ou null
@@ -59,7 +59,7 @@ fun TaskItem(
     card: Boolean,
     onToggleDone: () -> Unit,
     onOpen: () -> Unit,
-    onLongPress: () -> Unit,
+    onLongPress: (() -> Unit)?,
     modifier: Modifier = Modifier,
     origin: ListRef? = null,
     selected: Boolean = false,
@@ -71,9 +71,12 @@ fun TaskItem(
         onClickLabel = "Ouvrir la tâche",
         onLongClickLabel = "Sélectionner",
         onClick = onOpen,
-        onLongClick = {
-            haptic.performHapticFeedback(HapticFeedbackType.LongPress) // Petite vibration, comme les apps Android
-            onLongPress()
+        // null dans une liste : l'appui long y est géré par le glisser (TaskDrag), au niveau de l'écran
+        onLongClick = onLongPress?.let { action ->
+            {
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress) // Petite vibration, comme les apps Android
+                action()
+            }
         },
     )
     val frame = if (card) {

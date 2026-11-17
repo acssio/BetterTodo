@@ -170,8 +170,19 @@ abstract class TaskStore(
     }
 
     fun toggleSelection(task: Task) {
-        selectedIds = toggle(selectedIds, task.id)
+        toggleSelection(task.id)
     }
+
+    fun toggleSelection(taskId: String) {
+        selectedIds = toggle(selectedIds, taskId)
+    }
+
+    /** Tâches à glisser depuis taskId : toute la sélection si elle en fait partie, sinon elle seule (ordre de l'écran). */
+    fun idsToDrag(taskId: String): List<String> {
+        return if (taskId in selectedIds) inDisplayOrder(visibleTaskIds, selectedIds) else listOf(taskId)
+    }
+
+    fun titleOf(taskId: String): String = allTasks.firstOrNull { it.id == taskId }?.title ?: ""
 
     fun clearSelection() {
         selectedIds = emptySet()

@@ -28,4 +28,9 @@ class TaskChangesTest {
     fun texteAvecGuillemets() {
         assertEquals("""{"notes":"Dire \"bonjour\""}""", TaskChanges().notes("Dire \"bonjour\"").toJson())
     }
+
+    @Test
+    fun groupeEtPosition() {
+        assertEquals("""{"group_id":"g2","position":0}""", TaskChanges().groupId("g2").position(0).toJson())
+    }
 }
