@@ -1,5 +1,6 @@
 package io.github.acssio.bettertodo
 
+import io.github.acssio.bettertodo.api.ListChanges
 import io.github.acssio.bettertodo.api.TaskChanges
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -32,5 +33,12 @@ class TaskChangesTest {
     @Test
     fun groupeEtPosition() {
         assertEquals("""{"group_id":"g2","position":0}""", TaskChanges().groupId("g2").position(0).toJson())
+    }
+
+    @Test
+    fun modificationsDUneListe() {
+        assertEquals("""{"folder_id":null}""", ListChanges().folderId(null).toJson()) // Hors groupe de listes
+        assertEquals("""{"color":"#2F6FEB","icon":"house","default_view":"sections","show_done":true}""",
+            ListChanges().color("#2F6FEB").icon("house").defaultView("sections").showDone(true).toJson())
     }
 }

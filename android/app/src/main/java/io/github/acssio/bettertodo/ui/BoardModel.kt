@@ -6,6 +6,7 @@ import androidx.compose.runtime.setValue
 import io.github.acssio.bettertodo.api.ApiClient
 import io.github.acssio.bettertodo.api.ApiError
 import io.github.acssio.bettertodo.api.Board
+import io.github.acssio.bettertodo.api.ListChanges
 import io.github.acssio.bettertodo.api.BoardGroup
 import io.github.acssio.bettertodo.api.Task
 import io.github.acssio.bettertodo.api.TaskChanges
@@ -24,6 +25,7 @@ class BoardModel(
     val list: TodoList,
     scope: CoroutineScope,
     onUnauthorized: () -> Unit,
+    private val onDeleted: () -> Unit = {}, // Liste supprimée : retour à l'accueil
 ) : TaskStore(api, scope, onUnauthorized) {
 
     var board by mutableStateOf<Board?>(null)
@@ -123,7 +125,200 @@ class BoardModel(
         }
     }
 
+    // --- La liste elle-même, ses groupes, ses tâches faites (étape 6-6b) ---------
+    //
+    //   menu « … » ──(Modifier la liste)──→ panneau ListEditSheet (chaque champ enregistré tout de suite)
+    //              ──(Nouveau groupe / Renommer)──→ boîte de nom ──(OK)──→ fait
+    //              ──(Supprimer le groupe / Vider les faites / Supprimer la liste)──→ confirmation ──(OK)──→ fait
+
+    /** Boîte ouverte (nom ou confirmation), null = aucune. */
+    var dialog by mutableStateOf<ListDialog?>(null)
+        private set
+
+    /** Panneau « Modifier la liste » ouvert. */
+    var editingList by mutableStateOf(false)
+        private set
+
+    /** Vue colonnes : le groupe affiché (le menu de la liste propose de le renommer / supprimer). */
+    var shownGroupId by mutableStateOf<String?>(null)
+
+    /** Nombre de tâches faites (« Vider les tâches faites »). */
+    val doneCount: Int
+        get() = allTasks.count { it.done }
+
+    fun openListEditor() {
+        editingList = true
+    }
+
+    fun closeListEditor() {
+        editingList = false
+    }
+
+    fun setListName(name: String) {
+        val clean = name.trim()
+        if (clean.isNotEmpty() && clean != currentList.name) updateList(ListChanges().name(clean)) { it.copy(name = clean) }
+    }
+
+    fun setListColor(color: String) = updateList(ListChanges().color(color)) { it.copy(color = color) }
+
+    fun setListIcon(icon: String) = updateList(ListChanges().icon(icon)) { it.copy(icon = icon) }
+
+    /** @param folderId le groupe de listes, ou null pour hors groupe */
+    fun setListFolder(folderId: String?) {
+        if (folderId != currentList.folderId) updateList(ListChanges().folderId(folderId)) { it.copy(folderId = folderId) }
+    }
+
+    /** Vue colonnes ↔ sections, enregistrée sur la liste (comme le site). */
+    fun toggleView() {
+        val view = if (currentList.defaultView == TodoList.VIEW_SECTIONS) TodoList.VIEW_COLUMNS else TodoList.VIEW_SECTIONS
+        updateList(ListChanges().defaultView(view)) { it.copy(defaultView = view) }
+    }
+
+    fun toggleShowDone() {
+        val show = !currentList.showDone
+        updateList(ListChanges().showDone(show)) { it.copy(showDone = show) }
+    }
+
+    /** Modifie la liste : l'écran d'abord, puis l'API ; en cas d'erreur, la liste d'avant et un rechargement. */
+    private fun updateList(changes: ListChanges, change: (TodoList) -> TodoList) {
+        val before = board ?: return
+        board = before.copy(list = change(before.list))
+        scope.launch {
+            try {
+                api.updateList(list.id, changes)
+            } catch (e: ApiError) {
+                handleFailure(e) { board = before }
+            }
+        }
+    }
+
+    fun askNewGroup() {
+        dialog = ListDialog.NewGroup
+    }
+
+    fun askRenameGroup(group: BoardGroup) {
+        dialog = ListDialog.RenameGroup(group)
+    }
+
+    fun askDeleteGroup(group: BoardGroup) {
+        dialog = ListDialog.DeleteGroup(group)
+    }
+
+    fun askClearDone() {
+        dialog = ListDialog.ClearDone
+    }
+
+    fun askDeleteList() {
+        editingList = false
+        dialog = ListDialog.DeleteList
+    }
+
+    fun closeDialog() {
+        dialog = null
+    }
+
+    /** OK dans la boîte de nom. */
+    fun submitName(name: String) {
+        when (val current = dialog) {
+            ListDialog.NewGroup -> createGroup(name)
+            is ListDialog.RenameGroup -> renameGroup(current.group, name)
+            else -> {}
+        }
+        dialog = null
+    }
+
+    /** OK dans une confirmation. */
+    fun confirm() {
+        when (val current = dialog) {
+            is ListDialog.DeleteGroup -> deleteGroup(current.group)
+            ListDialog.ClearDone -> clearDone()
+            ListDialog.DeleteList -> deleteList()
+            else -> {}
+        }
+        dialog = null
+    }
+
+    /** Le groupe apparaît à la réponse du serveur (il faut son id), à la fin. */
+    private fun createGroup(name: String) {
+        scope.launch {
+            try {
+                val created = api.createGroup(list.id, name)
+                board = board?.let { it.copy(groups = it.groups + created) }
+                shownGroupId = created.id // Vue colonnes : on y va
+            } catch (e: ApiError) {
+                handleFailure(e) {}
+            }
+        }
+    }
+
+    private fun renameGroup(group: BoardGroup, name: String) {
+        if (name == group.name) return
+        val before = board ?: return
+        board = before.copy(groups = before.groups.map { if (it.id == group.id) it.copy(name = name) else it })
+        scope.launch {
+            try {
+                api.renameGroup(group.id, name)
+            } catch (e: ApiError) {
+                handleFailure(e) { board = before }
+            }
+        }
+    }
+
+    private fun deleteGroup(group: BoardGroup) {
+        val before = board ?: return
+        board = before.copy(groups = before.groups.filter { it.id != group.id })
+        scope.launch {
+            try {
+                api.deleteGroup(group.id)
+            } catch (e: ApiError) {
+                handleFailure(e) { board = before }
+            }
+        }
+    }
+
+    private fun clearDone() {
+        val before = board ?: return
+        board = withoutDone(before)
+        scope.launch {
+            try {
+                api.clearDone(list.id)
+            } catch (e: ApiError) {
+                handleFailure(e) { board = before }
+            }
+        }
+    }
+
+    /** Supprime la liste, puis retour à l'accueil (seulement si le serveur a accepté). */
+    private fun deleteList() {
+        scope.launch {
+            try {
+                api.deleteList(list.id)
+                onDeleted()
+            } catch (e: ApiError) {
+                handleFailure(e) {}
+            }
+        }
+    }
+
     companion object {
+        /** Copie du board sans les tâches faites (« Vider les tâches faites »). */
+        fun withoutDone(board: Board): Board {
+            return board.copy(groups = board.groups.map { group -> group.copy(tasks = group.tasks.filter { !it.done }) })
+        }
+
+        /** Confirmation de suppression d'un groupe, avec le nombre de tâches (comme le site). */
+        fun deleteGroupMessage(group: BoardGroup): String = when (group.tasks.size) {
+            0 -> "Supprimer le groupe « ${group.name} » ?"
+            1 -> "Supprimer le groupe « ${group.name} » et sa tâche ?"
+            else -> "Supprimer le groupe « ${group.name} » et ses ${group.tasks.size} tâches ?"
+        }
+
+        /** Confirmation de « Vider les tâches faites » (comme le site). */
+        fun clearDoneMessage(listName: String, count: Int): String {
+            val word = if (count > 1) "les $count tâches faites" else "la tâche faite"
+            return "Supprimer définitivement $word de « $listName » ?"
+        }
+
         /**
          * Copie du board où les tâches movedIds (dans cet ordre) sont dans le groupe groupId,
          * juste avant beforeId (null = à la fin).
@@ -177,4 +372,13 @@ class BoardModel(
             return board.copy(groups = board.groups.map { group -> group.copy(tasks = group.tasks.filter { it.id != taskId }) })
         }
     }
+}
+
+/** Boîte ouverte sur l'écran d'une liste. */
+sealed class ListDialog {
+    data object NewGroup : ListDialog()
+    data class RenameGroup(val group: BoardGroup) : ListDialog()
+    data class DeleteGroup(val group: BoardGroup) : ListDialog()
+    data object ClearDone : ListDialog()
+    data object DeleteList : ListDialog()
 }

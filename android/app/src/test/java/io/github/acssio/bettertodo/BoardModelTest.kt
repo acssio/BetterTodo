@@ -101,4 +101,18 @@ class BoardModelTest {
     fun deposerALaPlaceDOrigineNeChangeRien() {
         assertEquals(board, BoardModel.reorder(board, listOf("a"), "g", "b"))
     }
+
+    @Test
+    fun viderLesTachesFaites() {
+        assertEquals(listOf(listOf("À faire"), listOf("Autre groupe")), titles(BoardModel.withoutDone(board)))
+    }
+
+    @Test
+    fun messagesDeConfirmation() {
+        assertEquals("Supprimer le groupe « Plus tard » et sa tâche ?", BoardModel.deleteGroupMessage(board.groups[1]))
+        assertEquals("Supprimer le groupe « Tâches » et ses 2 tâches ?", BoardModel.deleteGroupMessage(board.groups[0]))
+        assertEquals("Supprimer le groupe « Vide » ?", BoardModel.deleteGroupMessage(BoardGroup("v", "Vide", 2)))
+        assertEquals("Supprimer définitivement la tâche faite de « Courses » ?", BoardModel.clearDoneMessage("Courses", 1))
+        assertEquals("Supprimer définitivement les 3 tâches faites de « Courses » ?", BoardModel.clearDoneMessage("Courses", 3))
+    }
 }

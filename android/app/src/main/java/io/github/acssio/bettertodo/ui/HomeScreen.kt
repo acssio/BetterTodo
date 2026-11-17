@@ -283,7 +283,9 @@ class HomeViewModel(private val api: ApiClient, private val quickTaskMemory: Qui
 
     /** Toucher une liste : un nouveau BoardModel, donc la liste est toujours rechargée. */
     fun openList(list: TodoList) {
-        page = HomePage.OpenList(BoardModel(api, list, viewModelScope, onUnauthorized = { sessionExpired = true }))
+        page = HomePage.OpenList(
+            BoardModel(api, list, viewModelScope, onUnauthorized = { sessionExpired = true }, onDeleted = { closeList() }),
+        )
     }
 
     /** Toucher « Aujourd'hui » ou « Planifié ». */
@@ -394,7 +396,7 @@ fun HomeScreen(
     when (val page = model.page) {
         is HomePage.OpenList -> {
             BackHandler(onBack = model::closeList)
-            ListScreen(page.board, model.orderedLists, onBack = model::closeList)
+            ListScreen(page.board, model.orderedLists, model.folders, onBack = model::closeList)
             return
         }
         is HomePage.OpenSmart -> {

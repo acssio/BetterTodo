@@ -5,7 +5,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.remember
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -49,6 +53,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.composables.icons.lucide.R // Icônes de la bibliothèque icons-lucide-android
 import io.github.acssio.bettertodo.api.BoardGroup
+import io.github.acssio.bettertodo.api.Folder
 import io.github.acssio.bettertodo.api.TodoList
 import io.github.acssio.bettertodo.ui.theme.Palette
 import kotlinx.coroutines.launch
@@ -61,7 +66,7 @@ import kotlinx.coroutines.launch
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ListScreen(model: BoardModel, lists: List<TodoList>, onBack: () -> Unit) {
+fun ListScreen(model: BoardModel, lists: List<TodoList>, folders: List<Folder>, onBack: () -> Unit) {
     val list = model.currentList
 
     // Pendant une sélection, le bouton retour d'Android l'annule (au lieu de revenir à l'accueil)
@@ -89,6 +94,7 @@ fun ListScreen(model: BoardModel, lists: List<TodoList>, onBack: () -> Unit) {
                         Text(list.name, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 },
+                actions = { ListMenu(model) },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Palette.background),
             )
         },
@@ -142,6 +148,12 @@ fun ListScreen(model: BoardModel, lists: List<TodoList>, onBack: () -> Unit) {
     model.openedTask?.let { task ->
         TaskSheet(model, task, onClose = model::closeTask)
     }
+
+    // Gérer la liste (étape 6-6b) : panneau « Modifier la liste », boîtes de nom et confirmations
+    if (model.editingList) {
+        ListEditSheet(model, folders)
+    }
+    ListDialogs(model)
 }
 
 /** Vue colonnes : onglets des groupes, puis un groupe par page (glisser à gauche / à droite). */
@@ -152,8 +164,24 @@ private fun ColumnsView(model: BoardModel, groups: List<BoardGroup>, drag: TaskD
         return
     }
 
-    val pager = rememberPagerState { groups.size }
+    // Les groupes à jour : le nombre de pages est relu à chaque fois (sinon, après « Nouveau groupe »,
+    // le pager croyait encore avoir l'ancien nombre de pages et ne pouvait pas aller sur la nouvelle)
+    val currentGroups by rememberUpdatedState(groups)
+    val pager = rememberPagerState { currentGroups.size }
     val scope = rememberCoroutineScope()
+
+    // Le groupe affiché, pour le menu de la liste (renommer / supprimer « le groupe affiché ») :
+    // mis à jour quand la page change (pas à chaque recomposition, sinon il écraserait un groupe tout juste créé)
+    LaunchedEffect(pager) {
+        // settledPage, pas currentPage : pendant une animation, currentPage passe par les pages intermédiaires,
+        // ce qui réécrivait le groupe affiché et coupait l'animation vers un groupe tout juste créé (bug testé)
+        snapshotFlow { pager.settledPage }.collect { page -> currentGroups.getOrNull(page)?.let { model.shownGroupId = it.id } }
+    }
+    // Groupe tout juste créé : on va à sa page
+    LaunchedEffect(model.shownGroupId) {
+        val index = groups.indexOfFirst { it.id == model.shownGroupId }
+        if (index >= 0 && index != pager.currentPage) pager.animateScrollToPage(index)
+    }
 
     // Glisser : doigt gardé 0,5 s contre le bord gauche / droit → groupe voisin
     SideEffect {
@@ -249,9 +277,12 @@ private fun LazyListScope.sectionItems(model: BoardModel, group: BoardGroup, dra
             Modifier
                 .fillMaxWidth()
                 .then(drag.track("head-" + group.id, DropKind.HEAD, group.id))
-                .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 6.dp),
+                .padding(start = 16.dp, end = 4.dp, top = 8.dp),
         ) {
-            GroupTitle(group, selected = true)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.weight(1f)) { GroupTitle(group, selected = true) }
+                GroupMenu(group, model) // Renommer / supprimer le groupe
+            }
         }
     }
 

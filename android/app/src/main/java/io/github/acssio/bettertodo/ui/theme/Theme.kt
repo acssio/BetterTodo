@@ -41,6 +41,7 @@ fun BetterTodoTheme(content: @Composable () -> Unit) {
         surfaceContainerHighest = Palette.surface, // Fond des champs de saisie
         surfaceContainerHigh = Palette.surface,    // Fond du calendrier et des boîtes de dialogue
         surfaceContainerLow = Palette.surface,     // Fond des panneaux du bas
+        surfaceContainer = Palette.surface,        // Fond des menus déroulants
         outline = Palette.border,
         outlineVariant = Palette.border,
         error = Palette.danger,

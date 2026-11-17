@@ -94,6 +94,37 @@ class ApiClient(private val serverUrl: String, private val token: String? = null
         return json.decodeFromString(send("POST", "/lists", body))
     }
 
+    /** Modifie une liste : seuls les champs de changes sont envoyés. */
+    suspend fun updateList(listId: String, changes: ListChanges): TodoList {
+        return json.decodeFromString(send("PATCH", "/lists/$listId", changes.toJson()))
+    }
+
+    /** Supprime la liste et toutes ses tâches. */
+    suspend fun deleteList(listId: String) {
+        send("DELETE", "/lists/$listId")
+    }
+
+    /** Supprime toutes les tâches faites de la liste (une seule transaction). */
+    suspend fun clearDone(listId: String) {
+        send("DELETE", "/lists/$listId/done-tasks")
+    }
+
+    /** Crée un groupe à la fin de la liste. */
+    suspend fun createGroup(listId: String, name: String): BoardGroup {
+        val body = buildJsonObject { put("name", name) }.toString()
+        return json.decodeFromString(send("POST", "/lists/$listId/groups", body))
+    }
+
+    suspend fun renameGroup(groupId: String, name: String) {
+        val body = buildJsonObject { put("name", name) }.toString()
+        send("PATCH", "/groups/$groupId", body)
+    }
+
+    /** Supprime le groupe et ses tâches. */
+    suspend fun deleteGroup(groupId: String) {
+        send("DELETE", "/groups/$groupId")
+    }
+
     /** La liste, ses groupes et toutes leurs tâches (faites comprises). */
     suspend fun board(listId: String): Board {
         return json.decodeFromString(send("GET", "/lists/$listId/board"))
