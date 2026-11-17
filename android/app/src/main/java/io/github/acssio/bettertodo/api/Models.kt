@@ -98,9 +98,9 @@ data class UrgencyLevel(
 @Serializable
 data class LoginRequest(val email: String, val password: String)
 
-/** PATCH /tasks/{id} pour cocher ou décocher : seul "done" est envoyé. */
+/** POST /groups/{id}/tasks : seul le titre (le reste se règle ensuite dans le panneau). */
 @Serializable
-data class TaskDoneChange(val done: Boolean)
+data class CreateTaskRequest(val title: String)
 
 @Serializable
 data class SetupStatus(@SerialName("needs_setup") val needsSetup: Boolean)

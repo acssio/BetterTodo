@@ -38,17 +38,34 @@ import io.github.acssio.bettertodo.ui.theme.Palette
  * Une tâche : case ronde, titre (barré si faite), icône de note, puis tags / échéance / urgence.
  * Comme TaskCard (vue colonnes) et TaskRow (vue sections) du site, en un seul composable.
  *
+ * Toucher la tâche ouvre le panneau du bas (onOpen) ; toucher la case la coche.
+ *
  * @param card true = carte avec bord (vue colonnes), false = ligne (vue sections)
  * @param urgency le niveau d'urgence de la tâche, ou null
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun TaskItem(task: Task, urgency: UrgencyLevel?, card: Boolean, onToggleDone: () -> Unit, modifier: Modifier = Modifier) {
+fun TaskItem(
+    task: Task,
+    urgency: UrgencyLevel?,
+    card: Boolean,
+    onToggleDone: () -> Unit,
+    onOpen: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val shape = RoundedCornerShape(10.dp)
     val frame = if (card) {
-        Modifier.background(Palette.surface, shape).border(1.dp, Palette.border, shape).padding(end = 12.dp, top = 4.dp, bottom = 4.dp)
+        Modifier
+            .clip(shape)
+            .background(Palette.surface)
+            .border(1.dp, Palette.border, shape)
+            .clickable(onClickLabel = "Ouvrir la tâche", onClick = onOpen)
+            .padding(end = 12.dp, top = 4.dp, bottom = 4.dp)
     } else {
-        Modifier.background(Palette.surface).padding(end = 16.dp, top = 2.dp, bottom = 2.dp)
+        Modifier
+            .background(Palette.surface)
+            .clickable(onClickLabel = "Ouvrir la tâche", onClick = onOpen)
+            .padding(end = 16.dp, top = 2.dp, bottom = 2.dp)
     }
 
     Row(modifier.fillMaxWidth().then(frame), verticalAlignment = Alignment.Top) {
@@ -80,9 +97,9 @@ fun TaskItem(task: Task, urgency: UrgencyLevel?, card: Boolean, onToggleDone: ()
     }
 }
 
-/** Case ronde de 20 dp, dans une zone de 44 dp pour être facile à toucher. */
+/** Case ronde de 20 dp, dans une zone de 44 dp pour être facile à toucher (aussi utilisée par TaskSheet). */
 @Composable
-private fun CheckCircle(done: Boolean, onToggle: () -> Unit) {
+fun CheckCircle(done: Boolean, onToggle: () -> Unit) {
     val label = if (done) "Marquer comme à faire" else "Marquer comme faite"
     Box(
         Modifier

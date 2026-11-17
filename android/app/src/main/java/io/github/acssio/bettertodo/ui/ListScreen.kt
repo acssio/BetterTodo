@@ -7,7 +7,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -72,7 +74,8 @@ fun ListScreen(model: BoardModel, onBack: () -> Unit) {
             )
         },
     ) { padding ->
-        Box(Modifier.fillMaxSize().padding(padding)) {
+        // imePadding : la liste s'arrête au-dessus du clavier (sinon le champ « Ajouter » est caché dessous)
+        Box(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding).imePadding()) {
             when (model.state) {
                 LoadState.Loading -> CircularProgressIndicator(Modifier.align(Alignment.Center))
                 LoadState.Failed -> FailedMessage(model.error ?: "Erreur", onRetry = model::load)
@@ -93,6 +96,11 @@ fun ListScreen(model: BoardModel, onBack: () -> Unit) {
                 }
             }
         }
+    }
+
+    // Tâche touchée : panneau du bas par-dessus la liste
+    model.openedTask?.let { task ->
+        TaskSheet(model, task, onClose = model::closeTask)
     }
 }
 
@@ -137,11 +145,12 @@ private fun ColumnsView(model: BoardModel, groups: List<BoardGroup>) {
                         urgency = task.urgencyId?.let { model.urgencies[it] },
                         card = true,
                         onToggleDone = { model.toggleDone(task) },
+                        onOpen = { model.openTask(task) },
                         modifier = Modifier.animateItem(), // Fondu quand une tâche cochée disparaît
                     )
                 }
-                if (tasks.isEmpty()) {
-                    item { EmptyGroup() }
+                item(key = "add-" + group.id) {
+                    AddTaskRow(onAdd = { title -> model.createTask(group.id, title) })
                 }
             }
         }
@@ -178,12 +187,13 @@ private fun LazyListScope.sectionItems(model: BoardModel, group: BoardGroup) {
                 urgency = task.urgencyId?.let { model.urgencies[it] },
                 card = false,
                 onToggleDone = { model.toggleDone(task) },
+                onOpen = { model.openTask(task) },
             )
             HorizontalDivider(color = Palette.border)
         }
     }
-    if (tasks.isEmpty()) {
-        item(key = "empty-" + group.id) { EmptyGroup() }
+    item(key = "add-" + group.id) {
+        AddTaskRow(onAdd = { title -> model.createTask(group.id, title) }, modifier = Modifier.padding(horizontal = 4.dp))
     }
 }
 
@@ -209,11 +219,6 @@ private fun GroupTitle(group: BoardGroup, selected: Boolean) {
             )
         }
     }
-}
-
-@Composable
-private fun EmptyGroup() {
-    Text("Aucune tâche", color = Palette.faint, modifier = Modifier.fillMaxWidth().padding(16.dp))
 }
 
 /** Liste sans groupe (rare : le serveur en crée un à la création). Défilable pour que « tirer » marche. */

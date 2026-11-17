@@ -1,6 +1,8 @@
 package io.github.acssio.bettertodo.ui
 
+import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 import java.util.Locale
@@ -35,5 +37,23 @@ object DueDates {
     /** Vrai si l'échéance est aujourd'hui ou déjà passée (affichée en rouge). */
     fun isDueOrLate(iso: String, today: LocalDate = LocalDate.now()): Boolean {
         return daysFromToday(iso, today) <= 0
+    }
+
+    /** Date du jour au format de l'API ("2026-11-17"), dans le fuseau du téléphone. */
+    fun todayIso(today: LocalDate = LocalDate.now()): String = today.toString()
+
+    fun tomorrowIso(today: LocalDate = LocalDate.now()): String = today.plusDays(1).toString()
+
+    // Le calendrier Material (DatePicker) compte en millisecondes depuis 1970, à minuit **UTC**.
+    // Passer par UTC des deux côtés évite le décalage d'un jour selon le fuseau horaire.
+
+    /** "2026-11-18" → millisecondes pour DatePicker. */
+    fun toPickerMillis(iso: String): Long {
+        return LocalDate.parse(iso).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+    }
+
+    /** Millisecondes choisies dans DatePicker → "2026-11-18". */
+    fun fromPickerMillis(millis: Long): String {
+        return Instant.ofEpochMilli(millis).atZone(ZoneOffset.UTC).toLocalDate().toString()
     }
 }

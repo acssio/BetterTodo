@@ -34,4 +34,16 @@ class DueDatesTest {
         assertTrue(DueDates.isDueOrLate("2026-10-01", today))
         assertFalse(DueDates.isDueOrLate("2026-11-18", today))
     }
+
+    @Test
+    fun aujourdHuiEtDemain() {
+        assertEquals("2026-11-17", DueDates.todayIso(today))
+        assertEquals("2026-12-01", DueDates.tomorrowIso(LocalDate.of(2026, 11, 30)))
+    }
+
+    @Test
+    fun allerRetourAvecLeCalendrier() {
+        assertEquals(1795564800000L, DueDates.toPickerMillis("2026-11-25")) // 25/11/2026 00:00 UTC
+        assertEquals("2026-11-25", DueDates.fromPickerMillis(DueDates.toPickerMillis("2026-11-25")))
+    }
 }

@@ -15,6 +15,7 @@ object Palette {
     val muted = Color(0xFF6B6B6B)      // --muted
     val faint = Color(0xFF8A8A87)      // --faint
     val accent = Color(0xFF2F6FEB)     // --accent
+    val accentLight = Color(0xFFE3ECFD) // --accent très clair (fond d'une puce sélectionnée)
     val danger = Color(0xFFE5484D)     // --danger
     val success = Color(0xFF3FA66B)    // --success : case cochée
     val done = Color(0xFFA3A3A0)       // --done : titre d'une tâche cochée
@@ -33,9 +34,13 @@ fun BetterTodoTheme(content: @Composable () -> Unit) {
         onBackground = Palette.text,
         surface = Palette.background,
         onSurface = Palette.text,
+        secondaryContainer = Palette.accentLight, // Puce sélectionnée (échéance, urgence…)
+        onSecondaryContainer = Palette.accent,
         surfaceVariant = Palette.hover,
         onSurfaceVariant = Palette.muted,
         surfaceContainerHighest = Palette.surface, // Fond des champs de saisie
+        surfaceContainerHigh = Palette.surface,    // Fond du calendrier et des boîtes de dialogue
+        surfaceContainerLow = Palette.surface,     // Fond des panneaux du bas
         outline = Palette.border,
         outlineVariant = Palette.border,
         error = Palette.danger,

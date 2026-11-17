@@ -65,10 +65,19 @@ class ApiClient(private val serverUrl: String, private val token: String? = null
 
     // --- Tâches --------------------------------------------------------------
 
-    /** Coche (done = true) ou décoche une tâche. */
-    suspend fun setTaskDone(taskId: String, done: Boolean): Task {
-        val body = json.encodeToString(TaskDoneChange(done))
-        return json.decodeFromString(send("PATCH", "/tasks/$taskId", body))
+    /** Crée une tâche à la fin du groupe. */
+    suspend fun createTask(groupId: String, title: String): Task {
+        val body = json.encodeToString(CreateTaskRequest(title))
+        return json.decodeFromString(send("POST", "/groups/$groupId/tasks", body))
+    }
+
+    /** Modifie une tâche : seuls les champs de changes sont envoyés (cocher compris). */
+    suspend fun updateTask(taskId: String, changes: TaskChanges): Task {
+        return json.decodeFromString(send("PATCH", "/tasks/$taskId", changes.toJson()))
+    }
+
+    suspend fun deleteTask(taskId: String) {
+        send("DELETE", "/tasks/$taskId")
     }
 
     // --- Paramètres ----------------------------------------------------------
