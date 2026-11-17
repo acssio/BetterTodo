@@ -55,6 +55,20 @@ class BoardModel(
 
     override fun groupsFor(task: Task): List<BoardGroup> = board?.groups ?: emptyList()
 
+    override val visibleTaskIds: List<String>
+        get() = board?.groups?.flatMap { group -> visibleTasks(group).map { it.id } } ?: emptyList()
+
+    override fun listIdOf(task: Task): String = list.id
+
+    /** Même liste : à la fin du groupe ; autre liste : la tâche quitte l'écran. */
+    override fun applyMoved(task: Task, listId: String, groupId: String) {
+        if (listId == list.id) {
+            applyLocal(task.copy(groupId = groupId))
+        } else {
+            removeLocal(task.id)
+        }
+    }
+
     /** Les tâches à afficher dans un groupe (sans les faites si la liste les masque). */
     fun visibleTasks(group: BoardGroup): List<Task> {
         return visibleTasks(group.tasks, currentList.showDone, leavingIds)

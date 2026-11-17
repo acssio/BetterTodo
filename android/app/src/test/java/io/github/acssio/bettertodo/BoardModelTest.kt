@@ -65,4 +65,23 @@ class BoardModelTest {
         assertEquals("bio", TaskStore.cleanTag("bio"))
         assertNull(TaskStore.cleanTag(" # "))
     }
+
+    @Test
+    fun selection() {
+        assertEquals(setOf("a", "b"), TaskStore.toggle(setOf("a"), "b"))
+        assertEquals(setOf("a"), TaskStore.toggle(setOf("a", "b"), "b"))
+    }
+
+    @Test
+    fun selectionDansLOrdreDeLEcran() {
+        // Sélectionnées dans le désordre ; « c » n'est plus affichée
+        assertEquals(listOf("a", "d"), TaskStore.inDisplayOrder(listOf("a", "b", "d"), setOf("d", "c", "a")))
+    }
+
+    @Test
+    fun deplacerPlusieursTachesALaFinDansLOrdre() {
+        // Comme confirmMove : une tâche après l'autre, dans l'ordre de l'écran
+        val moved = listOf(todo, done).fold(board) { current, task -> BoardModel.applyTask(current, task.copy(groupId = "g2")) }
+        assertEquals(listOf(emptyList(), listOf("Autre groupe", "À faire", "Faite")), titles(moved))
+    }
 }

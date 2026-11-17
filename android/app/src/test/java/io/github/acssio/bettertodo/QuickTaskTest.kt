@@ -2,7 +2,7 @@ package io.github.acssio.bettertodo
 
 import io.github.acssio.bettertodo.api.BoardGroup
 import io.github.acssio.bettertodo.api.TodoList
-import io.github.acssio.bettertodo.ui.QuickTaskModel
+import io.github.acssio.bettertodo.ui.PlacePicker
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -14,20 +14,20 @@ class QuickTaskTest {
 
     @Test
     fun listeRetenue() {
-        assertEquals("l2", QuickTaskModel.chooseList("l2", lists))
+        assertEquals("l2", PlacePicker.chooseList("l2", lists))
     }
 
     @Test
     fun listeDisparueOuAucuneMemoire() {
-        assertEquals("l1", QuickTaskModel.chooseList("supprimée", lists))
-        assertEquals("l1", QuickTaskModel.chooseList(null, lists))
-        assertNull(QuickTaskModel.chooseList("l1", emptyList()))
+        assertEquals("l1", PlacePicker.chooseList("supprimée", lists))
+        assertEquals("l1", PlacePicker.chooseList(null, lists))
+        assertNull(PlacePicker.chooseList("l1", emptyList()))
     }
 
     @Test
     fun groupe() {
-        assertEquals("g2", QuickTaskModel.chooseGroup("g2", groups))
-        assertEquals("g1", QuickTaskModel.chooseGroup("d'une autre liste", groups))
-        assertNull(QuickTaskModel.chooseGroup(null, emptyList()))
+        assertEquals("g2", PlacePicker.chooseGroup("g2", groups))
+        assertEquals("g1", PlacePicker.chooseGroup("d'une autre liste", groups))
+        assertNull(PlacePicker.chooseGroup(null, emptyList()))
     }
 }

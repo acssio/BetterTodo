@@ -2,7 +2,9 @@ package io.github.acssio.bettertodo.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,6 +23,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -39,13 +43,15 @@ import io.github.acssio.bettertodo.ui.theme.Palette
  * Une tâche : case ronde, titre (barré si faite), icône de note, puis tags / échéance / urgence.
  * Comme TaskCard (vue colonnes) et TaskRow (vue sections) du site, en un seul composable.
  *
- * Toucher la tâche ouvre le panneau du bas (onOpen) ; toucher la case la coche.
+ * Toucher la tâche ouvre le panneau du bas (onOpen) ; toucher la case la coche ;
+ * appui long = sélection (onLongPress, avec une petite vibration).
  *
  * @param card true = carte avec bord (vue colonnes), false = ligne (vue sections)
  * @param urgency le niveau d'urgence de la tâche, ou null
  * @param origin la liste d'origine, affichée dans Aujourd'hui / Planifié (null dans une liste)
+ * @param selected dans la sélection : fond bleu clair
  */
-@OptIn(ExperimentalLayoutApi::class)
+@OptIn(ExperimentalLayoutApi::class, ExperimentalFoundationApi::class)
 @Composable
 fun TaskItem(
     task: Task,
@@ -53,21 +59,34 @@ fun TaskItem(
     card: Boolean,
     onToggleDone: () -> Unit,
     onOpen: () -> Unit,
+    onLongPress: () -> Unit,
     modifier: Modifier = Modifier,
     origin: ListRef? = null,
+    selected: Boolean = false,
 ) {
+    val haptic = LocalHapticFeedback.current
     val shape = RoundedCornerShape(10.dp)
+    val background = if (selected) Palette.accentLight else Palette.surface
+    val taps = Modifier.combinedClickable(
+        onClickLabel = "Ouvrir la tâche",
+        onLongClickLabel = "Sélectionner",
+        onClick = onOpen,
+        onLongClick = {
+            haptic.performHapticFeedback(HapticFeedbackType.LongPress) // Petite vibration, comme les apps Android
+            onLongPress()
+        },
+    )
     val frame = if (card) {
         Modifier
             .clip(shape)
-            .background(Palette.surface)
-            .border(1.dp, Palette.border, shape)
-            .clickable(onClickLabel = "Ouvrir la tâche", onClick = onOpen)
+            .background(background)
+            .border(1.dp, if (selected) Palette.accent else Palette.border, shape)
+            .then(taps)
             .padding(end = 12.dp, top = 4.dp, bottom = 4.dp)
     } else {
         Modifier
-            .background(Palette.surface)
-            .clickable(onClickLabel = "Ouvrir la tâche", onClick = onOpen)
+            .background(background)
+            .then(taps)
             .padding(end = 16.dp, top = 2.dp, bottom = 2.dp)
     }
 

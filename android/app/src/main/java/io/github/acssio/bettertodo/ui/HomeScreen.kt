@@ -255,12 +255,12 @@ fun HomeScreen(
     when (val page = model.page) {
         is HomePage.OpenList -> {
             BackHandler(onBack = model::closeList)
-            ListScreen(page.board, onBack = model::closeList)
+            ListScreen(page.board, model.orderedLists, onBack = model::closeList)
             return
         }
         is HomePage.OpenSmart -> {
             BackHandler(onBack = model::closeList)
-            SmartScreen(page.smart, onBack = model::closeList)
+            SmartScreen(page.smart, model.orderedLists, onBack = model::closeList)
             return
         }
         HomePage.Home -> {}

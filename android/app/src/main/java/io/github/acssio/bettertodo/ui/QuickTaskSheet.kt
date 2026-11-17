@@ -84,22 +84,7 @@ fun QuickTaskSheet(model: QuickTaskModel, onClose: () -> Unit) {
             )
 
             // Liste, puis groupe de cette liste
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                Dropdown(
-                    options = model.lists.map { it.id to it.name },
-                    selectedId = model.listId,
-                    onSelect = model::selectList,
-                    modifier = Modifier.weight(1f, fill = false),
-                )
-                Text("›", color = Palette.muted)
-                Dropdown(
-                    options = model.groups.map { it.id to it.name },
-                    selectedId = model.groupId,
-                    onSelect = model::selectGroup,
-                    placeholder = if (model.loadingGroups) "…" else "Aucun groupe",
-                    modifier = Modifier.weight(1f, fill = false),
-                )
-            }
+            PlacePickerRow(model.place)
 
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text("ÉCHÉANCE", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Palette.faint)

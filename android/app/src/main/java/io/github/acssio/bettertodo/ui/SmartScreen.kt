@@ -1,5 +1,6 @@
 package io.github.acssio.bettertodo.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -34,6 +35,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.composables.icons.lucide.R // Icônes de la bibliothèque icons-lucide-android
+import io.github.acssio.bettertodo.api.TodoList
 import io.github.acssio.bettertodo.ui.theme.Palette
 
 /**
@@ -43,10 +45,16 @@ import io.github.acssio.bettertodo.ui.theme.Palette
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SmartScreen(model: SmartModel, onBack: () -> Unit) {
+fun SmartScreen(model: SmartModel, lists: List<TodoList>, onBack: () -> Unit) {
+    // Pendant une sélection, le bouton retour d'Android l'annule (au lieu de revenir à l'accueil)
+    BackHandler(enabled = model.selecting, onBack = model::clearSelection)
+
     Scaffold(
         topBar = {
-            TopAppBar(
+            // Pas de « return » anticipé dans un lambda @Composable : l'écran entier restait blanc (bug testé)
+            if (model.selecting) {
+                SelectionTopBar(model)
+            } else TopAppBar(
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(painterResource(R.drawable.lucide_ic_chevron_left), contentDescription = "Retour à l'accueil")
@@ -60,6 +68,9 @@ fun SmartScreen(model: SmartModel, onBack: () -> Unit) {
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Palette.background),
             )
+        },
+        bottomBar = {
+            if (model.selecting) SelectionBottomBar(model, lists)
         },
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding).imePadding()) {
@@ -111,8 +122,10 @@ private fun SmartSections(model: SmartModel) {
                         urgency = due.task.urgencyId?.let { model.urgencies[it] },
                         card = false,
                         onToggleDone = { model.toggleDone(due.task) },
-                        onOpen = { model.openTask(due.task) },
+                        onOpen = { model.tap(due.task) },
+                        onLongPress = { model.toggleSelection(due.task) },
                         origin = due.list,
+                        selected = due.task.id in model.selectedIds,
                     )
                     HorizontalDivider(color = Palette.border)
                 }

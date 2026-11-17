@@ -1,5 +1,6 @@
 package io.github.acssio.bettertodo.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -53,12 +54,18 @@ import kotlinx.coroutines.launch
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ListScreen(model: BoardModel, onBack: () -> Unit) {
+fun ListScreen(model: BoardModel, lists: List<TodoList>, onBack: () -> Unit) {
     val list = model.currentList
+
+    // Pendant une sélection, le bouton retour d'Android l'annule (au lieu de revenir à l'accueil)
+    BackHandler(enabled = model.selecting, onBack = model::clearSelection)
 
     Scaffold(
         topBar = {
-            TopAppBar(
+            // Pas de « return » anticipé dans un lambda @Composable : l'écran entier restait blanc (bug testé)
+            if (model.selecting) {
+                SelectionTopBar(model)
+            } else TopAppBar(
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(painterResource(R.drawable.lucide_ic_chevron_left), contentDescription = "Retour à l'accueil")
@@ -72,6 +79,9 @@ fun ListScreen(model: BoardModel, onBack: () -> Unit) {
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Palette.background),
             )
+        },
+        bottomBar = {
+            if (model.selecting) SelectionBottomBar(model, lists)
         },
     ) { padding ->
         // imePadding : la liste s'arrête au-dessus du clavier (sinon le champ « Ajouter » est caché dessous)
@@ -145,12 +155,16 @@ private fun ColumnsView(model: BoardModel, groups: List<BoardGroup>) {
                         urgency = task.urgencyId?.let { model.urgencies[it] },
                         card = true,
                         onToggleDone = { model.toggleDone(task) },
-                        onOpen = { model.openTask(task) },
+                        onOpen = { model.tap(task) },
+                        onLongPress = { model.toggleSelection(task) },
+                        selected = task.id in model.selectedIds,
                         modifier = Modifier.animateItem(), // Fondu quand une tâche cochée disparaît
                     )
                 }
-                item(key = "add-" + group.id) {
-                    AddTaskRow(onAdd = { title -> model.createTask(group.id, title) })
+                if (!model.selecting) { // Pas d'ajout pendant une sélection
+                    item(key = "add-" + group.id) {
+                        AddTaskRow(onAdd = { title -> model.createTask(group.id, title) })
+                    }
                 }
             }
         }
@@ -187,13 +201,17 @@ private fun LazyListScope.sectionItems(model: BoardModel, group: BoardGroup) {
                 urgency = task.urgencyId?.let { model.urgencies[it] },
                 card = false,
                 onToggleDone = { model.toggleDone(task) },
-                onOpen = { model.openTask(task) },
+                onOpen = { model.tap(task) },
+                onLongPress = { model.toggleSelection(task) },
+                selected = task.id in model.selectedIds,
             )
             HorizontalDivider(color = Palette.border)
         }
     }
-    item(key = "add-" + group.id) {
-        AddTaskRow(onAdd = { title -> model.createTask(group.id, title) }, modifier = Modifier.padding(horizontal = 4.dp))
+    if (!model.selecting) { // Pas d'ajout pendant une sélection
+        item(key = "add-" + group.id) {
+            AddTaskRow(onAdd = { title -> model.createTask(group.id, title) }, modifier = Modifier.padding(horizontal = 4.dp))
+        }
     }
 }
 

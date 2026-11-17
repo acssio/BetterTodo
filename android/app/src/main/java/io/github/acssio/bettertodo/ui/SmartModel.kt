@@ -56,6 +56,20 @@ class SmartModel(
     /** On ne connaît que le groupe de la tâche, pas toute sa liste (comme le site) : lecture seule. */
     override fun groupsFor(task: Task): List<BoardGroup>? = null
 
+    override val visibleTaskIds: List<String>
+        get() = sections.flatMap { section -> section.tasks.map { it.task.id } }
+
+    override fun listIdOf(task: Task): String = tasks.firstOrNull { it.task.id == task.id }?.list?.id ?: ""
+
+    /** La tâche reste dans la vue (son échéance n'a pas changé) ; afterMove recharge les noms de liste et de groupe. */
+    override fun applyMoved(task: Task, listId: String, groupId: String) {
+        applyLocal(task.copy(groupId = groupId))
+    }
+
+    override fun afterMove() {
+        fetch()
+    }
+
     override fun placeOf(task: Task): String {
         val due = tasks.firstOrNull { it.task.id == task.id } ?: return ""
         return "${due.list.name} › ${due.groupName}"
