@@ -45,12 +45,62 @@ data class TodoList(
     val icon: String,                                      // Nom d'icône Lucide, ex. "briefcase"
     val position: Int,
     @SerialName("open_tasks") val openTasks: Int = 0,      // Tâches pas encore faites
+    @SerialName("default_view") val defaultView: String = VIEW_COLUMNS, // "columns" ou "sections"
+    @SerialName("show_done") val showDone: Boolean = false, // false = tâches faites masquées
+) {
+    companion object {
+        const val VIEW_COLUMNS = "columns"
+        const val VIEW_SECTIONS = "sections"
+    }
+}
+
+/** Une tâche. */
+@Serializable
+data class Task(
+    val id: String,
+    @SerialName("group_id") val groupId: String,
+    val title: String,
+    val notes: String = "",
+    @SerialName("due_date") val dueDate: String? = null,     // "2026-11-18", ou null
+    @SerialName("urgency_id") val urgencyId: String? = null, // null = pas d'urgence
+    val done: Boolean = false,
+    val position: Int,
+    val tags: List<String> = emptyList(),                    // Noms des tags, triés
+)
+
+/** Un groupe d'une liste, avec ses tâches (dans GET /lists/{id}/board). */
+@Serializable
+data class BoardGroup(
+    val id: String,
+    val name: String,
+    val position: Int,
+    val tasks: List<Task> = emptyList(),
+)
+
+/** Réponse de GET /lists/{id}/board : tout ce qu'il faut pour afficher une liste. */
+@Serializable
+data class Board(
+    val list: TodoList,
+    val groups: List<BoardGroup>,
+)
+
+/** Niveau d'urgence (Paramètres du site). */
+@Serializable
+data class UrgencyLevel(
+    val id: String,
+    val name: String,
+    val color: String,
+    val rank: Int, // 0 = le moins urgent
 )
 
 // --- Corps de requête et petites réponses ----------------------------------------
 
 @Serializable
 data class LoginRequest(val email: String, val password: String)
+
+/** PATCH /tasks/{id} pour cocher ou décocher : seul "done" est envoyé. */
+@Serializable
+data class TaskDoneChange(val done: Boolean)
 
 @Serializable
 data class SetupStatus(@SerialName("needs_setup") val needsSetup: Boolean)

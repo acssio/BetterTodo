@@ -58,6 +58,25 @@ class ApiClient(private val serverUrl: String, private val token: String? = null
         return json.decodeFromString(send("GET", "/lists"))
     }
 
+    /** La liste, ses groupes et toutes leurs tâches (faites comprises). */
+    suspend fun board(listId: String): Board {
+        return json.decodeFromString(send("GET", "/lists/$listId/board"))
+    }
+
+    // --- Tâches --------------------------------------------------------------
+
+    /** Coche (done = true) ou décoche une tâche. */
+    suspend fun setTaskDone(taskId: String, done: Boolean): Task {
+        val body = json.encodeToString(TaskDoneChange(done))
+        return json.decodeFromString(send("PATCH", "/tasks/$taskId", body))
+    }
+
+    // --- Paramètres ----------------------------------------------------------
+
+    suspend fun urgencyLevels(): List<UrgencyLevel> {
+        return json.decodeFromString(send("GET", "/urgency-levels"))
+    }
+
     // --- Envoi d'une requête -------------------------------------------------
 
     /**

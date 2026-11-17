@@ -154,6 +154,9 @@ Observé dans ses autres projets (C++ embarqué, React/TypeScript). Écrire du c
   - tests : `./gradlew test` (JUnit, fonctions pures) + vrais appuis sur l'émulateur (`adb shell input`) ;
   - plusieurs `async` en parallèle : **toujours dans `coroutineScope { }`**, sinon une erreur fait planter l'app au lieu d'aller dans le `try` (bug rencontré) ;
   - **6-1** (2026-11-17) : connexion + accueil en lecture seule (groupes de listes repliables localement, listes, compteurs).
+  - **Feuille de route (2026-11-17)** : 6-2 ouvrir une liste + cocher ; 6-3 ajouter / modifier (panneau du bas) / supprimer une tâche ; 6-4 Aujourd'hui / Planifié + Quick task ; 6-5 appui long, Déplacer, glisser ; 6-6 gérer listes, groupes de listes et groupes ; 6-7 Paramètres (dont le mot de passe initial). Console admin : reste sur le site.
+  - **6-2** (2026-11-17) : `HomeViewModel.page` (`HomePage.Home` / `OpenList`) + `BackHandler` ; `BoardModel` = **classe simple** (pas un ViewModel) créée à chaque ouverture, gardée par `HomeViewModel` ; vue colonnes = `PrimaryScrollableTabRow` + `HorizontalPager`, vue sections = `LazyColumn` ; `TaskItem` commun (`card`) ; cocher optimiste (en cas d'erreur : remettre la tâche, puis recharger) ; liste qui masque les faites : tâche cochée visible 0,7 s (`leavingIds`) puis fondu. Basculer la vue et afficher les faites depuis l'app : 6-6.
+  - **À faire plus tard (demande du 2026-11-17)** : un nouvel utilisateur (`must_change_password`) doit pouvoir **changer son mot de passe initial depuis l'app**, au lieu du bandeau qui renvoie vers le site (`POST /me/password`, comme `ChangePasswordPage` du web).
 - **2026-11-13 – Maquette web validée** (Figma, page « Web – Maquette v2 »).
 
 ## Questions ouvertes

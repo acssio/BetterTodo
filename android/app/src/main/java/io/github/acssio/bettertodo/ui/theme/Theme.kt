@@ -16,6 +16,11 @@ object Palette {
     val faint = Color(0xFF8A8A87)      // --faint
     val accent = Color(0xFF2F6FEB)     // --accent
     val danger = Color(0xFFE5484D)     // --danger
+    val success = Color(0xFF3FA66B)    // --success : case cochée
+    val done = Color(0xFFA3A3A0)       // --done : titre d'une tâche cochée
+    val checkBorder = Color(0xFFB5B5B1) // Bord de la case à cocher (.card-check)
+    val tagBackground = Color(0xFFF0F0EE) // .card-tag
+    val tagText = Color(0xFF55554F)
 }
 
 /** Thème Material 3 de l'app (clair seulement, comme le site pour l'instant). */

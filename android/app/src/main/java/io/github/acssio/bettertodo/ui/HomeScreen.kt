@@ -1,5 +1,6 @@
 package io.github.acssio.bettertodo.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -34,6 +35,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -55,14 +57,28 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 
-/** Chargement des données de l'accueil. */
+/** Chargement des données d'un écran (accueil, liste). */
 enum class LoadState { Loading, Ready, Failed }
 
 /**
- * Données de l'accueil : groupes de listes et listes (lecture seule pour l'instant).
- * Seuls AppViewModel et HomeViewModel parlent à l'API, comme App et Workspace sur le site.
+ * Page affichée une fois connecté (comme mobileScreen sur le site) :
+ *
+ *   Home ──(toucher une liste)──→ OpenList ──(‹ ou bouton retour)──→ Home (rechargé)
+ */
+sealed class HomePage {
+    data object Home : HomePage()
+    data class OpenList(val board: BoardModel) : HomePage()
+}
+
+/**
+ * Données de l'accueil : groupes de listes et listes, et la page affichée.
+ * Seuls AppViewModel et HomeViewModel (avec ses BoardModel) parlent à l'API,
+ * comme App et Workspace sur le site.
  */
 class HomeViewModel(private val api: ApiClient) : ViewModel() {
+    var page by mutableStateOf<HomePage>(HomePage.Home)
+        private set
+
     var state by mutableStateOf(LoadState.Loading)
         private set
     var refreshing by mutableStateOf(false) // Tiré vers le bas (les listes restent affichées)
@@ -99,6 +115,17 @@ class HomeViewModel(private val api: ApiClient) : ViewModel() {
 
     fun toggleFolder(folderId: String) {
         collapsedIds = if (folderId in collapsedIds) collapsedIds - folderId else collapsedIds + folderId
+    }
+
+    /** Toucher une liste : un nouveau BoardModel, donc la liste est toujours rechargée. */
+    fun openList(list: TodoList) {
+        page = HomePage.OpenList(BoardModel(api, list, viewModelScope, onUnauthorized = { sessionExpired = true }))
+    }
+
+    /** Retour à l'accueil : rechargé sans indicateur, pour mettre à jour les compteurs. */
+    fun closeList() {
+        page = HomePage.Home
+        fetch()
     }
 
     private fun fetch() {
@@ -156,6 +183,14 @@ fun HomeScreen(
         }
     }
 
+    // Liste ouverte : son écran remplace l'accueil, et le bouton retour d'Android y ramène
+    val page = model.page
+    if (page is HomePage.OpenList) {
+        BackHandler(onBack = model::closeList)
+        ListScreen(page.board, onBack = model::closeList)
+        return
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -207,10 +242,10 @@ private fun HomeLists(model: HomeViewModel, user: User) {
         item { SectionLabel("Listes") }
 
         val ungrouped = model.lists.filter { it.folderId == null }
-        items(ungrouped, key = { it.id }) { list -> ListRow(list) }
+        items(ungrouped, key = { it.id }) { list -> ListRow(list, model::openList) }
 
         for (folder in model.folders) {
-            folderItems(folder, model.lists.filter { it.folderId == folder.id }, folder.id in model.collapsedIds, model::toggleFolder)
+            folderItems(folder, model.lists.filter { it.folderId == folder.id }, folder.id in model.collapsedIds, model::toggleFolder, model::openList)
         }
 
         if (model.lists.isEmpty()) {
@@ -226,7 +261,13 @@ private fun HomeLists(model: HomeViewModel, user: User) {
 }
 
 /** Un groupe de listes : son en-tête (toucher = replier / déplier), puis ses listes s'il est ouvert. */
-private fun LazyListScope.folderItems(folder: Folder, lists: List<TodoList>, collapsed: Boolean, onToggle: (String) -> Unit) {
+private fun LazyListScope.folderItems(
+    folder: Folder,
+    lists: List<TodoList>,
+    collapsed: Boolean,
+    onToggle: (String) -> Unit,
+    onOpen: (TodoList) -> Unit,
+) {
     item(key = "folder-" + folder.id) {
         Row(
             Modifier
@@ -257,30 +298,40 @@ private fun LazyListScope.folderItems(folder: Folder, lists: List<TodoList>, col
         }
     }
     if (!collapsed) {
-        items(lists, key = { it.id }) { list -> ListRow(list) }
+        items(lists, key = { it.id }) { list -> ListRow(list, onOpen) }
     }
 }
 
-/** Une liste : icône sur carré teinté, nom, nombre de tâches à faire. */
+/** Une liste : icône sur carré teinté, nom, nombre de tâches à faire. Toucher = ouvrir la liste. */
 @Composable
-private fun ListRow(list: TodoList) {
-    val color = ListIcons.color(list.color)
+private fun ListRow(list: TodoList, onOpen: (TodoList) -> Unit) {
     Row(
-        Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(horizontal = 12.dp),
+        Modifier
+            .fillMaxWidth()
+            .heightIn(min = 48.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .clickable { onOpen(list) }
+            .padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        // Fond = la couleur de la liste à 10 % d'opacité, comme ListIcon sur le site
-        Box(
-            Modifier.size(30.dp).background(color.copy(alpha = 0.1f), RoundedCornerShape(8.dp)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(painterResource(ListIcons.drawable(list.icon)), contentDescription = null, tint = color, modifier = Modifier.size(18.dp))
-        }
+        ListIconBox(list)
         Text(list.name, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
         if (list.openTasks > 0) {
             Text(list.openTasks.toString(), color = Palette.faint, fontSize = 13.sp)
         }
+    }
+}
+
+/** Icône d'une liste sur un carré teinté : la couleur de la liste à 10 % d'opacité, comme ListIcon sur le site. */
+@Composable
+fun ListIconBox(list: TodoList) {
+    val color = ListIcons.color(list.color)
+    Box(
+        Modifier.size(30.dp).background(color.copy(alpha = 0.1f), RoundedCornerShape(8.dp)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(painterResource(ListIcons.drawable(list.icon)), contentDescription = null, tint = color, modifier = Modifier.size(18.dp))
     }
 }
 
@@ -295,9 +346,9 @@ private fun SectionLabel(text: String) {
     )
 }
 
-/** Bandeau d'information en haut de la liste. */
+/** Bandeau d'information en haut d'un écran (accueil, liste). */
 @Composable
-private fun Notice(text: String) {
+fun Notice(text: String) {
     Text(
         text,
         fontSize = 14.sp,
@@ -309,8 +360,9 @@ private fun Notice(text: String) {
     )
 }
 
+/** Chargement raté : message et « Réessayer » au centre de l'écran. */
 @Composable
-private fun FailedMessage(message: String, onRetry: () -> Unit) {
+fun FailedMessage(message: String, onRetry: () -> Unit) {
     Column(
         Modifier.fillMaxSize().padding(32.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
