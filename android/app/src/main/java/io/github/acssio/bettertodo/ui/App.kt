@@ -32,10 +32,14 @@ import kotlinx.coroutines.launch
 /**
  * L'écran affiché : la machine d'état de l'app.
  *
- *   Loading ──(jeton valide)──────────→ Home
- *      │ ──(pas de jeton / 401)───────→ Login ──(connexion)──→ Home
+ *   Loading ──(jeton valide)──────────→ Home (ou MustChangePassword)
+ *      │ ──(pas de jeton / 401)───────→ Login ──(connexion)──→ Home (ou MustChangePassword)
  *      └──(serveur injoignable)───────→ Unreachable ──(réessayer)──→ Loading
+ *   MustChangePassword ──(nouveau mot de passe enregistré)──→ Home
  *   Home ──(déconnexion / 401)────────→ Login
+ *
+ * MustChangePassword : mot de passe donné par l'admin (must_change_password), à changer avant
+ * d'ouvrir les listes, comme ChangePasswordPage sur le site.
  */
 sealed class Screen {
     /** Au lancement : on vérifie le jeton enregistré. */
@@ -46,6 +50,9 @@ sealed class Screen {
 
     /** Jeton enregistré, mais le serveur ne répond pas : on ne déconnecte pas pour autant. */
     data class Unreachable(val message: String) : Screen()
+
+    /** Connecté, mais le mot de passe provisoire doit d'abord être changé. */
+    data class MustChangePassword(val api: ApiClient, val user: User, val token: String) : Screen()
 
     /** Connecté. api envoie le jeton à chaque requête. */
     data class Home(val api: ApiClient, val user: User, val token: String) : Screen()
@@ -67,6 +74,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     var loginError by mutableStateOf<String?>(null)
         private set
 
+    // État du formulaire « Choisis ton mot de passe » (écran obligatoire)
+    var passwordBusy by mutableStateOf(false)
+        private set
+    var passwordError by mutableStateOf<String?>(null)
+        private set
+
     init {
         start()
     }
@@ -83,7 +96,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
             val api = ApiClient(saved.serverUrl, saved.token)
             try {
-                screen = Screen.Home(api, api.me(), saved.token)
+                screen = connected(api, api.me(), saved.token)
             } catch (e: ApiError) {
                 if (e.status == 401) {
                     store.clearToken()
@@ -110,12 +123,43 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 val session = api.login(email.trim(), password)
                 store.save(serverUrl, session.token)
-                screen = Screen.Home(ApiClient(serverUrl, session.token), session.user, session.token)
+                screen = connected(ApiClient(serverUrl, session.token), session.user, session.token)
             } catch (e: ApiError) {
                 loginError = loginErrorMessage(api, e)
             }
             loginBusy = false
         }
+    }
+
+    /** Après connexion : l'accueil, ou d'abord l'écran du mot de passe provisoire. */
+    private fun connected(api: ApiClient, user: User, token: String): Screen {
+        return if (user.mustChangePassword) Screen.MustChangePassword(api, user, token) else Screen.Home(api, user, token)
+    }
+
+    /** « Enregistrer » sur l'écran du mot de passe obligatoire. */
+    fun changeInitialPassword(current: String, new: String, confirm: String) {
+        val screenNow = screen as? Screen.MustChangePassword ?: return
+        PasswordForm.check(current, new, confirm)?.let {
+            passwordError = it
+            return
+        }
+        passwordBusy = true
+        passwordError = null
+        viewModelScope.launch {
+            try {
+                val user = screenNow.api.changePassword(current, new) // Les autres sessions sont fermées, pas celle-ci
+                screen = Screen.Home(screenNow.api, user, screenNow.token)
+            } catch (e: ApiError) {
+                if (e.status == 401) onSessionExpired() else passwordError = e.message
+            }
+            passwordBusy = false
+        }
+    }
+
+    /** Le compte a changé (Paramètres) : nom affiché, langue, vue par défaut. */
+    fun updateUser(user: User) {
+        val home = screen as? Screen.Home ?: return
+        screen = home.copy(user = user)
     }
 
     /** Sur un refus (401), explique si le serveur n'a encore aucun compte. */
@@ -134,10 +178,14 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     /** Bouton de déconnexion de l'accueil. */
     fun logout() {
-        val current = screen as? Screen.Home ?: return
+        val api = when (val current = screen) {
+            is Screen.Home -> current.api
+            is Screen.MustChangePassword -> current.api
+            else -> return
+        }
         viewModelScope.launch {
             try {
-                current.api.logout()
+                api.logout()
             } catch (e: ApiError) {
                 // Serveur injoignable ou session déjà fermée : on se déconnecte quand même ici
             }
@@ -182,12 +230,20 @@ fun App(app: AppViewModel = viewModel()) {
             onRetry = app::start,
             onLogout = app::forgetSession,
         )
+        is Screen.MustChangePassword -> ChangePasswordScreen(
+            user = screen.user,
+            busy = app.passwordBusy,
+            error = app.passwordError,
+            onSubmit = app::changeInitialPassword,
+            onLogout = app::logout,
+        )
         is Screen.Home -> HomeScreen(
             api = screen.api,
             user = screen.user,
             sessionKey = screen.token,
             onLogout = app::logout,
             onSessionExpired = app::onSessionExpired,
+            onUserChanged = app::updateUser,
         )
     }
 }

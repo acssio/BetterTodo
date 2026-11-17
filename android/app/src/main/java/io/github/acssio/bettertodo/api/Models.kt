@@ -14,6 +14,7 @@ data class User(
     val email: String,
     @SerialName("display_name") val displayName: String,
     val language: String = "fr",                                                  // "fr" ou "en"
+    @SerialName("default_view") val defaultView: String = "columns",              // Vue des nouvelles listes
     @SerialName("is_admin") val isAdmin: Boolean = false,
     @SerialName("must_change_password") val mustChangePassword: Boolean = false, // Mot de passe donné par l'admin
 )

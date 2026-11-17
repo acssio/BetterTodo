@@ -81,11 +81,13 @@ enum class LoadState { Loading, Ready, Failed }
  *
  *   Home ──(toucher une liste)───────────→ OpenList  ──(‹ ou bouton retour)──→ Home (rechargé)
  *        ──(toucher Aujourd'hui/Planifié)→ OpenSmart ──(‹ ou bouton retour)──→ Home (rechargé)
+ *        ──(engrenage)───────────────────→ Settings  ──(‹ ou bouton retour)──→ Home (rechargé)
  */
 sealed class HomePage {
     data object Home : HomePage()
     data class OpenList(val board: BoardModel) : HomePage()
     data class OpenSmart(val smart: SmartModel) : HomePage()
+    data class Settings(val settings: SettingsModel) : HomePage()
 }
 
 /** Boîte de nom ouverte sur l'accueil. */
@@ -288,6 +290,11 @@ class HomeViewModel(private val api: ApiClient, private val quickTaskMemory: Qui
         )
     }
 
+    /** Engrenage de l'en-tête : les Paramètres. */
+    fun openSettings(user: User, onUserChanged: (User) -> Unit) {
+        page = HomePage.Settings(SettingsModel(api, user, viewModelScope, onUnauthorized = { sessionExpired = true }, onUserChanged))
+    }
+
     /** Toucher « Aujourd'hui » ou « Planifié ». */
     fun openSmart(kind: SmartKind) {
         page = HomePage.OpenSmart(SmartModel(api, kind, viewModelScope, onUnauthorized = { sessionExpired = true }))
@@ -373,6 +380,7 @@ fun HomeScreen(
     sessionKey: String,
     onLogout: () -> Unit,
     onSessionExpired: () -> Unit,
+    onUserChanged: (User) -> Unit,
 ) {
     val context = LocalContext.current
     val model: HomeViewModel = viewModel(key = sessionKey) { HomeViewModel(api, QuickTaskMemory(context)) }
@@ -404,6 +412,11 @@ fun HomeScreen(
             SmartScreen(page.smart, model.orderedLists, onBack = model::closeList)
             return
         }
+        is HomePage.Settings -> {
+            BackHandler(onBack = model::closeList)
+            SettingsScreen(page.settings, onBack = model::closeList)
+            return
+        }
         HomePage.Home -> {}
     }
 
@@ -421,6 +434,9 @@ fun HomeScreen(
                 },
                 actions = {
                     NewMenu(onNewList = { model.askNewList(null) }, onNewFolder = model::askNewFolder)
+                    IconButton(onClick = { model.openSettings(user, onUserChanged) }) {
+                        Icon(painterResource(R.drawable.lucide_ic_settings), contentDescription = "Paramètres", modifier = Modifier.size(20.dp))
+                    }
                     IconButton(onClick = onLogout) {
                         Icon(painterResource(R.drawable.lucide_ic_log_out), contentDescription = "Se déconnecter (${user.displayName})", modifier = Modifier.size(20.dp))
                     }
@@ -531,9 +547,6 @@ fun MenuItem(label: String, icon: Int, danger: Boolean = false, onClick: () -> U
 private fun HomeLists(model: HomeViewModel, user: User) {
     // En bas : de la place pour que le bouton Quick task ne cache pas la dernière liste
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 88.dp)) {
-        if (user.mustChangePassword) {
-            item { Notice("Ton mot de passe a été donné par l'administrateur : change-le depuis le site (Paramètres › Mot de passe).") }
-        }
         if (model.error != null) {
             item { Notice(model.error ?: "") }
         }

@@ -45,6 +45,31 @@ class ApiClient(private val serverUrl: String, private val token: String? = null
         return json.decodeFromString(send("GET", "/me"))
     }
 
+    /**
+     * Modifie le compte : nom affiché, langue ("fr" / "en") ou vue par défaut ("columns" / "sections").
+     * Seuls les champs non null sont envoyés.
+     */
+    suspend fun updateMe(displayName: String? = null, language: String? = null, defaultView: String? = null): User {
+        val body = buildJsonObject {
+            displayName?.let { put("display_name", it) }
+            language?.let { put("language", it) }
+            defaultView?.let { put("default_view", it) }
+        }.toString()
+        return json.decodeFromString(send("PATCH", "/me", body))
+    }
+
+    /**
+     * Change le mot de passe (il faut l'actuel, même sur l'écran obligatoire).
+     * Les AUTRES sessions du compte sont fermées ; celle du téléphone reste valable.
+     */
+    suspend fun changePassword(current: String, new: String): User {
+        val body = buildJsonObject {
+            put("current_password", current)
+            put("new_password", new)
+        }.toString()
+        return json.decodeFromString(send("POST", "/me/password", body))
+    }
+
     /** Ferme la session côté serveur : le jeton ne marche plus. */
     suspend fun logout() {
         send("POST", "/auth/logout")
