@@ -94,6 +94,14 @@ data class UrgencyLevel(
     val rank: Int, // 0 = le moins urgent
 )
 
+/** Un tag (Paramètres), avec le nombre de tâches qui le portent. */
+@Serializable
+data class Tag(
+    val id: String,
+    val name: String,
+    @SerialName("task_count") val taskCount: Int = 0,
+)
+
 /** La liste d'origine d'une tâche d'Aujourd'hui / Planifié. */
 @Serializable
 data class ListRef(

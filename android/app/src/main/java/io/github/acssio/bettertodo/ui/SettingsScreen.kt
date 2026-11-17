@@ -46,14 +46,18 @@ import androidx.compose.ui.unit.sp
 import com.composables.icons.lucide.R // Icônes de la bibliothèque icons-lucide-android
 import io.github.acssio.bettertodo.api.ApiClient
 import io.github.acssio.bettertodo.api.ApiError
+import io.github.acssio.bettertodo.api.Tag
 import io.github.acssio.bettertodo.api.TodoList
+import io.github.acssio.bettertodo.api.UrgencyLevel
 import io.github.acssio.bettertodo.api.User
 import io.github.acssio.bettertodo.ui.theme.Palette
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 
 /**
- * Données de l'écran Paramètres (étape 6-7a) : le compte et le mot de passe.
+ * Données de l'écran Paramètres : le compte et le mot de passe (6-7a), les niveaux d'urgence et les tags (6-7b).
  * Comme BoardModel, ce n'est pas un ViewModel : HomeViewModel en crée un à chaque ouverture.
  *
  * @param onUserChanged le compte a changé : AppViewModel le garde (nom affiché ailleurs dans l'app)
@@ -76,6 +80,146 @@ class SettingsModel(
         private set
     var passwordDone by mutableStateOf(false) // « Mot de passe changé » affiché sous le formulaire
         private set
+
+    // --- Niveaux d'urgence et tags (étape 6-7b) ---
+    var levels by mutableStateOf<List<UrgencyLevel>>(emptyList()) // Du moins urgent au plus urgent
+        private set
+    var tags by mutableStateOf<List<Tag>>(emptyList())
+        private set
+
+    /** Boîte ouverte (nom, couleur ou confirmation), null = aucune. */
+    var dialog by mutableStateOf<SettingsDialog?>(null)
+        private set
+
+    init {
+        scope.launch {
+            try {
+                coroutineScope { // Obligatoire autour des async (étape 6-1)
+                    val levelsCall = async { api.urgencyLevels() }
+                    val tagsCall = async { api.tags() }
+                    levels = levelsCall.await().sortedBy { it.rank }
+                    tags = tagsCall.await()
+                }
+            } catch (e: ApiError) {
+                failed(e)
+            }
+        }
+    }
+
+    fun ask(dialog: SettingsDialog) {
+        this.dialog = dialog
+    }
+
+    fun closeDialog() {
+        dialog = null
+    }
+
+    /** OK dans une boîte de nom. */
+    fun submitName(name: String) {
+        when (val current = dialog) {
+            SettingsDialog.NewLevel -> addLevel(name)
+            is SettingsDialog.RenameLevel -> renameLevel(current.level, name)
+            SettingsDialog.NewTag -> addTag(name)
+            is SettingsDialog.RenameTag -> renameTag(current.tag, name)
+            else -> {}
+        }
+        dialog = null
+    }
+
+    /** OK dans une confirmation. */
+    fun confirm() {
+        when (val current = dialog) {
+            is SettingsDialog.DeleteLevel -> deleteLevel(current.level)
+            is SettingsDialog.DeleteTag -> deleteTag(current.tag)
+            else -> {}
+        }
+        dialog = null
+    }
+
+    /** Nouveau niveau, à la fin, avec la première couleur de la palette pas encore prise (comme le site). */
+    private fun addLevel(name: String) {
+        scope.launch {
+            try {
+                levels = levels + api.createUrgencyLevel(name, nextLevelColor(levels.map { it.color }))
+            } catch (e: ApiError) {
+                failed(e)
+            }
+        }
+    }
+
+    private fun renameLevel(level: UrgencyLevel, name: String) {
+        if (name == level.name) return
+        changeLevels(levels.map { if (it.id == level.id) it.copy(name = name) else it }) { api.updateUrgencyLevel(level.id, name = name) }
+    }
+
+    /** Couleur choisie dans la boîte « Couleur ». */
+    fun setLevelColor(level: UrgencyLevel, color: String) {
+        dialog = null
+        if (color.equals(level.color, ignoreCase = true)) return
+        changeLevels(levels.map { if (it.id == level.id) it.copy(color = color) else it }) { api.updateUrgencyLevel(level.id, color = color) }
+    }
+
+    /** Flèche ↑ (direction -1, moins urgent) ou ↓ (+1, plus urgent). */
+    fun moveLevel(level: UrgencyLevel, direction: Int) {
+        val index = levels.indexOfFirst { it.id == level.id }
+        val target = index + direction
+        if (index < 0 || target !in levels.indices) return
+        changeLevels(reorderLevels(levels, index, target)) { api.updateUrgencyLevel(level.id, rank = target) }
+    }
+
+    private fun deleteLevel(level: UrgencyLevel) {
+        changeLevels(levels.filter { it.id != level.id }) { api.deleteUrgencyLevel(level.id) }
+    }
+
+    /** L'écran d'abord, puis l'API ; en cas d'erreur, la liste d'avant et un bandeau. */
+    private fun changeLevels(after: List<UrgencyLevel>, call: suspend () -> Unit) {
+        val before = levels
+        levels = after
+        scope.launch {
+            try {
+                call()
+            } catch (e: ApiError) {
+                levels = before
+                failed(e)
+            }
+        }
+    }
+
+    private fun addTag(name: String) {
+        scope.launch {
+            try {
+                tags = (tags + api.createTag(name)).sortedBy { it.name.lowercase() }
+            } catch (e: ApiError) {
+                failed(e)
+            }
+        }
+    }
+
+    private fun renameTag(tag: Tag, name: String) {
+        if (name == tag.name) return
+        changeTags(tags.map { if (it.id == tag.id) it.copy(name = name) else it }) { api.renameTag(tag.id, name) }
+    }
+
+    private fun deleteTag(tag: Tag) {
+        changeTags(tags.filter { it.id != tag.id }) { api.deleteTag(tag.id) }
+    }
+
+    private fun changeTags(after: List<Tag>, call: suspend () -> Unit) {
+        val before = tags
+        tags = after
+        scope.launch {
+            try {
+                call()
+            } catch (e: ApiError) {
+                tags = before
+                failed(e)
+            }
+        }
+    }
+
+    private fun failed(e: ApiError) {
+        if (e.status == 401) onUnauthorized() else error = "Modification non enregistrée : ${e.message}"
+    }
 
     /** Nom vide ou inchangé : rien n'est envoyé. */
     fun setDisplayName(name: String) {
@@ -134,10 +278,44 @@ class SettingsModel(
     }
 }
 
+/** Boîte ouverte dans les Paramètres. */
+sealed class SettingsDialog {
+    data object NewLevel : SettingsDialog()
+    data class RenameLevel(val level: UrgencyLevel) : SettingsDialog()
+    data class LevelColor(val level: UrgencyLevel) : SettingsDialog()
+    data class DeleteLevel(val level: UrgencyLevel) : SettingsDialog()
+    data object NewTag : SettingsDialog()
+    data class RenameTag(val tag: Tag) : SettingsDialog()
+    data class DeleteTag(val tag: Tag) : SettingsDialog()
+}
+
+/** Couleur d'un nouveau niveau : la première de la palette pas encore prise, sinon la dernière (comme le site). */
+fun nextLevelColor(used: List<String>): String {
+    val taken = used.map { it.uppercase() }
+    return ListIcons.colors.firstOrNull { it.uppercase() !in taken } ?: ListIcons.colors.last()
+}
+
+/** Les niveaux après déplacement de from à to, rangs renumérotés 0, 1, 2… (comme le fera le serveur). */
+fun reorderLevels(levels: List<UrgencyLevel>, from: Int, to: Int): List<UrgencyLevel> {
+    val moved = levels.toMutableList()
+    moved.add(to, moved.removeAt(from))
+    return moved.mapIndexed { rank, level -> level.copy(rank = rank) }
+}
+
+/** Confirmation de suppression d'un niveau (texte du site). */
+fun deleteLevelMessage(level: UrgencyLevel): String =
+    "Supprimer le niveau « ${level.name} » ? Les tâches de ce niveau passeront sans urgence."
+
+/** Confirmation de suppression d'un tag, avec le nombre de tâches (texte du site). */
+fun deleteTagMessage(tag: Tag): String {
+    val usage = if (tag.taskCount > 0) " Il sera enlevé de ${tag.taskCount} tâche${if (tag.taskCount > 1) "s" else ""}." else ""
+    return "Supprimer le tag « ${tag.name} » ?$usage"
+}
+
 /**
  * Écran Paramètres (comme SettingsDialog du site, en plein écran comme sur le site mobile) :
- * Compte (nom affiché, langue), Mot de passe, Affichage par défaut.
- * Niveaux d'urgence et tags : étape 6-7b. Jetons d'accès et console admin : sur le site.
+ * Compte (nom affiché, langue), Mot de passe, Niveaux d'urgence, Tags, Affichage par défaut.
+ * Jetons d'accès et console admin : sur le site.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -206,6 +384,18 @@ fun SettingsScreen(model: SettingsModel, onBack: () -> Unit) {
 
             HorizontalDivider(color = Palette.border)
 
+            // --- Niveaux d'urgence (6-7b) ---
+            SectionTitle("Niveaux d'urgence")
+            UrgencyLevelsSection(model)
+
+            HorizontalDivider(color = Palette.border)
+
+            // --- Tags (6-7b) ---
+            SectionTitle("Tags")
+            TagsSection(model)
+
+            HorizontalDivider(color = Palette.border)
+
             // --- Affichage par défaut ---
             SectionTitle("Affichage par défaut")
             Text("La vue des nouvelles listes.", color = Palette.muted, fontSize = 14.sp)
@@ -216,6 +406,8 @@ fun SettingsScreen(model: SettingsModel, onBack: () -> Unit) {
             Box(Modifier.height(24.dp))
         }
     }
+
+    SettingsDialogs(model) // Boîtes de nom, de couleur et confirmations (6-7b)
 }
 
 /** Changer son mot de passe : actuel, nouveau, confirmation ; erreurs et confirmation sous le formulaire. */

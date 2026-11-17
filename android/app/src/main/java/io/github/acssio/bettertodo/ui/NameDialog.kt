@@ -30,6 +30,7 @@ import androidx.compose.ui.text.input.TextFieldValue
  *
  * @param initial texte de départ (renommer), sélectionné en entier pour être remplacé d'un coup
  * @param confirmLabel « Créer » ou « Renommer »
+ * @param capitalize majuscule en début de nom proposée par le clavier (pas pour les tags, en minuscules comme sur le site)
  */
 @Composable
 fun NameDialog(
@@ -37,6 +38,7 @@ fun NameDialog(
     placeholder: String,
     confirmLabel: String,
     initial: String = "",
+    capitalize: Boolean = true,
     onConfirm: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -58,7 +60,10 @@ fun NameDialog(
                 onValueChange = { value = it },
                 placeholder = { Text(placeholder) },
                 singleLine = true,
-                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Done),
+                keyboardOptions = KeyboardOptions(
+                    capitalization = if (capitalize) KeyboardCapitalization.Sentences else KeyboardCapitalization.None,
+                    imeAction = ImeAction.Done,
+                ),
                 keyboardActions = KeyboardActions(onDone = { submit() }),
                 modifier = Modifier.focusRequester(focus),
             )
