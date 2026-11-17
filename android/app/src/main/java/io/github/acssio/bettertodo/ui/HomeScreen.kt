@@ -1,6 +1,11 @@
 package io.github.acssio.bettertodo.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.foundation.border
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FabPosition
@@ -83,6 +88,24 @@ sealed class HomePage {
     data class OpenSmart(val smart: SmartModel) : HomePage()
 }
 
+/** Boîte de nom ouverte sur l'accueil. */
+sealed class HomeDialog {
+    /** @param folderId le groupe de listes où créer la liste, ou null pour hors groupe */
+    data class NewList(val folderId: String?) : HomeDialog()
+    data object NewFolder : HomeDialog()
+    data class RenameFolder(val folder: Folder) : HomeDialog()
+}
+
+/** Les listes après la suppression du groupe de listes folderId : les siennes passent hors groupe. */
+fun withoutFolder(lists: List<TodoList>, folderId: String): List<TodoList> {
+    return lists.map { if (it.folderId == folderId) it.copy(folderId = null) else it }
+}
+
+/** Texte de la confirmation de suppression d'un groupe de listes. */
+fun deleteFolderMessage(folder: Folder): String {
+    return "« ${folder.name} » sera supprimé. Ses listes sont gardées, hors groupe."
+}
+
 /**
  * Données de l'accueil : compteurs d'Aujourd'hui / Planifié, groupes de listes et listes,
  * la page affichée et la Quick task.
@@ -113,11 +136,19 @@ class HomeViewModel(private val api: ApiClient, private val quickTaskMemory: Qui
     var quickTask by mutableStateOf<QuickTaskModel?>(null)
         private set
 
+    /** Boîte de nom ouverte (null = fermée). */
+    var nameDialog by mutableStateOf<HomeDialog?>(null)
+        private set
+
+    /** Groupe de listes dont la suppression attend une confirmation (null = aucun). */
+    var folderToDelete by mutableStateOf<Folder?>(null)
+        private set
+
     /** Message court affiché en bas (Snackbar), ex. après une Quick task. */
     var message by mutableStateOf<String?>(null)
         private set
 
-    /** Groupes de listes repliés. Pour l'instant seulement sur ce téléphone (pas envoyé au serveur). */
+    /** Groupes de listes repliés (retenu sur le serveur, comme sur le site). */
     var collapsedIds by mutableStateOf<Set<String>>(emptySet())
         private set
 
@@ -137,8 +168,117 @@ class HomeViewModel(private val api: ApiClient, private val quickTaskMemory: Qui
         fetch()
     }
 
+    /** Replier / déplier : l'écran d'abord, puis le serveur (retenu comme sur le site). */
     fun toggleFolder(folderId: String) {
-        collapsedIds = if (folderId in collapsedIds) collapsedIds - folderId else collapsedIds + folderId
+        val collapsed = folderId !in collapsedIds
+        collapsedIds = if (collapsed) collapsedIds + folderId else collapsedIds - folderId
+        viewModelScope.launch {
+            try {
+                api.setFolderCollapsed(folderId, collapsed)
+            } catch (e: ApiError) {
+                failed(e)
+            }
+        }
+    }
+
+    // --- Listes et groupes de listes (étape 6-6a) -------------------------------
+    //
+    //   aucune boîte ──(+ › Nouvelle liste / … › Nouvelle liste ici)──→ NewList ──(OK)──→ liste créée et ouverte
+    //               ──(+ › Nouveau groupe de listes)─────────────────→ NewFolder ──(OK)──→ ajouté à la fin
+    //               ──(… › Renommer)─────────────────────────────────→ RenameFolder ──(OK)──→ renommé
+    //               ──(… › Supprimer)──→ confirmation ──(Supprimer)──→ supprimé, ses listes hors groupe
+
+    fun askNewList(folderId: String?) {
+        nameDialog = HomeDialog.NewList(folderId)
+    }
+
+    fun askNewFolder() {
+        nameDialog = HomeDialog.NewFolder
+    }
+
+    fun askRenameFolder(folder: Folder) {
+        nameDialog = HomeDialog.RenameFolder(folder)
+    }
+
+    fun closeDialog() {
+        nameDialog = null
+    }
+
+    /** OK dans la boîte de nom. */
+    fun submitName(name: String) {
+        when (val dialog = nameDialog ?: return) {
+            is HomeDialog.NewList -> createList(name, dialog.folderId)
+            HomeDialog.NewFolder -> createFolder(name)
+            is HomeDialog.RenameFolder -> renameFolder(dialog.folder, name)
+        }
+        nameDialog = null
+    }
+
+    /** La nouvelle liste s'ouvre tout de suite (on veut en général y ajouter des tâches). */
+    private fun createList(name: String, folderId: String?) {
+        viewModelScope.launch {
+            try {
+                val created = api.createList(name, folderId)
+                lists = lists + created
+                openList(created)
+            } catch (e: ApiError) {
+                failed(e)
+            }
+        }
+    }
+
+    private fun createFolder(name: String) {
+        viewModelScope.launch {
+            try {
+                folders = folders + api.createFolder(name)
+            } catch (e: ApiError) {
+                failed(e)
+            }
+        }
+    }
+
+    private fun renameFolder(folder: Folder, name: String) {
+        if (name == folder.name) return
+        folders = folders.map { if (it.id == folder.id) it.copy(name = name) else it }
+        viewModelScope.launch {
+            try {
+                api.renameFolder(folder.id, name)
+            } catch (e: ApiError) {
+                failed(e)
+            }
+        }
+    }
+
+    fun askDeleteFolder(folder: Folder) {
+        folderToDelete = folder
+    }
+
+    fun cancelDeleteFolder() {
+        folderToDelete = null
+    }
+
+    /** Après confirmation : l'écran d'abord (ses listes passent hors groupe), puis le serveur. */
+    fun confirmDeleteFolder() {
+        val folder = folderToDelete ?: return
+        folderToDelete = null
+        folders = folders.filter { it.id != folder.id }
+        lists = withoutFolder(lists, folder.id)
+        viewModelScope.launch {
+            try {
+                api.deleteFolder(folder.id)
+            } catch (e: ApiError) {
+                failed(e)
+            }
+        }
+    }
+
+    /** Une modification de l'accueil a échoué : 401 → session expirée ; sinon bandeau et rechargement. */
+    private fun failed(e: ApiError) {
+        if (e.status == 401) {
+            sessionExpired = true
+            return
+        }
+        fetch(message = "Modification non enregistrée : ${e.message}")
     }
 
     /** Toucher une liste : un nouveau BoardModel, donc la liste est toujours rechargée. */
@@ -184,7 +324,8 @@ class HomeViewModel(private val api: ApiClient, private val quickTaskMemory: Qui
         fetch()
     }
 
-    private fun fetch() {
+    /** @param message affiché après le rechargement (ex. modification ratée), ou null */
+    private fun fetch(message: String? = null) {
         viewModelScope.launch {
             try {
                 // Les trois requêtes partent en même temps. coroutineScope est obligatoire :
@@ -197,17 +338,15 @@ class HomeViewModel(private val api: ApiClient, private val quickTaskMemory: Qui
                     dueCounts = countsCall.await()
                     foldersCall.await().sortedBy { it.position }
                 }
-                if (state != LoadState.Ready) {
-                    collapsedIds = newFolders.filter { it.collapsed }.map { it.id }.toSet() // Comme sur le site
-                }
+                collapsedIds = newFolders.filter { it.collapsed }.map { it.id }.toSet() // Retenu sur le serveur, comme sur le site
                 folders = newFolders
-                error = null
+                error = message
                 state = LoadState.Ready
             } catch (e: ApiError) {
                 if (e.status == 401) {
                     sessionExpired = true
                 } else if (state == LoadState.Ready) {
-                    error = e.message // Rafraîchissement raté : on garde les listes affichées
+                    error = message ?: e.message // Rafraîchissement raté : on garde les listes affichées
                 } else {
                     error = e.message
                     state = LoadState.Failed
@@ -279,6 +418,7 @@ fun HomeScreen(
                     }
                 },
                 actions = {
+                    NewMenu(onNewList = { model.askNewList(null) }, onNewFolder = model::askNewFolder)
                     IconButton(onClick = onLogout) {
                         Icon(painterResource(R.drawable.lucide_ic_log_out), contentDescription = "Se déconnecter (${user.displayName})", modifier = Modifier.size(20.dp))
                     }
@@ -322,6 +462,66 @@ fun HomeScreen(
     model.quickTask?.let { quick ->
         QuickTaskSheet(quick, onClose = model::closeQuickTask)
     }
+
+    // Boîte de nom : nouvelle liste, nouveau groupe de listes, renommer
+    when (val dialog = model.nameDialog) {
+        is HomeDialog.NewList -> NameDialog("Nouvelle liste", "Nom de la liste", "Créer", onConfirm = model::submitName, onDismiss = model::closeDialog)
+        HomeDialog.NewFolder -> NameDialog("Nouveau groupe de listes", "Nom du groupe de listes", "Créer", onConfirm = model::submitName, onDismiss = model::closeDialog)
+        is HomeDialog.RenameFolder -> NameDialog("Renommer le groupe de listes", "Nom du groupe de listes", "Renommer", dialog.folder.name, onConfirm = model::submitName, onDismiss = model::closeDialog)
+        null -> {}
+    }
+
+    model.folderToDelete?.let { folder ->
+        AlertDialog(
+            onDismissRequest = model::cancelDeleteFolder,
+            title = { Text("Supprimer le groupe de listes ?") },
+            text = { Text(deleteFolderMessage(folder)) },
+            confirmButton = { TextButton(onClick = model::confirmDeleteFolder) { Text("Supprimer", color = Palette.danger) } },
+            dismissButton = { TextButton(onClick = model::cancelDeleteFolder) { Text("Annuler") } },
+        )
+    }
+}
+
+/** « + » de l'en-tête : nouvelle liste ou nouveau groupe de listes. */
+@Composable
+private fun NewMenu(onNewList: () -> Unit, onNewFolder: () -> Unit) {
+    var open by rememberSaveable { mutableStateOf(false) }
+    Box {
+        IconButton(onClick = { open = true }) {
+            Icon(painterResource(R.drawable.lucide_ic_plus), contentDescription = "Nouvelle liste ou groupe de listes", modifier = Modifier.size(22.dp))
+        }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            MenuItem("Nouvelle liste", R.drawable.lucide_ic_list_plus) { open = false; onNewList() }
+            MenuItem("Nouveau groupe de listes", R.drawable.lucide_ic_folder_plus) { open = false; onNewFolder() }
+        }
+    }
+}
+
+/** Menu « … » d'un groupe de listes. */
+@Composable
+private fun FolderMenu(folder: Folder, model: HomeViewModel) {
+    var open by rememberSaveable { mutableStateOf(false) }
+    Box {
+        IconButton(onClick = { open = true }, modifier = Modifier.size(36.dp)) {
+            Icon(painterResource(R.drawable.lucide_ic_ellipsis), contentDescription = "Options de ${folder.name}", tint = Palette.muted, modifier = Modifier.size(18.dp))
+        }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            MenuItem("Nouvelle liste ici", R.drawable.lucide_ic_list_plus) { open = false; model.askNewList(folder.id) }
+            MenuItem("Renommer", R.drawable.lucide_ic_pencil) { open = false; model.askRenameFolder(folder) }
+            MenuItem("Supprimer le groupe", R.drawable.lucide_ic_trash_2, danger = true) { open = false; model.askDeleteFolder(folder) }
+        }
+    }
+}
+
+/** Une ligne de menu avec son icône Lucide (en rouge si danger). */
+@Composable
+fun MenuItem(label: String, icon: Int, danger: Boolean = false, onClick: () -> Unit) {
+    val color = if (danger) Palette.danger else Palette.text
+    DropdownMenuItem(
+        text = { Text(label, color = color) },
+        leadingIcon = { Icon(painterResource(icon), contentDescription = null, tint = color, modifier = Modifier.size(18.dp)) },
+        onClick = onClick,
+    )
 }
 
 /** Le contenu défilant de l'accueil. */
@@ -349,13 +549,13 @@ private fun HomeLists(model: HomeViewModel, user: User) {
         items(ungrouped, key = { it.id }) { list -> ListRow(list, model::openList) }
 
         for (folder in model.folders) {
-            folderItems(folder, model.lists.filter { it.folderId == folder.id }, folder.id in model.collapsedIds, model::toggleFolder, model::openList)
+            folderItems(folder, model.lists.filter { it.folderId == folder.id }, folder.id in model.collapsedIds, model)
         }
 
         if (model.lists.isEmpty()) {
             item {
                 Text(
-                    "Aucune liste : crée-en une depuis le site.",
+                    "Aucune liste : touche + en haut pour en créer une.",
                     color = Palette.muted,
                     modifier = Modifier.padding(12.dp),
                 )
@@ -369,16 +569,15 @@ private fun LazyListScope.folderItems(
     folder: Folder,
     lists: List<TodoList>,
     collapsed: Boolean,
-    onToggle: (String) -> Unit,
-    onOpen: (TodoList) -> Unit,
+    model: HomeViewModel,
 ) {
     item(key = "folder-" + folder.id) {
         Row(
             Modifier
                 .fillMaxWidth()
                 .heightIn(min = 44.dp)
-                .clickable { onToggle(folder.id) }
-                .padding(horizontal = 12.dp),
+                .clickable { model.toggleFolder(folder.id) }
+                .padding(start = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
@@ -399,10 +598,11 @@ private fun LazyListScope.folderItems(
             if (collapsed) {
                 Text(lists.sumOf { it.openTasks }.toString(), color = Palette.faint, fontSize = 13.sp)
             }
+            FolderMenu(folder, model)
         }
     }
     if (!collapsed) {
-        items(lists, key = { it.id }) { list -> ListRow(list, onOpen) }
+        items(lists, key = { it.id }) { list -> ListRow(list, model::openList) }
     }
 }
 

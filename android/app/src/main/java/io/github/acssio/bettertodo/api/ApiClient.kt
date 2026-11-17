@@ -4,6 +4,8 @@ import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -56,6 +58,40 @@ class ApiClient(private val serverUrl: String, private val token: String? = null
 
     suspend fun lists(): List<TodoList> {
         return json.decodeFromString(send("GET", "/lists"))
+    }
+
+    /** Crée un groupe de listes, à la fin. */
+    suspend fun createFolder(name: String): Folder {
+        val body = buildJsonObject { put("name", name) }.toString()
+        return json.decodeFromString(send("POST", "/folders", body))
+    }
+
+    suspend fun renameFolder(folderId: String, name: String): Folder {
+        val body = buildJsonObject { put("name", name) }.toString()
+        return json.decodeFromString(send("PATCH", "/folders/$folderId", body))
+    }
+
+    /** Replié ou déplié : retenu sur le serveur, comme sur le site. */
+    suspend fun setFolderCollapsed(folderId: String, collapsed: Boolean): Folder {
+        val body = buildJsonObject { put("collapsed", collapsed) }.toString()
+        return json.decodeFromString(send("PATCH", "/folders/$folderId", body))
+    }
+
+    /** Supprime le groupe de listes : ses listes sont gardées, hors groupe (ON DELETE SET NULL). */
+    suspend fun deleteFolder(folderId: String) {
+        send("DELETE", "/folders/$folderId")
+    }
+
+    /**
+     * Crée une liste (le serveur lui ajoute un groupe par défaut, « Tâches » ou « Tasks »).
+     * @param folderId son groupe de listes, ou null pour hors groupe
+     */
+    suspend fun createList(name: String, folderId: String?): TodoList {
+        val body = buildJsonObject {
+            put("name", name)
+            put("folder_id", folderId) // null est bien envoyé : hors groupe de listes
+        }.toString()
+        return json.decodeFromString(send("POST", "/lists", body))
     }
 
     /** La liste, ses groupes et toutes leurs tâches (faites comprises). */
