@@ -81,6 +81,7 @@ type taskOut struct {
 	Title   string   `json:"title"`
 	Done    bool     `json:"done"`
 	DueDate string   `json:"due_date,omitempty"`
+	DueTime string   `json:"due_time,omitempty"` // "14:30"
 	Urgency string   `json:"urgency,omitempty"`
 	Tags    []string `json:"tags,omitempty"`
 	Notes   string   `json:"notes,omitempty"`
@@ -93,6 +94,9 @@ func toTaskOut(task apiTask, urgencyNames map[string]string) taskOut {
 	out := taskOut{ID: task.ID, Title: task.Title, Done: task.Done, Tags: task.Tags, Notes: task.Notes}
 	if task.DueDate != nil {
 		out.DueDate = *task.DueDate
+	}
+	if task.DueTime != nil {
+		out.DueTime = *task.DueTime
 	}
 	if task.UrgencyID != nil {
 		out.Urgency = urgencyNames[*task.UrgencyID]
@@ -258,6 +262,7 @@ type createTaskInput struct {
 	Title   string   `json:"title" jsonschema:"titre de la tâche"`
 	Notes   string   `json:"notes,omitempty" jsonschema:"notes facultatives"`
 	DueDate string   `json:"due_date,omitempty" jsonschema:"échéance AAAA-MM-JJ"`
+	DueTime string   `json:"due_time,omitempty" jsonschema:"heure facultative HH:MM (24 h), seulement avec due_date"`
 	Urgency string   `json:"urgency,omitempty" jsonschema:"nom d'un niveau d'urgence (voir list_tags_and_urgency_levels)"`
 	Tags    []string `json:"tags,omitempty" jsonschema:"noms des tags, sans # ; un tag inconnu est créé"`
 }
@@ -302,6 +307,9 @@ func (t *Tools) CreateTask(ctx context.Context, _ *mcp.CallToolRequest, in creat
 	if in.DueDate != "" {
 		changes["due_date"] = in.DueDate
 	}
+	if in.DueTime != "" {
+		changes["due_time"] = in.DueTime
+	}
 	if len(in.Tags) > 0 {
 		changes["tags"] = in.Tags
 	}
@@ -315,7 +323,8 @@ type updateTaskInput struct {
 	TaskID  string    `json:"task_id" jsonschema:"id de la tâche"`
 	Title   *string   `json:"title,omitempty" jsonschema:"nouveau titre"`
 	Notes   *string   `json:"notes,omitempty" jsonschema:"nouvelles notes (remplacent les anciennes) ; vide = effacer"`
-	DueDate *string   `json:"due_date,omitempty" jsonschema:"échéance AAAA-MM-JJ ; vide = enlever l'échéance"`
+	DueDate *string   `json:"due_date,omitempty" jsonschema:"échéance AAAA-MM-JJ ; vide = enlever l'échéance (et l'heure)"`
+	DueTime *string   `json:"due_time,omitempty" jsonschema:"heure HH:MM (24 h), demande une échéance ; vide = enlever l'heure"`
 	Urgency *string   `json:"urgency,omitempty" jsonschema:"nom d'un niveau d'urgence ; vide = enlever l'urgence"`
 	Tags    *[]string `json:"tags,omitempty" jsonschema:"remplace TOUS les tags de la tâche ; liste vide = aucun tag"`
 	Done    *bool     `json:"done,omitempty" jsonschema:"true = cochée (faite), false = à faire"`
@@ -332,6 +341,9 @@ func (t *Tools) UpdateTask(ctx context.Context, _ *mcp.CallToolRequest, in updat
 	}
 	if in.DueDate != nil {
 		changes["due_date"] = emptyToNull(*in.DueDate)
+	}
+	if in.DueTime != nil {
+		changes["due_time"] = emptyToNull(*in.DueTime)
 	}
 	if in.Tags != nil {
 		changes["tags"] = *in.Tags

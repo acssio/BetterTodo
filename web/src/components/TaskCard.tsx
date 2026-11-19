@@ -212,7 +212,7 @@ export class TaskCard extends React.Component<TaskCardProps, TaskCardState> {
 
                 {hasMeta && (
                     <div className="card-meta">
-                        {task.due_date && <DueDate dueDate={task.due_date} done={task.done} />}
+                        {task.due_date && <DueDate dueDate={task.due_date} dueTime={task.due_time} done={task.done} />}
                         {task.tags.map(tag => <span key={tag} className="card-tag">#{tag}</span>)}
                         {task.notes !== '' && (
                             <span className="card-note" title={task.notes}><StickyNote size={12} /></span>
@@ -243,15 +243,15 @@ export class UrgencyPill extends React.Component<{ urgency: UrgencyLevel }> {
     }
 }
 
-/** Échéance, en rouge si c'est aujourd'hui ou en retard (sauf si la tâche est faite). */
-export class DueDate extends React.Component<{ dueDate: string, done: boolean }> {
+/** Échéance (et heure si elle existe), en rouge si c'est aujourd'hui ou en retard (sauf si la tâche est faite). */
+export class DueDate extends React.Component<{ dueDate: string, dueTime: string | null, done: boolean }> {
     render(): React.ReactNode {
-        const { dueDate, done } = this.props
+        const { dueDate, dueTime, done } = this.props
         const late = !done && isDueOrLate(dueDate)
         return (
             <span className={late ? 'card-due late' : 'card-due'}>
                 <Calendar size={12} />
-                {formatDueDate(dueDate)}
+                {formatDueDate(dueDate)}{dueTime && ` ${dueTime}`}
             </span>
         )
     }

@@ -86,6 +86,7 @@ export interface Task {
     title: string
     notes: string
     due_date: string | null   // "2026-11-18"
+    due_time: string | null   // "14:30" (jamais sans due_date)
     urgency_id: string | null
     done: boolean
     done_at: string | null
@@ -107,12 +108,13 @@ export interface Board {
 
 /**
  * Champs modifiables d'une tâche (PATCH /tasks/{id}).
- * Un champ absent n'est pas modifié ; null efface l'échéance ou l'urgence.
+ * Un champ absent n'est pas modifié ; null efface l'échéance (et son heure), l'heure ou l'urgence.
  */
 export interface TaskChanges {
     title?: string
     notes?: string
     due_date?: string | null
+    due_time?: string | null // Demande une échéance
     urgency_id?: string | null
     done?: boolean
     group_id?: string

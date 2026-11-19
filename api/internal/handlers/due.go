@@ -40,7 +40,8 @@ type dueTask struct {
 }
 
 const dueSelect = `
-	SELECT t.id, t.group_id, t.title, t.notes, t.due_date::text, t.urgency_id, t.done, t.done_at, t.position,
+	SELECT t.id, t.group_id, t.title, t.notes, t.due_date::text, to_char(t.due_time, 'HH24:MI'),
+	       t.urgency_id, t.done, t.done_at, t.position,
 	       COALESCE(array_agg(tg.name ORDER BY tg.name) FILTER (WHERE tg.id IS NOT NULL), '{}'),
 	       t.created_at, t.updated_at,
 	       l.id, l.name, l.color, l.icon, g.name
@@ -52,11 +53,11 @@ const dueSelect = `
 	WHERE l.user_id = $1 AND NOT t.done AND t.due_date IS NOT NULL
 	  AND ($2::date IS NULL OR t.due_date <= $2::date)
 	GROUP BY t.id, l.id, g.id
-	ORDER BY t.due_date, l.position, g.position, t.position`
+	ORDER BY t.due_date, t.due_time NULLS LAST, l.position, g.position, t.position`
 
 func scanDueTask(row pgx.Row) (dueTask, error) {
 	var d dueTask
-	err := row.Scan(&d.ID, &d.GroupID, &d.Title, &d.Notes, &d.DueDate, &d.UrgencyID, &d.Done, &d.DoneAt,
+	err := row.Scan(&d.ID, &d.GroupID, &d.Title, &d.Notes, &d.DueDate, &d.DueTime, &d.UrgencyID, &d.Done, &d.DoneAt,
 		&d.Position, &d.Tags, &d.CreatedAt, &d.UpdatedAt,
 		&d.List.ID, &d.List.Name, &d.List.Color, &d.List.Icon, &d.GroupName)
 	return d, err

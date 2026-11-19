@@ -1,5 +1,5 @@
 """
-Génère la collection Postman des données (étape 2b, complétée en 3c-2b et 3e).
+Génère la collection Postman des données (étape 2b, complétée en 3c-2b, 3e et 7-3).
 
 Usage, depuis la racine du projet :
     python3 api/tests/generer_collection_donnees.py api/tests/bettertodo-api-donnees.postman_collection.json
@@ -247,6 +247,23 @@ req("Date invalide", "GET", "/tasks/due?until=15.06.2026", tests=[status(400)])
 req("Compteurs sans date du jour", "GET", "/tasks/due/counts", tests=[status(400)])
 req("B ne voit pas les échéances de A", "GET", "/tasks/due", token="tokenB", tests=[
     status(200), "pm.test('aucune tâche de A', () => pm.expect(pm.response.json().map(t => t.title)).to.not.include('Du jour'));"])
+# --- Heure facultative (étape 7-3) -------------------------------------------------
+req("Heure – tâche du jour à 09:00", "POST", "/groups/{{groupDue}}/tasks",
+    body={"title": "Du jour 9h", "due_date": "2026-06-15", "due_time": "09:00"}, tests=[
+        status(201), J, "pm.test('heure renvoyée', () => pm.expect(b.due_time).to.eql('09:00'));",
+        "pm.collectionVariables.set('dueNine', b.id);"])
+req("Heure – sans date refusée", "POST", "/groups/{{groupDue}}/tasks",
+    body={"title": "X", "due_time": "09:00"}, tests=[status(400)])
+req("Heure – format invalide", "POST", "/groups/{{groupDue}}/tasks",
+    body={"title": "X", "due_date": "2026-06-15", "due_time": "25:00"}, tests=[status(400)])
+req("Heure – ajouter 14:30 à « Du jour »", "PATCH", "/tasks/{{due_Du_jour}}", body={"due_time": "14:30"}, tests=[
+    status(200), J, "pm.test('14:30, date gardée', () => { pm.expect(b.due_time).to.eql('14:30'); pm.expect(b.due_date).to.eql('2026-06-15'); });"])
+req("Heure – triées par date puis heure", "GET", "/tasks/due?until=2026-06-15", tests=[
+    status(200), J,
+    "pm.test('retard, 09:00, 14:30', () => pm.expect(b.map(t => t.title)).to.eql(['En retard', 'Du jour 9h', 'Du jour']));"])
+req("Heure – refusée sur une tâche sans date", "PATCH", "/tasks/{{due_Sans_date}}", body={"due_time": "10:00"}, tests=[status(400)])
+req("Heure – enlever l'échéance enlève l'heure", "PATCH", "/tasks/{{due_Du_jour}}", body={"due_date": None}, tests=[
+    status(200), J, "pm.test('date et heure à null', () => { pm.expect(b.due_date).to.eql(null); pm.expect(b.due_time).to.eql(null); });"])
 req("Supprimer la liste des échéances", "DELETE", "/lists/{{listDue}}", tests=[status(204)])
 
 # --- Suppressions ----------------------------------------------------------------

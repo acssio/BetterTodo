@@ -66,6 +66,15 @@
     min-width: 0;
 }
 
+/* Champ « Heure » : étroit, à côté de l'échéance */
+.pop-row .pop-field.pop-time {
+    flex: 0 0 84px;
+}
+
+.pop-time input:disabled {
+    opacity: 0.5;
+}
+
 .pop-field {
     display: flex;
     flex-direction: column;

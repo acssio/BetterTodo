@@ -70,6 +70,23 @@ func TestValidDate(t *testing.T) {
 	}
 }
 
+func TestValidTime(t *testing.T) {
+	cases := map[string]bool{
+		"14:30":    true,
+		"00:00":    true,
+		"23:59":    true,
+		"24:00":    false, // N'existe pas
+		"9:05":     false, // Toujours deux chiffres
+		"14:30:00": false,
+		"":         false,
+	}
+	for input, want := range cases {
+		if got := validTime(input); got != want {
+			t.Errorf("validTime(%q) = %v, attendu %v", input, got, want)
+		}
+	}
+}
+
 func TestUpdateBuilder(t *testing.T) {
 	u := newUpdate("tasks")
 	u.set("title", "x")

@@ -2181,7 +2181,232 @@
       ]
     },
     {
-      "name": "70 Supprimer la liste des échéances",
+      "name": "70 Heure – tâche du jour à 09:00",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/groups/{{groupDue}}/tasks",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"Du jour 9h\",\n  \"due_date\": \"2026-06-15\",\n  \"due_time\": \"09:00\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('201', () => pm.response.to.have.status(201));",
+              "const b = pm.response.json();",
+              "pm.test('heure renvoyée', () => pm.expect(b.due_time).to.eql('09:00'));",
+              "pm.collectionVariables.set('dueNine', b.id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "71 Heure – sans date refusée",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/groups/{{groupDue}}/tasks",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"X\",\n  \"due_time\": \"09:00\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('400', () => pm.response.to.have.status(400));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "72 Heure – format invalide",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/groups/{{groupDue}}/tasks",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"X\",\n  \"due_date\": \"2026-06-15\",\n  \"due_time\": \"25:00\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('400', () => pm.response.to.have.status(400));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "73 Heure – ajouter 14:30 à « Du jour »",
+      "request": {
+        "method": "PATCH",
+        "url": "{{baseUrl}}/tasks/{{due_Du_jour}}",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"due_time\": \"14:30\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200', () => pm.response.to.have.status(200));",
+              "const b = pm.response.json();",
+              "pm.test('14:30, date gardée', () => { pm.expect(b.due_time).to.eql('14:30'); pm.expect(b.due_date).to.eql('2026-06-15'); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "74 Heure – triées par date puis heure",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/tasks/due?until=2026-06-15",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ]
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200', () => pm.response.to.have.status(200));",
+              "const b = pm.response.json();",
+              "pm.test('retard, 09:00, 14:30', () => pm.expect(b.map(t => t.title)).to.eql(['En retard', 'Du jour 9h', 'Du jour']));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "75 Heure – refusée sur une tâche sans date",
+      "request": {
+        "method": "PATCH",
+        "url": "{{baseUrl}}/tasks/{{due_Sans_date}}",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"due_time\": \"10:00\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('400', () => pm.response.to.have.status(400));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "76 Heure – enlever l'échéance enlève l'heure",
+      "request": {
+        "method": "PATCH",
+        "url": "{{baseUrl}}/tasks/{{due_Du_jour}}",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"due_date\": null\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200', () => pm.response.to.have.status(200));",
+              "const b = pm.response.json();",
+              "pm.test('date et heure à null', () => { pm.expect(b.due_date).to.eql(null); pm.expect(b.due_time).to.eql(null); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "77 Supprimer la liste des échéances",
       "request": {
         "method": "DELETE",
         "url": "{{baseUrl}}/lists/{{listDue}}",
@@ -2205,7 +2430,7 @@
       ]
     },
     {
-      "name": "71 Supprimer le groupe de listes Personnel",
+      "name": "78 Supprimer le groupe de listes Personnel",
       "request": {
         "method": "DELETE",
         "url": "{{baseUrl}}/folders/{{folderPerso}}",
@@ -2229,7 +2454,7 @@
       ]
     },
     {
-      "name": "72 La liste Perso est passée hors groupe",
+      "name": "79 La liste Perso est passée hors groupe",
       "request": {
         "method": "GET",
         "url": "{{baseUrl}}/lists",
@@ -2255,7 +2480,7 @@
       ]
     },
     {
-      "name": "73 Supprimer le groupe Courses",
+      "name": "80 Supprimer le groupe Courses",
       "request": {
         "method": "DELETE",
         "url": "{{baseUrl}}/groups/{{groupA}}",
@@ -2279,7 +2504,7 @@
       ]
     },
     {
-      "name": "74 Ses tâches sont supprimées (ou déjà vidées)",
+      "name": "81 Ses tâches sont supprimées (ou déjà vidées)",
       "request": {
         "method": "GET",
         "url": "{{baseUrl}}/tasks/{{task1}}",
@@ -2303,7 +2528,7 @@
       ]
     },
     {
-      "name": "75 Supprimer la liste",
+      "name": "82 Supprimer la liste",
       "request": {
         "method": "DELETE",
         "url": "{{baseUrl}}/lists/{{listId}}",
@@ -2327,7 +2552,7 @@
       ]
     },
     {
-      "name": "76 La liste n'existe plus",
+      "name": "83 La liste n'existe plus",
       "request": {
         "method": "GET",
         "url": "{{baseUrl}}/lists/{{listId}}/board",
@@ -2351,7 +2576,7 @@
       ]
     },
     {
-      "name": "77 Lait (dans Administratif) est supprimé avec la liste",
+      "name": "84 Lait (dans Administratif) est supprimé avec la liste",
       "request": {
         "method": "GET",
         "url": "{{baseUrl}}/tasks/{{task2}}",
@@ -2375,7 +2600,7 @@
       ]
     },
     {
-      "name": "78 Admin supprime le compte A",
+      "name": "85 Admin supprime le compte A",
       "request": {
         "method": "DELETE",
         "url": "{{baseUrl}}/admin/users/{{tokenId}}",
@@ -2399,7 +2624,7 @@
       ]
     },
     {
-      "name": "79 Admin supprime le compte B",
+      "name": "86 Admin supprime le compte B",
       "request": {
         "method": "DELETE",
         "url": "{{baseUrl}}/admin/users/{{tokenBId}}",
@@ -2423,7 +2648,7 @@
       ]
     },
     {
-      "name": "80 La session de B ne marche plus",
+      "name": "87 La session de B ne marche plus",
       "request": {
         "method": "GET",
         "url": "{{baseUrl}}/lists",

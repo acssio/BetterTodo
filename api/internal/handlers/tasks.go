@@ -29,6 +29,7 @@ type task struct {
 	Title     string     `json:"title"`
 	Notes     string     `json:"notes"`
 	DueDate   *string    `json:"due_date"`   // "2026-11-18", ou null
+	DueTime   *string    `json:"due_time"`   // "14:30", ou null (jamais d'heure sans date)
 	UrgencyID *string    `json:"urgency_id"` // null = pas d'urgence
 	Done      bool       `json:"done"`
 	DoneAt    *time.Time `json:"done_at"`
@@ -41,7 +42,8 @@ type task struct {
 // taskSelect lit les tâches avec leurs tags regroupés dans un tableau.
 // Toujours suivi d'un WHERE puis de taskGroupBy.
 const taskSelect = `
-	SELECT t.id, t.group_id, t.title, t.notes, t.due_date::text, t.urgency_id, t.done, t.done_at, t.position,
+	SELECT t.id, t.group_id, t.title, t.notes, t.due_date::text, to_char(t.due_time, 'HH24:MI'),
+	       t.urgency_id, t.done, t.done_at, t.position,
 	       COALESCE(array_agg(tg.name ORDER BY tg.name) FILTER (WHERE tg.id IS NOT NULL), '{}'),
 	       t.created_at, t.updated_at
 	FROM tasks t
@@ -60,7 +62,7 @@ var taskOrdering = ordering{
 
 func scanTask(row pgx.Row) (task, error) {
 	var t task
-	err := row.Scan(&t.ID, &t.GroupID, &t.Title, &t.Notes, &t.DueDate, &t.UrgencyID, &t.Done, &t.DoneAt,
+	err := row.Scan(&t.ID, &t.GroupID, &t.Title, &t.Notes, &t.DueDate, &t.DueTime, &t.UrgencyID, &t.Done, &t.DoneAt,
 		&t.Position, &t.Tags, &t.CreatedAt, &t.UpdatedAt)
 	return t, err
 }
@@ -74,6 +76,7 @@ type createTaskRequest struct {
 	Title     string   `json:"title"`
 	Notes     string   `json:"notes"`
 	DueDate   *string  `json:"due_date"`
+	DueTime   *string  `json:"due_time"` // "14:30" ; demande une due_date
 	UrgencyID *string  `json:"urgency_id"`
 	Tags      []string `json:"tags"`
 	Position  *int     `json:"position"`
@@ -108,6 +111,14 @@ func (h *TaskHandler) Create(w http.ResponseWriter, r *http.Request) {
 		badRequest(w, "due_date doit être une date au format AAAA-MM-JJ")
 		return
 	}
+	if req.DueTime != nil && !validTime(*req.DueTime) {
+		badRequest(w, "due_time doit être une heure au format HH:MM")
+		return
+	}
+	if req.DueTime != nil && req.DueDate == nil {
+		badRequest(w, "due_time demande une due_date")
+		return
+	}
 	tags, message := normalizeTags(req.Tags)
 	if message != "" {
 		badRequest(w, message)
@@ -123,10 +134,10 @@ func (h *TaskHandler) Create(w http.ResponseWriter, r *http.Request) {
 	err := pgx.BeginFunc(ctx, h.pool, func(tx pgx.Tx) error {
 		var id string
 		err := tx.QueryRow(ctx,
-			`INSERT INTO tasks (group_id, title, notes, due_date, urgency_id, position)
-			 VALUES ($1, $2, $3, $4, $5, (SELECT COALESCE(MAX(position) + 1, 0) FROM tasks WHERE group_id = $1))
+			`INSERT INTO tasks (group_id, title, notes, due_date, due_time, urgency_id, position)
+			 VALUES ($1, $2, $3, $4, $5, $6, (SELECT COALESCE(MAX(position) + 1, 0) FROM tasks WHERE group_id = $1))
 			 RETURNING id`,
-			groupID, title, req.Notes, req.DueDate, req.UrgencyID).Scan(&id)
+			groupID, title, req.Notes, req.DueDate, req.DueTime, req.UrgencyID).Scan(&id)
 		if err != nil {
 			return err
 		}
@@ -172,7 +183,8 @@ func (h *TaskHandler) Get(w http.ResponseWriter, r *http.Request) {
 type updateTaskRequest struct {
 	Title     Optional[string]   `json:"title"`
 	Notes     Optional[string]   `json:"notes"`
-	DueDate   Optional[string]   `json:"due_date"`   // null = enlever l'échéance
+	DueDate   Optional[string]   `json:"due_date"`   // null = enlever l'échéance (et l'heure)
+	DueTime   Optional[string]   `json:"due_time"`   // null = enlever l'heure ; demande une échéance
 	UrgencyID Optional[string]   `json:"urgency_id"` // null = enlever l'urgence
 	Done      Optional[bool]     `json:"done"`
 	GroupID   Optional[string]   `json:"group_id"` // Déplacer dans un autre groupe (même d'une autre liste)
@@ -223,6 +235,29 @@ func (h *TaskHandler) Update(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		changes.set("due_date", req.DueDate.Value)
+	}
+	if req.DueTime.Set {
+		if req.DueTime.Value != nil {
+			if !validTime(*req.DueTime.Value) {
+				badRequest(w, "due_time doit être une heure au format HH:MM")
+				return
+			}
+			// Une heure demande une date : celle envoyée, sinon celle déjà sur la tâche
+			hasDate := req.DueDate.Set && req.DueDate.Value != nil
+			if !req.DueDate.Set {
+				if err := h.pool.QueryRow(r.Context(), `SELECT due_date IS NOT NULL FROM tasks WHERE id = $1`, id).Scan(&hasDate); err != nil {
+					httpjson.ServerError(w, err)
+					return
+				}
+			}
+			if !hasDate {
+				badRequest(w, "due_time demande une due_date")
+				return
+			}
+		}
+		changes.set("due_time", req.DueTime.Value)
+	} else if req.DueDate.IsNull() {
+		changes.set("due_time", nil) // Plus d'échéance : plus d'heure non plus
 	}
 	if req.UrgencyID.Set {
 		if req.UrgencyID.Value != nil &&
@@ -359,4 +394,10 @@ func normalizeTags(names []string) ([]string, string) {
 func validDate(s string) bool {
 	_, err := time.Parse(time.DateOnly, s)
 	return err == nil
+}
+
+// validTime vérifie le format HH:MM (00:00 à 23:59).
+func validTime(s string) bool {
+	_, err := time.Parse("15:04", s)
+	return err == nil && len(s) == 5
 }

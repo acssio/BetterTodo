@@ -23,6 +23,7 @@ interface TaskPopoverProps {
 class TaskPopoverState {
     title: string = ''   // Titre et notes sont modifiés localement,
     notes: string = ''   // puis envoyés à l'API (voir saveTitle / saveNotes)
+    dueTime: string = '' // Heure tapée ("14:30", '' = aucune), envoyée en quittant le champ (saveDueTime)
     tagInput: string = ''
     pending: number = 0  // Nombre d'enregistrements en cours
     keyboard: number = 0 // Panneau du bas : hauteur cachée par le clavier du téléphone
@@ -32,7 +33,7 @@ class TaskPopoverState {
  * Petit overlay d'édition d'une tâche, ouvert à côté de sa carte.
  * Pas de bouton « Enregistrer » : chaque changement part tout seul à l'API.
  *   - échéance, groupe, urgence, tags : dès qu'on les change ;
- *   - titre : en quittant le champ ou avec Entrée ;
+ *   - titre et heure : en quittant le champ ou avec Entrée ;
  *   - notes : 0,8 s après la dernière frappe, ou en quittant le champ.
  * Se ferme avec Échap, la croix, ou un clic en dehors.
  */
@@ -44,7 +45,12 @@ export class TaskPopover extends React.Component<TaskPopoverProps, TaskPopoverSt
 
     constructor(props: TaskPopoverProps) {
         super(props)
-        this.state = { ...new TaskPopoverState(), title: props.task.title, notes: props.task.notes }
+        this.state = {
+            ...new TaskPopoverState(),
+            title: props.task.title,
+            notes: props.task.notes,
+            dueTime: props.task.due_time ?? '',
+        }
     }
 
     // Panneau du bas : on le remonte au-dessus du clavier du téléphone
@@ -62,6 +68,7 @@ export class TaskPopover extends React.Component<TaskPopoverProps, TaskPopoverSt
         window.clearTimeout(this.notesTimer)
         this.saveTitle()
         this.saveNotes()
+        this.saveDueTime()
     }
 
     // --- Enregistrement --------------------------------------------------------
@@ -91,6 +98,18 @@ export class TaskPopover extends React.Component<TaskPopoverProps, TaskPopoverSt
         }
     }
 
+    /**
+     * L'heure n'est envoyée qu'en quittant le champ : si on l'enregistrait à chaque chiffre,
+     * la réponse de l'API réécrirait le champ pendant la frappe et le navigateur perdrait la saisie.
+     */
+    private saveDueTime(): void {
+        if (this.props.task.due_date === null) return // Pas d'échéance : pas d'heure possible
+        const time = this.state.dueTime === '' ? null : this.state.dueTime
+        if (time !== this.props.task.due_time) {
+            void this.update({ due_time: time })
+        }
+    }
+
     onTitleChanged = (event: React.ChangeEvent<HTMLInputElement>): void => {
         this.setState({ title: event.target.value })
     }
@@ -111,7 +130,23 @@ export class TaskPopover extends React.Component<TaskPopoverProps, TaskPopoverSt
     }
 
     onDueDateChanged = (event: React.ChangeEvent<HTMLInputElement>): void => {
-        void this.update({ due_date: event.target.value || null }) // Champ vidé → plus d'échéance
+        const date = event.target.value
+        if (date) {
+            void this.update({ due_date: date })
+        } else {
+            // Champ vidé → plus d'échéance, et donc plus d'heure (une heure demande une date)
+            this.setState({ dueTime: '' })
+            void this.update({ due_date: null, due_time: null })
+        }
+    }
+
+    /** Heure tapée directement (HH:MM). Le navigateur donne '' tant que l'heure n'est pas complète. */
+    onDueTimeChanged = (event: React.ChangeEvent<HTMLInputElement>): void => {
+        this.setState({ dueTime: event.target.value })
+    }
+
+    onDueTimeKeyDown = (event: React.KeyboardEvent<HTMLInputElement>): void => {
+        if (event.key === 'Enter') event.currentTarget.blur() // → onBlur → saveDueTime
     }
 
     onGroupChanged = (event: React.ChangeEvent<HTMLSelectElement>): void => {
@@ -189,13 +224,29 @@ export class TaskPopover extends React.Component<TaskPopoverProps, TaskPopoverSt
                                 <input type="date" value={task.due_date ?? ''} onChange={this.onDueDateChanged} />
                             </span>
                         </label>
-                        <label className="pop-field">
-                            <span className="pop-label">Groupe</span>
-                            <select className="pop-input" value={task.group_id} onChange={this.onGroupChanged}>
-                                {groups.map(group => <option key={group.id} value={group.id}>{group.name}</option>)}
-                            </select>
+                        <label className="pop-field pop-time">
+                            <span className="pop-label">Heure</span>
+                            <span className="pop-input">
+                                <input
+                                    type="time"
+                                    value={this.state.dueTime}
+                                    disabled={task.due_date === null}
+                                    title={task.due_date === null ? "Choisir d'abord une échéance" : undefined}
+                                    onChange={this.onDueTimeChanged}
+                                    onKeyDown={this.onDueTimeKeyDown}
+                                    onBlur={() => this.saveDueTime()}
+                                />
+                            </span>
                         </label>
                     </div>
+
+                    {/* Groupe sur sa propre ligne : avec l'heure, trois champs ne tiennent pas en 360 px */}
+                    <label className="pop-field">
+                        <span className="pop-label">Groupe</span>
+                        <select className="pop-input" value={task.group_id} onChange={this.onGroupChanged}>
+                            {groups.map(group => <option key={group.id} value={group.id}>{group.name}</option>)}
+                        </select>
+                    </label>
 
                     <div className="pop-field">
                         <span className="pop-label">Urgence</span>

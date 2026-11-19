@@ -217,7 +217,7 @@ export class TaskRow extends React.Component<TaskRowProps, TaskRowState> {
                     {task.tags.map(tag => <span key={tag} className="card-tag">#{tag}</span>)}
                 </span>
                 <span className="row-due">
-                    {task.due_date ? <DueDate dueDate={task.due_date} done={task.done} /> : <span className="row-none">—</span>}
+                    {task.due_date ? <DueDate dueDate={task.due_date} dueTime={task.due_time} done={task.done} /> : <span className="row-none">—</span>}
                 </span>
                 <span className="row-urgency">
                     {urgency && <UrgencyPill urgency={urgency} />}

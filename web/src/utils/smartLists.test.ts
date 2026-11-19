@@ -7,7 +7,7 @@ const today = new Date(2026, 10, 15, 23, 30) // 15 novembre 2026, tard le soir
 
 function due(title: string, date: string): DueTask {
     return {
-        id: title, group_id: 'g', title, notes: '', due_date: date, urgency_id: null, done: false, done_at: null,
+        id: title, group_id: 'g', title, notes: '', due_date: date, due_time: null, urgency_id: null, done: false, done_at: null,
         position: 0, tags: [], created_at: '', updated_at: '',
         list: { id: 'l', name: 'L', color: '#000000', icon: 'list' }, group_name: 'G',
     }
