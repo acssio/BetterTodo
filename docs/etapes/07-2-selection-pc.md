@@ -12,7 +12,9 @@ Choix validés :
 - Maj+clic **ajoute** la plage à la sélection, sans rien retirer ;
 - le clic droit **ne change pas** la sélection ;
 - « Supprimer » du menu agit sur **toute la sélection** si la tâche cliquée en fait partie, sinon sur **cette tâche seulement** ;
-- rien ne change en mode mobile (appui long, comme avant) ;
+- **mode sélection**, comme sur mobile : tant qu'au moins une tâche est sélectionnée, un clic simple (ou sur la case) **ajoute ou retire** la tâche ; pas de titre modifié sur place, pas de bouton « Ouvrir le détail », Entrée n'ouvre rien ;
+- **on sort de la sélection seulement par Échap** (ou le ✕ de la barre) **ou en désélectionnant tout** : un clic dans le vide ne la vide plus ;
+- en mode mobile, l'appui long marche comme avant ;
 - **ni l'API ni la base n'ont changé**.
 
 ## Fichiers
@@ -46,6 +48,15 @@ Maj+clic sur une tâche              ──► selectRange(tâche)
   - **Aujourd'hui / Planifié** : les sections de `groupDueTasks`, comme à l'écran.
 - `selectRange` : plage de l'ancrage à la tâche (dans un sens ou dans l'autre), ajoutée sans doublon. Ancrage absent ou dans une autre liste : seulement la tâche cliquée.
 
+### Mode sélection
+
+`selecting = selectedTaskIds.length > 0`, passé par `Board`, `SectionsView` et `SmartView` à chaque `TaskCard` / `TaskRow` (avant : en mode mobile seulement). Avec `selecting` :
+- `onClick` et la case appellent `onToggleSelection` au lieu de modifier le titre ou de cocher ;
+- le bouton `task-open` n'est pas affiché, Entrée ne fait rien ;
+- le menu du clic droit n'a pas « Ouvrir le détail ».
+
+`Workspace.onPaneMouseDown` ne fait plus que choisir la moitié active : il ne vide plus la sélection.
+
 ### Clic droit
 
 ```
@@ -73,12 +84,13 @@ npx tsc -b
 
 Dans le navigateur (http://localhost:8000) :
 
-1. Cmd+clic sur une tâche, puis Maj+clic sur une tâche d'un **autre groupe** : tout ce qui est entre les deux est sélectionné (colonnes et sections).
-2. Même chose dans Planifié : la plage traverse les sections de dates.
-3. Clic droit sur une tâche sélectionnée : « Retirer de la sélection », « Supprimer les N tâches ».
-4. Clic droit sur une tâche non sélectionnée : « Ajouter à la sélection », « Supprimer » (cette tâche seule, avec confirmation ; la sélection reste).
-5. « Ouvrir le détail » ouvre l'overlay à côté de la tâche. Échap ferme le menu.
-6. En mode mobile (fenêtre étroite) : l'appui long marche comme avant, pas de menu.
+1. Cmd+clic sur une tâche, puis **clic simple** sur une autre : elle est ajoutée, son titre ne passe pas en modification. Clic dans le vide : la sélection reste. Échap : on en sort, et un clic modifie de nouveau le titre.
+2. Cmd+clic sur une tâche, puis Maj+clic sur une tâche d'un **autre groupe** : tout ce qui est entre les deux est sélectionné (colonnes et sections).
+3. Même chose dans Planifié : la plage traverse les sections de dates.
+4. Clic droit sur une tâche sélectionnée : « Retirer de la sélection », « Supprimer les N tâches ».
+5. Clic droit sur une tâche non sélectionnée, sans sélection : « Ajouter à la sélection », « Ouvrir le détail », « Supprimer » (cette tâche seule, avec confirmation ; la sélection reste).
+6. « Ouvrir le détail » ouvre l'overlay à côté de la tâche. Échap ferme le menu.
+7. En mode mobile (fenêtre étroite) : l'appui long marche comme avant, pas de menu.
 
 ## Où regarder en cas de problème
 

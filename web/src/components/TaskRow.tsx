@@ -28,7 +28,7 @@ interface TaskRowProps {
     canDrag?: boolean  // false dans les listes intelligentes (l'ordre vient des dates)
     leaving?: boolean  // Tâche cochée qui va disparaître (courte animation)
     tapToOpen?: boolean // Mode mobile : toucher la ligne ouvre l'overlay (pas de titre sur place ni de glisser)
-    selecting?: boolean // Mode mobile, sélection en cours : toucher = sélectionner / désélectionner
+    selecting?: boolean // Sélection en cours : clic (ou toucher) = sélectionner / désélectionner, pas de modification
     // Mode mobile : glisser au doigt après un appui long (absents = pas de glisser, ex. listes intelligentes)
     onTouchDragStart?: (task: Task, x: number, y: number) => void
     onTouchDragMove?: (x: number, y: number) => void
@@ -111,7 +111,7 @@ export class TaskRow extends React.Component<TaskRowProps, TaskRowState> {
     }
 
     onKeyDown = (event: React.KeyboardEvent<HTMLDivElement>): void => {
-        if (event.key === 'Enter' && !this.state.editing) {
+        if (event.key === 'Enter' && !this.state.editing && !this.props.selecting) {
             this.props.onOpen(this.props.task, event.currentTarget.getBoundingClientRect())
         }
     }
@@ -222,9 +222,11 @@ export class TaskRow extends React.Component<TaskRowProps, TaskRowState> {
                 <span className="row-urgency">
                     {urgency && <UrgencyPill urgency={urgency} />}
                 </span>
-                <button className="task-open" onClick={this.onOpenClick} title="Ouvrir le détail" aria-label="Ouvrir le détail">
-                    <PanelRightOpen size={14} />
-                </button>
+                {!this.props.selecting && (
+                    <button className="task-open" onClick={this.onOpenClick} title="Ouvrir le détail" aria-label="Ouvrir le détail">
+                        <PanelRightOpen size={14} />
+                    </button>
+                )}
             </div>
         )
     }

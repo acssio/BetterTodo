@@ -24,7 +24,7 @@ interface TaskCardProps {
     onDragStart: (task: Task) => void
     onDragEnd: () => void
     tapToOpen?: boolean // Mode mobile : toucher la carte ouvre l'overlay (pas de titre sur place ni de glisser)
-    selecting?: boolean // Mode mobile, sélection en cours : toucher = sélectionner / désélectionner
+    selecting?: boolean // Sélection en cours : clic (ou toucher) = sélectionner / désélectionner, pas de modification
     // Mode mobile : glisser au doigt après un appui long (absents = pas de glisser, ex. listes intelligentes)
     onTouchDragStart?: (task: Task, x: number, y: number) => void
     onTouchDragMove?: (x: number, y: number) => void
@@ -46,7 +46,9 @@ class TaskCardState {
  *   bouton au survol, Entrée  → overlay d'édition
  *   case                      → cocher / décocher
  * En mode mobile (tapToOpen) : toucher → overlay, appui long → sélection, appui long puis
- * glisser → déplacement, et pendant une sélection (selecting) toucher ajoute / retire.
+ * glisser → déplacement.
+ * Pendant une sélection (selecting, ordinateur et mobile) : un clic ajoute / retire la tâche,
+ * la case aussi ; pas de titre sur place ni d'overlay. On en sort par Échap ou en désélectionnant tout.
  * La carte peut être glissée (API glisser-déposer native du navigateur), sauf pendant la modification.
  */
 export class TaskCard extends React.Component<TaskCardProps, TaskCardState> {
@@ -111,7 +113,7 @@ export class TaskCard extends React.Component<TaskCardProps, TaskCardState> {
     }
 
     onKeyDown = (event: React.KeyboardEvent<HTMLDivElement>): void => {
-        if (event.key === 'Enter' && !this.state.editing) {
+        if (event.key === 'Enter' && !this.state.editing && !this.props.selecting) {
             this.props.onOpen(this.props.task, event.currentTarget.getBoundingClientRect())
         }
     }
@@ -218,7 +220,7 @@ export class TaskCard extends React.Component<TaskCardProps, TaskCardState> {
                     </div>
                 )}
 
-                {!editing && (
+                {!editing && !this.props.selecting && (
                     <button className="task-open" onClick={this.onOpenClick} title="Ouvrir le détail" aria-label="Ouvrir le détail">
                         <PanelRightOpen size={14} />
                     </button>

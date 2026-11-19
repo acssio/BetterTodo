@@ -133,7 +133,7 @@ export class Board extends React.Component<TaskViewProps, BoardState> {
                                     menuOpen={task.id === this.props.menuTaskId}
                                     dragging={dragging}
                                     tapToOpen={this.props.mobile}
-                                    selecting={this.props.mobile && selectedTaskIds.length > 0}
+                                    selecting={selectedTaskIds.length > 0}
                                     onTouchDragStart={this.props.mobile ? actions.touchDragStart : undefined}
                                     onTouchDragMove={actions.touchDragMove}
                                     onTouchDragEnd={actions.touchDragEnd}

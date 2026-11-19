@@ -21,7 +21,7 @@ import { confirmDialog } from './confirm'
 import { ListEditPopover } from './ListEditPopover'
 import { ListHeader } from './ListHeader'
 import { type PickedPlace } from './ListGroupPicker'
-import { Menu } from './Menu'
+import { Menu, type MenuItem } from './Menu'
 import { MobileHome } from './MobileHome'
 import { SelectionActions, SelectionHeader } from './MobileSelection'
 import { MoveTasksSheet } from './MoveTasksSheet'
@@ -825,11 +825,12 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
         }
     }
 
-    /** Clic dans le vide d'une liste (pas sur une tâche) → vide la sélection. */
-    onPaneMouseDown = (event: React.MouseEvent<HTMLElement>, index: number): void => {
+    /**
+     * Clic dans une moitié : elle devient la moitié active.
+     * Un clic dans le vide ne vide PAS la sélection : on en sort par Échap ou en désélectionnant tout.
+     */
+    onPaneMouseDown = (index: number): void => {
         if (this.state.activePane !== index) this.setState({ activePane: index })
-        const onTask = (event.target as Element).closest('[data-task-id]') !== null
-        if (!onTask && !event.metaKey && !event.ctrlKey) this.clearSelection()
     }
 
     deleteSelection = async (): Promise<void> => {
@@ -1334,7 +1335,7 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
             <section
                 key={pane.listId}
                 className={classes.join(' ')}
-                onMouseDown={event => this.onPaneMouseDown(event, index)}
+                onMouseDown={() => this.onPaneMouseDown(index)}
             >
                 {isSmart(pane.listId) && (
                     <SmartView
@@ -1511,41 +1512,39 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
     /**
      * Menu du clic droit sur une tâche. Supprimer agit sur toute la sélection si la tâche
      * en fait partie, sinon sur cette tâche seulement. Le clic droit ne change pas la sélection.
+     * Pendant une sélection, pas de « Ouvrir le détail » : on ne modifie pas de tâche en sélection.
      */
     private renderTaskMenu(): React.ReactNode {
         const menu = this.state.taskMenu
         if (!menu) return null
         const task = menu.task
+        const selecting = this.state.selectedTaskIds.length > 0
         const selected = this.state.selectedTaskIds.includes(task.id)
         const deleteIds = selected ? this.state.selectedTaskIds : [task.id]
 
-        return (
-            <Menu
-                at={{ x: menu.x, y: menu.y }}
-                onClose={this.closeTaskMenu}
-                items={[
-                    {
-                        label: selected ? 'Retirer de la sélection' : 'Ajouter à la sélection',
-                        icon: selected ? SquareMinus : SquareCheck,
-                        kbd: SELECT_KEY,
-                        onSelect: () => this.toggleSelection(task),
-                    },
-                    {
-                        label: 'Ouvrir le détail',
-                        icon: PanelRightOpen,
-                        kbd: 'Entrée',
-                        onSelect: () => this.openTask(task, menu.anchor),
-                    },
-                    {
-                        label: deleteIds.length > 1 ? `Supprimer les ${deleteIds.length} tâches` : 'Supprimer',
-                        icon: Trash2,
-                        kbd: '⌫',
-                        danger: true,
-                        onSelect: () => void this.deleteTasks(deleteIds, 'Supprimer cette tâche ?'),
-                    },
-                ]}
-            />
-        )
+        const items: MenuItem[] = [{
+            label: selected ? 'Retirer de la sélection' : 'Ajouter à la sélection',
+            icon: selected ? SquareMinus : SquareCheck,
+            kbd: selecting ? 'clic' : SELECT_KEY,
+            onSelect: () => this.toggleSelection(task),
+        }]
+        if (!selecting) {
+            items.push({
+                label: 'Ouvrir le détail',
+                icon: PanelRightOpen,
+                kbd: 'Entrée',
+                onSelect: () => this.openTask(task, menu.anchor),
+            })
+        }
+        items.push({
+            label: deleteIds.length > 1 ? `Supprimer les ${deleteIds.length} tâches` : 'Supprimer',
+            icon: Trash2,
+            kbd: '⌫',
+            danger: true,
+            onSelect: () => void this.deleteTasks(deleteIds, 'Supprimer cette tâche ?'),
+        })
+
+        return <Menu at={{ x: menu.x, y: menu.y }} onClose={this.closeTaskMenu} items={items} />
     }
 
     /** Barre en bas de l'écran tant que des tâches sont sélectionnées. */
