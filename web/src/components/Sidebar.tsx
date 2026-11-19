@@ -84,7 +84,7 @@ export class Sidebar extends React.Component<SidebarProps, SidebarState> {
         return (
             <aside className={classes.join(' ')} style={{ width }}>
                 <div className="sidebar-brand">
-                    <span className="sidebar-logo"><Check size={14} color="#FFFFFF" strokeWidth={3} /></span>
+                    <span className="sidebar-logo"><Check size={14} strokeWidth={3} /></span>
                     <span className="sidebar-brand-name">BetterTodo</span>
                     {!compact && (
                         <button className="icon-btn" title="Réduire la barre (icônes seules)" onClick={this.props.onCollapse}>

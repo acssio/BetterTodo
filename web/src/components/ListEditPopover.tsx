@@ -154,7 +154,7 @@ export class ListEditPopover extends React.Component<ListEditPopoverProps, ListE
                                     title={LIST_ICONS[name].label}
                                     onClick={() => this.props.onUpdate({ icon: name })}
                                 >
-                                    <Icon size={18} color={selected ? list.color : '#3A3A3A'} />
+                                    <Icon size={18} color={selected ? list.color : 'currentColor'} />
                                 </button>
                             )
                         })}

@@ -16,7 +16,7 @@
 .group-count {
     padding: 1px 7px;
     border-radius: 10px;
-    background: #E2E2DE;
+    background: var(--count-bg);
     color: var(--muted);
     font-size: 11px;
     font-weight: 600;

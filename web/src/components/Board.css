@@ -28,18 +28,18 @@
 }
 
 .board-scroll::-webkit-scrollbar-thumb {
-    background: #CFCFCA;
+    background: var(--scrollbar);
     border-radius: 4px;
 }
 
 .board-scroll::-webkit-scrollbar-thumb:hover {
-    background: #A3A3A0;
+    background: var(--scrollbar-hover);
 }
 
 @supports not selector(::-webkit-scrollbar) {
     .board-scroll {
         scrollbar-width: thin;
-        scrollbar-color: #CFCFCA transparent;
+        scrollbar-color: var(--scrollbar) transparent;
     }
 }
 
@@ -128,7 +128,7 @@
 
 /* Colonne survolée pendant un glisser-déposer */
 .board-column.drop-over {
-    background: #E6ECF8;
+    background: var(--drop-over);
 }
 
 /* =============================================================================

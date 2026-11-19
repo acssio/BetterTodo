@@ -1,9 +1,11 @@
 import * as React from 'react'
-import { Check, Columns3, Copy, GripVertical, KeyRound, Plus, Rows2, Trash2, X } from 'lucide-react'
+import { Check, Columns3, Copy, GripVertical, KeyRound, Monitor, Moon, Plus, Rows2, Sun, Trash2, X } from 'lucide-react'
 import { api, ApiError } from '../api/ApiClient'
 import type { ApiToken, Language, ListView, Tag, UrgencyLevel, User, UserChanges } from '../api/types'
 import { computeDropIndex } from '../utils/dragDrop'
 import { moveItem } from '../utils/moveItem'
+import { theme } from '../utils/theme'
+import type { ThemeChoice } from '../utils/theme'
 import { DismissListener } from '../utils/popover'
 import { confirmDialog } from './confirm'
 import { InlineInput } from './InlineInput'
@@ -24,6 +26,7 @@ interface SettingsDialogProps {
 
 class SettingsDialogState {
     displayName: string = ''
+    theme: ThemeChoice = 'system' // Partie « Apparence » (retenu sur cet appareil)
     levels: UrgencyLevel[] = []
     tags: Tag[] = []
     tagsLoaded: boolean = false
@@ -48,7 +51,7 @@ class SettingsDialogState {
 }
 
 /**
- * Écran Paramètres (écran 6 de la maquette) : compte, niveaux d'urgence, tags, vue par défaut,
+ * Écran Paramètres (écran 6 de la maquette) : apparence (clair / sombre), compte, niveaux d'urgence, tags, vue par défaut,
  * jetons d'accès (pour Claude via MCP).
  *
  * Exception à la règle « seul Workspace parle à l'API » : c'est un écran à part,
@@ -63,7 +66,12 @@ export class SettingsDialog extends React.Component<SettingsDialogProps, Setting
 
     constructor(props: SettingsDialogProps) {
         super(props)
-        this.state = { ...new SettingsDialogState(), displayName: props.user.display_name, levels: props.urgencyLevels }
+        this.state = {
+            ...new SettingsDialogState(),
+            displayName: props.user.display_name,
+            levels: props.urgencyLevels,
+            theme: theme.choice,
+        }
     }
 
     async componentDidMount(): Promise<void> {
@@ -82,6 +90,15 @@ export class SettingsDialog extends React.Component<SettingsDialogProps, Setting
 
     private showError(error: unknown): void {
         this.setState({ error: error instanceof ApiError ? error.message : 'Impossible de joindre le serveur.' })
+    }
+
+    // =========================================================================
+    // Apparence (pas d'API : retenu dans le navigateur, par appareil)
+    // =========================================================================
+
+    onThemeClick = (choice: ThemeChoice): void => {
+        theme.setChoice(choice)
+        this.setState({ theme: choice })
     }
 
     // =========================================================================
@@ -299,6 +316,7 @@ export class SettingsDialog extends React.Component<SettingsDialogProps, Setting
                                 <button onClick={() => this.setState({ error: '' })}>OK</button>
                             </div>
                         )}
+                        {this.renderAppearance()}
                         {this.renderAccount()}
                         {this.renderPassword()}
                         {this.renderLevels()}
@@ -312,6 +330,27 @@ export class SettingsDialog extends React.Component<SettingsDialogProps, Setting
                     </footer>
                 </div>
             </div>
+        )
+    }
+
+    private renderAppearance(): React.ReactNode {
+        const choice = this.state.theme
+        return (
+            <section>
+                <h3>Apparence</h3>
+                <p className="settings-desc">Système : suit le mode clair ou sombre de l'appareil. Retenu sur cet appareil.</p>
+                <div className="header-views settings-views">
+                    <button className={choice === 'system' ? 'on' : ''} onClick={() => this.onThemeClick('system')}>
+                        <Monitor size={14} />Système
+                    </button>
+                    <button className={choice === 'light' ? 'on' : ''} onClick={() => this.onThemeClick('light')}>
+                        <Sun size={14} />Clair
+                    </button>
+                    <button className={choice === 'dark' ? 'on' : ''} onClick={() => this.onThemeClick('dark')}>
+                        <Moon size={14} />Sombre
+                    </button>
+                </div>
+            </section>
         )
     }
 

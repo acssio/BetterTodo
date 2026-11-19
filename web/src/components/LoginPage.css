@@ -33,6 +33,7 @@
     height: 30px;
     border-radius: 9px;
     background: var(--text);
+    color: var(--bg);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -75,7 +76,7 @@
 .login-error {
     padding: 8px 10px;
     border-radius: var(--radius);
-    background: #FDE8E8;
+    background: var(--danger-bg);
     color: var(--danger);
     font-weight: 500;
 }

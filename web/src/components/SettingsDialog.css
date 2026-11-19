@@ -9,7 +9,7 @@
     align-items: flex-start;
     justify-content: center;
     padding: 64px 16px 16px;
-    background: rgba(20, 20, 20, 0.35);
+    background: var(--backdrop);
 }
 
 .SettingsDialog {
@@ -62,7 +62,7 @@
     justify-content: space-between;
     padding: 8px 12px;
     border-radius: var(--radius);
-    background: #FDE8E8;
+    background: var(--danger-bg);
     color: var(--danger);
     font-weight: 500;
 }
@@ -156,7 +156,7 @@
 
 .settings-grip {
     flex-shrink: 0;
-    color: #B5B5B1;
+    color: var(--check-border);
     cursor: grab;
 }
 

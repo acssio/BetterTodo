@@ -63,7 +63,7 @@ export class MobileHome extends React.Component<MobileHomeProps, MobileHomeState
         return (
             <div className="MobileHome">
                 <header className="mhome-head">
-                    <span className="mhome-logo"><Check size={16} color="#FFFFFF" strokeWidth={3} /></span>
+                    <span className="mhome-logo"><Check size={16} strokeWidth={3} /></span>
                     <span className="mhome-brand">BetterTodo</span>
                     <div className="menu-anchor">
                         <button className="mhome-btn" aria-label="Nouvelle liste ou groupe de listes" onClick={() => this.setState({ newMenuOpen: true })}>

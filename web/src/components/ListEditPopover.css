@@ -63,6 +63,7 @@ input.pop-input {
     justify-content: center;
     border: 1px solid var(--border);
     border-radius: var(--radius);
+    color: var(--text-soft); /* Icône non choisie */
 }
 
 .list-icon:hover {
