@@ -21,6 +21,11 @@
 }
 
 /* Tâche sélectionnée (Cmd+clic) : fond bleuté */
+/* Menu du clic droit ouvert sur cette tâche */
+.TaskRow.menu-on {
+    background: var(--hover);
+}
+
 .TaskRow.selected {
     background: var(--selected);
 }

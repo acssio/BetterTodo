@@ -10,8 +10,10 @@ export interface TaskViewActions {
     openTask(task: Task, anchor: DOMRect): void
     renameTask(task: Task, title: string): void
 
-    // Sélection (Cmd+clic / Ctrl+clic) et modification du titre sur place
+    // Sélection (Cmd+clic / Ctrl+clic, Maj+clic, clic droit) et modification du titre sur place
     toggleSelection(task: Task): void
+    selectRange(task: Task): void
+    openTaskMenu(task: Task, x: number, y: number, anchor: DOMRect): void
     startEditing(task: Task): void // Vide la sélection et ferme l'overlay
     createTask(groupId: string, title: string): Promise<void>
     createGroup(listId: string, name: string): Promise<void>
@@ -37,6 +39,7 @@ export interface TaskViewProps {
     actions: TaskViewActions
     openTaskId: string | null // Tâche dont l'overlay est ouvert
     selectedTaskIds: string[] // Tâches sélectionnées
+    menuTaskId: string | null // Tâche dont le menu du clic droit est ouvert
     drag: DragState | null    // Glisser-déposer en cours
     addingGroup: boolean      // Champ « nouveau groupe » affiché (bouton de l'en-tête)
     onAddingGroupDone: () => void

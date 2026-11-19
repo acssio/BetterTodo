@@ -22,6 +22,11 @@
 }
 
 /* Tâche sélectionnée (Cmd+clic) : fond bleuté */
+/* Menu du clic droit ouvert sur cette tâche */
+.TaskCard.menu-on {
+    border-color: var(--faint);
+}
+
 .TaskCard.selected {
     background: var(--selected);
     border-color: var(--selected-border);

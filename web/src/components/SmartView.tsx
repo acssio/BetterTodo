@@ -15,11 +15,14 @@ interface SmartViewProps {
     urgencyLevels: UrgencyLevel[]
     openTaskId: string | null
     selectedTaskIds: string[]
+    menuTaskId: string | null // Tâche dont le menu du clic droit est ouvert
     leavingTaskIds: string[] // Tâches cochées en train de disparaître
     onToggle: (task: Task) => void
     onOpen: (task: Task, anchor: DOMRect) => void
     onRename: (task: Task, title: string) => void
     onToggleSelection: (task: Task) => void
+    onSelectRange: (task: Task) => void
+    onOpenMenu: (task: Task, x: number, y: number, anchor: DOMRect) => void
     onStartEditing: (task: Task) => void
     onClosePane?: () => void // Vue scindée
     mobile?: boolean         // Mode mobile : toucher une tâche ouvre l'overlay
@@ -81,6 +84,7 @@ export class SmartView extends React.Component<SmartViewProps> {
                                 urgency={this.props.urgencyLevels.find(level => level.id === task.urgency_id)}
                                 opened={task.id === this.props.openTaskId}
                                 selected={this.props.selectedTaskIds.includes(task.id)}
+                                menuOpen={task.id === this.props.menuTaskId}
                                 dragging={false}
                                 canDrag={false}
                                 leaving={this.props.leavingTaskIds.includes(task.id)}
@@ -91,6 +95,8 @@ export class SmartView extends React.Component<SmartViewProps> {
                                 onOpen={this.props.onOpen}
                                 onRename={this.props.onRename}
                                 onToggleSelection={this.props.onToggleSelection}
+                                onSelectRange={this.props.onSelectRange}
+                                onOpenMenu={this.props.onOpenMenu}
                                 onStartEditing={this.props.onStartEditing}
                                 onDragStart={() => {}}
                                 onDragEnd={() => {}}

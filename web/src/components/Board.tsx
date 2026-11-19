@@ -130,6 +130,7 @@ export class Board extends React.Component<TaskViewProps, BoardState> {
                                     urgency={urgencyLevels.find(level => level.id === task.urgency_id)}
                                     opened={task.id === openTaskId}
                                     selected={selectedTaskIds.includes(task.id)}
+                                    menuOpen={task.id === this.props.menuTaskId}
                                     dragging={dragging}
                                     tapToOpen={this.props.mobile}
                                     selecting={this.props.mobile && selectedTaskIds.length > 0}
@@ -140,6 +141,8 @@ export class Board extends React.Component<TaskViewProps, BoardState> {
                                     onOpen={actions.openTask}
                                     onRename={actions.renameTask}
                                     onToggleSelection={actions.toggleSelection}
+                                    onSelectRange={actions.selectRange}
+                                    onOpenMenu={actions.openTaskMenu}
                                     onStartEditing={actions.startEditing}
                                     onDragStart={actions.startTaskDrag}
                                     onDragEnd={actions.endTaskDrag}

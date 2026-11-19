@@ -12,11 +12,14 @@ interface TaskCardProps {
     urgency: UrgencyLevel | undefined // undefined = pas d'urgence
     opened: boolean                   // Son overlay est ouvert
     selected: boolean                 // Fait partie de la sélection (Cmd+clic)
+    menuOpen: boolean                 // Son menu du clic droit est ouvert
     dragging: boolean                 // C'est une carte en train d'être glissée
     onToggle: (task: Task) => void
     onOpen: (task: Task, anchor: DOMRect) => void
     onRename: (task: Task, title: string) => void
     onToggleSelection: (task: Task) => void
+    onSelectRange: (task: Task) => void                                  // Maj+clic
+    onOpenMenu: (task: Task, x: number, y: number, anchor: DOMRect) => void // Clic droit
     onStartEditing: (task: Task) => void
     onDragStart: (task: Task) => void
     onDragEnd: () => void
@@ -38,6 +41,8 @@ class TaskCardState {
  * Une carte de tâche : case à cocher, titre, urgence, puis échéance, tags et note.
  *   clic                      → modifier le titre sur place (curseur là où on a cliqué)
  *   Cmd+clic / Ctrl+clic      → ajouter à la sélection ou l'en retirer
+ *   Maj+clic                  → sélectionner une plage
+ *   clic droit                → petit menu (sélection, détail, supprimer)
  *   bouton au survol, Entrée  → overlay d'édition
  *   case                      → cocher / décocher
  * En mode mobile (tapToOpen) : toucher → overlay, appui long → sélection, appui long puis
@@ -89,6 +94,10 @@ export class TaskCard extends React.Component<TaskCardProps, TaskCardState> {
     onClick = (event: React.MouseEvent<HTMLDivElement>): void => {
         if (this.state.editing) return
         if (this.longPress.consumeClick()) return // Ce clic termine un appui long ou un glisser : déjà traité
+        if (event.shiftKey && !this.props.tapToOpen) {
+            this.props.onSelectRange(this.props.task) // Maj+clic : plage depuis la dernière tâche cliquée
+            return
+        }
         if (event.metaKey || event.ctrlKey || this.props.selecting) {
             this.props.onToggleSelection(this.props.task)
             return
@@ -139,9 +148,15 @@ export class TaskCard extends React.Component<TaskCardProps, TaskCardState> {
         if (this.props.tapToOpen && event.isPrimary) this.gesture.start(event.pointerId, event.clientX, event.clientY)
     }
 
-    /** Android ouvre un menu sur un appui long : pas sur une tâche. */
+    /** Clic droit : notre menu à la place de celui du navigateur. Android ouvre un menu sur un appui long : pas sur une tâche. */
     onContextMenu = (event: React.MouseEvent<HTMLDivElement>): void => {
-        if (this.props.tapToOpen) event.preventDefault()
+        if (this.props.tapToOpen) {
+            event.preventDefault()
+            return
+        }
+        if (this.state.editing) return // Titre en cours de modification : menu du navigateur (copier, coller…)
+        event.preventDefault()
+        this.props.onOpenMenu(this.props.task, event.clientX, event.clientY, event.currentTarget.getBoundingClientRect())
     }
 
     onDragStart = (event: React.DragEvent<HTMLDivElement>): void => {
@@ -159,6 +174,7 @@ export class TaskCard extends React.Component<TaskCardProps, TaskCardState> {
         if (task.done) classes.push('done')
         if (opened) classes.push('opened')
         if (selected) classes.push('selected')
+        if (this.props.menuOpen) classes.push('menu-on')
         if (dragging) classes.push('dragging')
         if (editing) classes.push('editing')
         if (this.state.lifted) classes.push('lifted')
