@@ -20,6 +20,8 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.boolean
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -41,9 +43,35 @@ import java.util.UUID
  *  - 3 niveaux d'urgence au départ (Basse, Moyenne, Haute), comme un nouveau compte.
  *
  * Plusieurs écritures liées passent par withTransaction : tout ou rien, comme les transactions du serveur.
+ *
+ * Synchronisation (8-5) : quand recording est vrai (un serveur est relié), chaque modification est
+ * AUSSI notée dans la table outbox, sous la forme de la requête REST que le serveur doit recevoir
+ * (avec les id choisis ici). Dans la même transaction que la modification : jamais l'une sans l'autre.
+ * SyncEngine envoie ensuite la file au serveur, dans l'ordre.
  */
 class LocalApi(private val db: LocalDatabase) : TodoApi {
     private val dao = db.dao()
+
+    /** Vrai quand un serveur est relié : chaque modification est aussi notée dans outbox. */
+    @Volatile
+    var recording = false
+
+    /** Appelé après chaque modification notée (SyncEngine lance alors une synchronisation un peu plus tard). */
+    @Volatile
+    var onRecorded: (() -> Unit)? = null
+
+    /** Note la requête que le serveur devra recevoir (seulement si un serveur est relié). */
+    private suspend fun record(method: String, path: String, body: JsonObject? = null) {
+        if (!recording) return
+        dao.insertOutbox(OutboxEntity(method = method, path = path, body = body?.toString()))
+        onRecorded?.invoke()
+    }
+
+    private suspend fun record(method: String, path: String, body: String) {
+        if (!recording) return
+        dao.insertOutbox(OutboxEntity(method = method, path = path, body = body))
+        onRecorded?.invoke()
+    }
 
     // --- Compte local ----------------------------------------------------------------
 
@@ -63,8 +91,30 @@ class LocalApi(private val db: LocalDatabase) : TodoApi {
             }
             profile = profile.copy(quickTaskDue = quickTaskDue)
         }
-        dao.updateProfile(profile)
+        db.withTransaction {
+            dao.updateProfile(profile)
+            record("PATCH", "/me", buildJsonObject {
+                displayName?.let { put("display_name", profile.displayName) }
+                language?.let { put("language", it) }
+                defaultView?.let { put("default_view", it) }
+                quickTaskDue?.let { put("quick_task_due", it) }
+            })
+        }
         return profile.toUser()
+    }
+
+    /** Le compte reçu du serveur à la synchronisation : rien à renvoyer (SyncEngine). */
+    suspend fun saveProfile(user: User) {
+        val profile = profile()
+        dao.updateProfile(
+            profile.copy(
+                displayName = user.displayName,
+                language = user.language,
+                defaultView = user.defaultView,
+                quickTaskDue = user.quickTaskDue,
+                email = user.email,
+            )
+        )
     }
 
     /**
@@ -85,7 +135,7 @@ class LocalApi(private val db: LocalDatabase) : TodoApi {
 
     private fun ProfileEntity.toUser() = User(
         id = LOCAL_USER_ID,
-        email = "",
+        email = email,
         displayName = displayName,
         language = language,
         defaultView = defaultView,
@@ -98,27 +148,42 @@ class LocalApi(private val db: LocalDatabase) : TodoApi {
 
     override suspend fun createFolder(name: String): Folder {
         val folder = FolderEntity(newId(), cleanName(name, "Le nom"), nextPosition(dao.folders().map { it.position }), createdAt = now())
-        dao.insertFolder(folder)
+        db.withTransaction {
+            dao.insertFolder(folder)
+            record("POST", "/folders", buildJsonObject {
+                put("id", folder.id)
+                put("name", folder.name)
+            })
+        }
         return folder.toFolder()
     }
 
     override suspend fun renameFolder(folderId: String, name: String): Folder {
         val folder = dao.folder(folderId) ?: throw notFound()
         val renamed = folder.copy(name = cleanName(name, "Le nom"))
-        dao.updateFolder(renamed)
+        db.withTransaction {
+            dao.updateFolder(renamed)
+            record("PATCH", "/folders/$folderId", buildJsonObject { put("name", renamed.name) })
+        }
         return renamed.toFolder()
     }
 
     override suspend fun setFolderCollapsed(folderId: String, collapsed: Boolean): Folder {
         val folder = dao.folder(folderId) ?: throw notFound()
         val changed = folder.copy(collapsed = collapsed)
-        dao.updateFolder(changed)
+        db.withTransaction {
+            dao.updateFolder(changed)
+            record("PATCH", "/folders/$folderId", buildJsonObject { put("collapsed", collapsed) })
+        }
         return changed.toFolder()
     }
 
     override suspend fun deleteFolder(folderId: String) {
         dao.folder(folderId) ?: throw notFound()
-        dao.deleteFolder(folderId) // Ses listes passent hors groupe (SET_NULL)
+        db.withTransaction {
+            dao.deleteFolder(folderId) // Ses listes passent hors groupe (SET_NULL)
+            record("DELETE", "/folders/$folderId")
+        }
     }
 
     private fun FolderEntity.toFolder() = Folder(id, name, position, collapsed)
@@ -142,9 +207,17 @@ class LocalApi(private val db: LocalDatabase) : TodoApi {
             position = nextPosition(dao.listsIn(folderId).map { it.position }),
             createdAt = now(),
         )
+        val group = GroupEntity(newId(), list.id, DEFAULT_GROUP_NAME.getValue(profile.language), 0, now())
         db.withTransaction {
             dao.insertList(list)
-            dao.insertGroup(GroupEntity(newId(), list.id, DEFAULT_GROUP_NAME.getValue(profile.language), 0, now()))
+            dao.insertGroup(group)
+            // Le serveur crée lui aussi le groupe par défaut : on lui donne son id (default_group_id)
+            record("POST", "/lists", buildJsonObject {
+                put("id", list.id)
+                put("default_group_id", group.id)
+                put("name", list.name)
+                put("folder_id", folderId)
+            })
         }
         return list.toTodoList()
     }
@@ -178,18 +251,25 @@ class LocalApi(private val db: LocalDatabase) : TodoApi {
                 val ids = Ordering.move(dao.listsIn(list.folderId).map { it.id }, list.id, position)
                 ids.forEachIndexed { index, id -> dao.setListPosition(id, index) }
             }
+            record("PATCH", "/lists/$listId", changes.toJson())
         }
         return (dao.list(listId) ?: throw notFound()).toTodoList()
     }
 
     override suspend fun deleteList(listId: String) {
         dao.list(listId) ?: throw notFound()
-        dao.deleteList(listId) // Groupes et tâches supprimés en cascade
+        db.withTransaction {
+            dao.deleteList(listId) // Groupes et tâches supprimés en cascade
+            record("DELETE", "/lists/$listId")
+        }
     }
 
     override suspend fun clearDone(listId: String) {
         dao.list(listId) ?: throw notFound()
-        dao.deleteDoneTasks(listId)
+        db.withTransaction {
+            dao.deleteDoneTasks(listId)
+            record("DELETE", "/lists/$listId/done-tasks")
+        }
     }
 
     private suspend fun ListEntity.toTodoList() =
@@ -200,18 +280,31 @@ class LocalApi(private val db: LocalDatabase) : TodoApi {
     override suspend fun createGroup(listId: String, name: String): BoardGroup {
         dao.list(listId) ?: throw notFound()
         val group = GroupEntity(newId(), listId, cleanName(name, "Le nom"), nextPosition(dao.groupsOf(listId).map { it.position }), now())
-        dao.insertGroup(group)
+        db.withTransaction {
+            dao.insertGroup(group)
+            record("POST", "/lists/$listId/groups", buildJsonObject {
+                put("id", group.id)
+                put("name", group.name)
+            })
+        }
         return BoardGroup(group.id, group.name, group.position)
     }
 
     override suspend fun renameGroup(groupId: String, name: String) {
         val group = dao.group(groupId) ?: throw notFound()
-        dao.updateGroup(group.copy(name = cleanName(name, "Le nom")))
+        val renamed = group.copy(name = cleanName(name, "Le nom"))
+        db.withTransaction {
+            dao.updateGroup(renamed)
+            record("PATCH", "/groups/$groupId", buildJsonObject { put("name", renamed.name) })
+        }
     }
 
     override suspend fun deleteGroup(groupId: String) {
         dao.group(groupId) ?: throw notFound()
-        dao.deleteGroup(groupId) // Ses tâches avec (CASCADE)
+        db.withTransaction {
+            dao.deleteGroup(groupId) // Ses tâches avec (CASCADE)
+            record("DELETE", "/groups/$groupId")
+        }
     }
 
     override suspend fun board(listId: String): Board {
@@ -234,7 +327,14 @@ class LocalApi(private val db: LocalDatabase) : TodoApi {
             position = nextPosition(dao.tasksOf(groupId).map { it.position }),
             createdAt = now(),
         )
-        dao.insertTask(task)
+        db.withTransaction {
+            dao.insertTask(task)
+            record("POST", "/groups/$groupId/tasks", buildJsonObject {
+                put("id", task.id)
+                put("title", task.title)
+                if (dueDate != null) put("due_date", dueDate)
+            })
+        }
         return toTask(task)
     }
 
@@ -284,13 +384,17 @@ class LocalApi(private val db: LocalDatabase) : TodoApi {
                 val ids = Ordering.move(dao.tasksOf(task.groupId).map { it.id }, task.id, position)
                 ids.forEachIndexed { index, id -> dao.setTaskPosition(id, index) }
             }
+            record("PATCH", "/tasks/$taskId", changes.toJson())
         }
         return toTask(dao.task(taskId) ?: throw notFound())
     }
 
     override suspend fun deleteTask(taskId: String) {
         dao.task(taskId) ?: throw notFound()
-        dao.deleteTask(taskId)
+        db.withTransaction {
+            dao.deleteTask(taskId)
+            record("DELETE", "/tasks/$taskId")
+        }
     }
 
     override suspend fun dueTasks(until: String?): List<DueTask> {
@@ -322,11 +426,20 @@ class LocalApi(private val db: LocalDatabase) : TodoApi {
     private fun TaskEntity.toTask(tags: List<String>) =
         Task(id, groupId, title, notes, dueDate, dueTime, urgencyId, done, position, tags)
 
-    /** Remplace tous les tags de la tâche ; un nom inconnu crée le tag (comme setTaskTags du serveur). */
+    /**
+     * Remplace tous les tags de la tâche ; un nom inconnu crée le tag (comme setTaskTags du serveur).
+     * Un tag créé ici est d'abord envoyé au serveur avec son id (POST /tags), pour garder le même des deux côtés.
+     */
     private suspend fun setTaskTags(taskId: String, names: List<String>) {
         dao.clearTaskTags(taskId)
         for (name in names) {
-            val tag = dao.tagNamed(name) ?: TagEntity(newId(), name).also { dao.insertTag(it) }
+            val tag = dao.tagNamed(name) ?: TagEntity(newId(), name).also { created ->
+                dao.insertTag(created)
+                record("POST", "/tags", buildJsonObject {
+                    put("id", created.id)
+                    put("name", created.name)
+                })
+            }
             dao.insertTaskTag(TaskTagEntity(taskId, tag.id))
         }
     }
@@ -340,7 +453,14 @@ class LocalApi(private val db: LocalDatabase) : TodoApi {
 
     override suspend fun createUrgencyLevel(name: String, color: String): UrgencyLevel {
         val level = UrgencyEntity(newId(), cleanName(name, "Le nom"), checkColor(color), nextPosition(dao.urgencyLevels().map { it.rank }), now())
-        dao.insertUrgencyLevel(level)
+        db.withTransaction {
+            dao.insertUrgencyLevel(level)
+            record("POST", "/urgency-levels", buildJsonObject {
+                put("id", level.id)
+                put("name", level.name)
+                put("color", level.color)
+            })
+        }
         return UrgencyLevel(level.id, level.name, level.color, level.rank)
     }
 
@@ -354,12 +474,20 @@ class LocalApi(private val db: LocalDatabase) : TodoApi {
                 val ids = Ordering.move(dao.urgencyLevels().map { it.id }, id, rank)
                 ids.forEachIndexed { index, levelId -> dao.setUrgencyRank(levelId, index) }
             }
+            record("PATCH", "/urgency-levels/$id", buildJsonObject {
+                if (name != null) put("name", level.name)
+                if (color != null) put("color", color)
+                if (rank != null) put("rank", rank)
+            })
         }
     }
 
     override suspend fun deleteUrgencyLevel(id: String) {
         dao.urgencyLevel(id) ?: throw notFound()
-        dao.deleteUrgencyLevel(id) // Ses tâches passent sans urgence (SET_NULL)
+        db.withTransaction {
+            dao.deleteUrgencyLevel(id) // Ses tâches passent sans urgence (SET_NULL)
+            record("DELETE", "/urgency-levels/$id")
+        }
     }
 
     // --- Tags -------------------------------------------------------------------------
@@ -370,7 +498,13 @@ class LocalApi(private val db: LocalDatabase) : TodoApi {
         val clean = cleanTag(name)
         if (dao.tagNamed(clean) != null) throw ApiError(409, "Ce tag existe déjà")
         val tag = TagEntity(newId(), clean)
-        dao.insertTag(tag)
+        db.withTransaction {
+            dao.insertTag(tag)
+            record("POST", "/tags", buildJsonObject {
+                put("id", tag.id)
+                put("name", tag.name)
+            })
+        }
         return Tag(tag.id, tag.name, 0)
     }
 
@@ -379,12 +513,18 @@ class LocalApi(private val db: LocalDatabase) : TodoApi {
         val clean = cleanTag(name)
         val other = dao.tagNamed(clean)
         if (other != null && other.id != id) throw ApiError(409, "Ce tag existe déjà")
-        dao.updateTag(tag.copy(name = clean))
+        db.withTransaction {
+            dao.updateTag(tag.copy(name = clean))
+            record("PATCH", "/tags/$id", buildJsonObject { put("name", clean) })
+        }
     }
 
     override suspend fun deleteTag(id: String) {
         dao.tag(id) ?: throw notFound()
-        dao.deleteTag(id) // Enlevé de ses tâches (CASCADE sur task_tags)
+        db.withTransaction {
+            dao.deleteTag(id) // Enlevé de ses tâches (CASCADE sur task_tags)
+            record("DELETE", "/tags/$id")
+        }
     }
 
     // --- Validation (mêmes règles et messages que le serveur) --------------------------

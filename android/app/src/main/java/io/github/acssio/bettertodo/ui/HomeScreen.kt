@@ -65,6 +65,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.composables.icons.lucide.R // Icônes de la bibliothèque icons-lucide-android
 import io.github.acssio.bettertodo.api.ApiClient
 import io.github.acssio.bettertodo.api.TodoApi
+import io.github.acssio.bettertodo.sync.SyncEngine
 import io.github.acssio.bettertodo.api.ApiError
 import io.github.acssio.bettertodo.api.Folder
 import io.github.acssio.bettertodo.api.TodoList
@@ -115,7 +116,11 @@ fun deleteFolderMessage(folder: Folder): String {
  * Seuls AppViewModel et HomeViewModel (avec ses BoardModel, SmartModel et QuickTaskModel)
  * parlent à l'API, comme App et Workspace sur le site.
  */
-class HomeViewModel(private val api: TodoApi, private val quickTaskMemory: QuickTaskMemory) : ViewModel() {
+class HomeViewModel(
+    private val api: TodoApi,
+    private val quickTaskMemory: QuickTaskMemory,
+    private val sync: SyncEngine? = null, // null sans serveur
+) : ViewModel() {
     var page by mutableStateOf<HomePage>(HomePage.Home)
         private set
 
@@ -165,10 +170,29 @@ class HomeViewModel(private val api: TodoApi, private val quickTaskMemory: Quick
         fetch()
     }
 
-    /** Tirer vers le bas. */
+    /** Tirer vers le bas : synchronise d'abord avec le serveur s'il y en a un. */
     fun refresh() {
         refreshing = true
+        viewModelScope.launch {
+            sync?.syncNow()
+            fetch()
+        }
+    }
+
+    /** Après une synchronisation qui a changé la base : on relit, sans indicateur de chargement. */
+    fun reloadAfterSync() {
         fetch()
+        when (val current = page) {
+            is HomePage.OpenList -> current.board.reloadQuietly()
+            is HomePage.OpenSmart -> current.smart.reloadQuietly()
+            else -> {}
+        }
+    }
+
+    /** Tirer vers le bas dans une liste : synchronise d'abord, comme sur l'accueil. */
+    private fun syncFirst(store: TaskStore): TaskStore {
+        sync?.let { engine -> store.beforeRefresh = { engine.syncNow() } }
+        return store
     }
 
     /** Replier / déplier : l'écran d'abord, puis le serveur (retenu comme sur le site). */
@@ -286,19 +310,21 @@ class HomeViewModel(private val api: TodoApi, private val quickTaskMemory: Quick
 
     /** Toucher une liste : un nouveau BoardModel, donc la liste est toujours rechargée. */
     fun openList(list: TodoList) {
-        page = HomePage.OpenList(
-            BoardModel(api, list, viewModelScope, onUnauthorized = { sessionExpired = true }, onDeleted = { closeList() }),
-        )
+        val board = BoardModel(api, list, viewModelScope, onUnauthorized = { sessionExpired = true }, onDeleted = { closeList() })
+        page = HomePage.OpenList(board)
+        syncFirst(board)
     }
 
     /** Engrenage de l'en-tête : les Paramètres. */
     fun openSettings(server: ApiClient?, user: User, onUserChanged: (User) -> Unit) {
-        page = HomePage.Settings(SettingsModel(api, server, user, viewModelScope, onUnauthorized = { sessionExpired = true }, onUserChanged))
+        page = HomePage.Settings(SettingsModel(api, server, sync, user, viewModelScope, onUnauthorized = { sessionExpired = true }, onUserChanged))
     }
 
     /** Toucher « Aujourd'hui » ou « Planifié ». */
     fun openSmart(kind: SmartKind) {
-        page = HomePage.OpenSmart(SmartModel(api, kind, viewModelScope, onUnauthorized = { sessionExpired = true }))
+        val smart = SmartModel(api, kind, viewModelScope, onUnauthorized = { sessionExpired = true })
+        page = HomePage.OpenSmart(smart)
+        syncFirst(smart)
     }
 
     /** Les listes dans l'ordre de l'accueil : hors groupe, puis groupe de listes par groupe de listes. */
@@ -373,6 +399,7 @@ class HomeViewModel(private val api: TodoApi, private val quickTaskMemory: Quick
  * Même disposition que l'accueil mobile du site (MobileHome).
  *
  * @param server le serveur (pour le mot de passe), ou null sans serveur : pas de bouton de déconnexion
+ * @param sync la synchronisation avec ce serveur, ou null sans serveur
  * @param sessionKey change à chaque connexion : un nouveau HomeViewModel est créé
  * @param onConnectServer Paramètres › Se connecter à un serveur (sans serveur seulement)
  */
@@ -381,21 +408,21 @@ class HomeViewModel(private val api: TodoApi, private val quickTaskMemory: Quick
 fun HomeScreen(
     api: TodoApi,
     server: ApiClient?,
+    sync: SyncEngine?,
     user: User,
     sessionKey: String,
     onLogout: () -> Unit,
     onConnectServer: () -> Unit,
-    onSessionExpired: () -> Unit,
     onUserChanged: (User) -> Unit,
 ) {
     val context = LocalContext.current
-    val model: HomeViewModel = viewModel(key = sessionKey) { HomeViewModel(api, QuickTaskMemory(context)) }
+    val model: HomeViewModel = viewModel(key = sessionKey) { HomeViewModel(api, QuickTaskMemory(context), sync) }
     val snackbar = remember { SnackbarHostState() }
 
-    LaunchedEffect(model.sessionExpired) {
-        if (model.sessionExpired) {
-            onSessionExpired()
-        }
+    // Une synchronisation a changé la base : l'accueil et l'écran ouvert se rechargent
+    val syncVersion = sync?.version ?: 0
+    LaunchedEffect(syncVersion) {
+        if (syncVersion > 0) model.reloadAfterSync()
     }
 
     // Message court en bas de l'écran (Quick task créée)

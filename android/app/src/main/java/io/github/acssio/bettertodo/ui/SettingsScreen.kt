@@ -57,6 +57,8 @@ import io.github.acssio.bettertodo.api.TodoList
 import io.github.acssio.bettertodo.api.UrgencyLevel
 import io.github.acssio.bettertodo.api.User
 import io.github.acssio.bettertodo.data.AppearanceStore
+import io.github.acssio.bettertodo.sync.SyncEngine
+import io.github.acssio.bettertodo.sync.SyncStatus
 import io.github.acssio.bettertodo.ui.theme.Palette
 import io.github.acssio.bettertodo.ui.theme.ThemeMode
 import kotlinx.coroutines.CoroutineScope
@@ -75,6 +77,7 @@ import kotlinx.coroutines.launch
 class SettingsModel(
     private val api: TodoApi,
     private val server: ApiClient?, // Le serveur (mot de passe), ou null sans serveur
+    val sync: SyncEngine?,          // La synchronisation avec ce serveur (8-5), ou null
     user: User,
     private val scope: CoroutineScope,
     private val onUnauthorized: () -> Unit,
@@ -85,6 +88,15 @@ class SettingsModel(
 
     /** Vrai avec un serveur : mot de passe et email affichés. */
     val hasServer: Boolean get() = server != null
+
+    /** L'adresse du serveur relié ("" sans serveur). */
+    val serverUrl: String get() = server?.serverUrl ?: ""
+
+    /** « Synchroniser maintenant ». */
+    fun syncNow() {
+        val engine = sync ?: return
+        scope.launch { engine.syncNow() }
+    }
     var error by mutableStateOf<String?>(null) // Erreur du compte (nom, langue, vue)
         private set
 
@@ -378,18 +390,19 @@ fun SettingsScreen(model: SettingsModel, onBack: () -> Unit, onConnectServer: ()
 
             HorizontalDivider(color = Palette.border)
 
-            // --- Serveur (8-3) : sans serveur, on peut en ajouter un ---
+            // --- Serveur : sans serveur, on peut en ajouter un (8-3) ; avec, l'état de la synchronisation (8-5) ---
+            SectionTitle("Serveur")
             if (!model.hasServer) {
-                SectionTitle("Serveur")
                 Text(
                     "Tes listes sont sur ce téléphone, sans serveur. Avec un serveur BetterTodo, tu les retrouves aussi sur le site.",
                     color = Palette.muted,
                     fontSize = 14.sp,
                 )
                 OutlinedButton(onClick = onConnectServer) { Text("Se connecter à un serveur") }
-
-                HorizontalDivider(color = Palette.border)
+            } else {
+                model.sync?.let { SyncSection(model, it) }
             }
+            HorizontalDivider(color = Palette.border)
 
             // --- Compte ---
             SectionTitle("Compte")
@@ -491,6 +504,15 @@ private fun PasswordSection(model: SettingsModel) {
             }
         }
     }
+}
+
+/** Adresse du serveur, dernière synchronisation, modifications en attente, erreur, « Synchroniser maintenant ». */
+@Composable
+private fun SyncSection(model: SettingsModel, sync: SyncEngine) {
+    Text(model.serverUrl, color = Palette.muted, fontSize = 14.sp)
+    Text(SyncStatus.describe(sync.syncing, sync.lastSync, sync.pending), fontSize = 14.sp)
+    sync.error?.let { Text("Dernière tentative : $it", color = Palette.danger, fontSize = 14.sp) }
+    OutlinedButton(onClick = model::syncNow, enabled = !sync.syncing) { Text("Synchroniser maintenant") }
 }
 
 /**

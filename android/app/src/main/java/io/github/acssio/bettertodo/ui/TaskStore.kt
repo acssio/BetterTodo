@@ -106,9 +106,20 @@ abstract class TaskStore(
         fetch()
     }
 
+    /** Avant de recharger en tirant vers le bas : la synchronisation avec le serveur (8-5), ou rien. */
+    var beforeRefresh: (suspend () -> Unit)? = null
+
     fun refresh() {
         refreshing = true
-        fetch()
+        scope.launch {
+            beforeRefresh?.invoke()
+            fetch()
+        }
+    }
+
+    /** Relit les données sans indicateur (après une synchronisation), si l'écran est déjà affiché. */
+    fun reloadQuietly() {
+        if (state == LoadState.Ready) fetch()
     }
 
     /**

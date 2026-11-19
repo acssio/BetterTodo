@@ -1,5 +1,6 @@
 package io.github.acssio.bettertodo.local
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
@@ -125,4 +126,28 @@ data class ProfileEntity(
     val language: String = "fr",
     val defaultView: String = "columns",
     val quickTaskDue: String = "today",
+    @ColumnInfo(defaultValue = "") val email: String = "", // Celui du compte du serveur relié (8-5), "" sans serveur
+)
+
+/**
+ * File d'attente de la synchronisation (8-5) : chaque modification faite sur le téléphone,
+ * sous la forme de la requête REST qu'il faudra envoyer au serveur, dans l'ordre (seq).
+ * Vide sans serveur : LocalApi n'y écrit que lorsque la synchronisation est active.
+ */
+@Entity(tableName = "outbox")
+data class OutboxEntity(
+    @PrimaryKey(autoGenerate = true) val seq: Long = 0,
+    val method: String,  // "POST", "PATCH", "DELETE"
+    val path: String,    // "/tasks/<id>" (après /api/v1)
+    val body: String?,   // JSON, ou null
+)
+
+/** Où en est la synchronisation (une seule ligne, id = 1). */
+@Entity(tableName = "sync_state")
+data class SyncStateEntity(
+    @PrimaryKey val id: Int = 1,
+    val userId: String? = null,  // Le compte du serveur relié (un autre compte = tout recommencer)
+    val linked: Boolean = false, // Les données du téléphone ont déjà été envoyées à ce serveur (premier lien fait)
+    val cursor: String? = null,  // Renvoyé par GET /sync, à redonner la fois suivante
+    val lastSync: Long? = null,  // Dernière synchronisation réussie (millisecondes)
 )

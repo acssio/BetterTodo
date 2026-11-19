@@ -1,6 +1,7 @@
 package io.github.acssio.bettertodo.api
 
 import android.util.Log
+import io.github.acssio.bettertodo.sync.SyncServer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -27,7 +28,7 @@ class ApiError(val status: Int, message: String) : Exception(message)
  * @param serverUrl adresse du serveur, déjà normalisée (voir ServerUrl.normalize)
  * @param token jeton de session, ou null avant la connexion
  */
-class ApiClient(private val serverUrl: String, private val token: String? = null) : TodoApi {
+class ApiClient(val serverUrl: String, private val token: String? = null) : TodoApi, SyncServer {
 
     // --- Comptes -------------------------------------------------------------
 
@@ -253,6 +254,19 @@ class ApiClient(private val serverUrl: String, private val token: String? = null
         send("DELETE", "/tags/$id")
     }
 
+    // --- Synchronisation (8-5) ------------------------------------------------
+
+    /** Ce qui a changé depuis le curseur de la synchronisation précédente (tout si null). */
+    override suspend fun sync(since: String?): SyncData {
+        val path = if (since != null) "/sync?since=" + java.net.URLEncoder.encode(since, "UTF-8") else "/sync"
+        return json.decodeFromString(send("GET", path))
+    }
+
+    /** Envoie une requête de la file d'attente telle quelle (méthode, chemin après /api/v1, corps JSON). */
+    override suspend fun replay(method: String, path: String, body: String?) {
+        send(method, path, body)
+    }
+
     // --- Envoi d'une requête -------------------------------------------------
 
     /**
@@ -291,7 +305,8 @@ class ApiClient(private val serverUrl: String, private val token: String? = null
         return try {
             json.decodeFromString<ErrorBody>(text).error
         } catch (e: Exception) {
-            "Erreur $status"
+            // 502 / 503 / 504 sans JSON : c'est nginx qui répond, l'API derrière est arrêtée
+            if (status in 502..504) "Serveur injoignable (erreur $status)" else "Erreur $status"
         }
     }
 

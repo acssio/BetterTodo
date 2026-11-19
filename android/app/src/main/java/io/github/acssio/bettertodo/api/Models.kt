@@ -140,6 +140,35 @@ data class DueCounts(
     val scheduled: Int = 0, // Toutes les tâches avec une échéance
 )
 
+// --- Synchronisation (8-5) ------------------------------------------------------------
+
+/** Un groupe dans GET /sync : avec sa liste (list_id), qui n'est pas dans BoardGroup. */
+@Serializable
+data class SyncGroup(
+    val id: String,
+    @SerialName("list_id") val listId: String,
+    val name: String,
+    val position: Int,
+)
+
+/** Un élément supprimé sur le serveur. type : folder, list, group, task, urgency_level, tag, smart_list */
+@Serializable
+data class SyncDeletion(val type: String, val id: String)
+
+/** Réponse de GET /sync?since= : ce qui a changé ou disparu depuis le curseur (tout, sans curseur). */
+@Serializable
+data class SyncData(
+    val cursor: String,
+    val user: User,
+    val folders: List<Folder> = emptyList(),
+    val lists: List<TodoList> = emptyList(),
+    val groups: List<SyncGroup> = emptyList(),
+    val tasks: List<Task> = emptyList(),
+    @SerialName("urgency_levels") val urgencyLevels: List<UrgencyLevel> = emptyList(),
+    val tags: List<Tag> = emptyList(),
+    val deleted: List<SyncDeletion> = emptyList(),
+)
+
 // --- Corps de requête et petites réponses ----------------------------------------
 
 @Serializable

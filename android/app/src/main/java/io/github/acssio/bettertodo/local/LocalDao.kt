@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
 import androidx.room.Update
+import androidx.room.Upsert
 
 /** Nom d'un tag d'une tâche (résultat d'une jointure task_tags × tags). */
 data class TaskTagName(val taskId: String, val name: String)
@@ -202,4 +203,67 @@ interface LocalDao {
 
     @Query("DELETE FROM urgency_levels WHERE id = :id")
     suspend fun deleteUrgencyLevel(id: String)
+
+    // --- Synchronisation (8-5) ------------------------------------------------
+
+    @Insert
+    suspend fun insertOutbox(op: OutboxEntity)
+
+    @Query("SELECT * FROM outbox ORDER BY seq")
+    suspend fun outbox(): List<OutboxEntity>
+
+    @Query("SELECT COUNT(*) FROM outbox")
+    suspend fun outboxCount(): Int
+
+    @Query("DELETE FROM outbox WHERE seq = :seq")
+    suspend fun deleteOutbox(seq: Long)
+
+    @Query("DELETE FROM outbox")
+    suspend fun clearOutbox()
+
+    // Upsert = insérer, ou mettre à jour si l'id existe. Jamais REPLACE : il SUPPRIME puis réinsère,
+    // et la suppression partirait en cascade (les tâches d'une liste…).
+
+    @Upsert
+    suspend fun upsertFolder(folder: FolderEntity)
+
+    @Upsert
+    suspend fun upsertList(list: ListEntity)
+
+    @Upsert
+    suspend fun upsertGroup(group: GroupEntity)
+
+    @Upsert
+    suspend fun upsertTask(task: TaskEntity)
+
+    @Upsert
+    suspend fun upsertUrgencyLevel(level: UrgencyEntity)
+
+    @Upsert
+    suspend fun upsertTag(tag: TagEntity)
+
+    @Query("SELECT * FROM tags")
+    suspend fun allTags(): List<TagEntity>
+
+    @Query("SELECT * FROM tasks")
+    suspend fun allTasks(): List<TaskEntity>
+
+    @Query("SELECT * FROM task_groups")
+    suspend fun allGroups(): List<GroupEntity>
+
+    /** Les tâches qui portent l'ancien tag portent le nouveau (fusion de deux tags du même nom). */
+    @Query("INSERT OR IGNORE INTO task_tags (taskId, tagId) SELECT taskId, :newId FROM task_tags WHERE tagId = :oldId")
+    suspend fun copyTaskTags(oldId: String, newId: String)
+
+    @Query("SELECT taskId FROM task_tags WHERE tagId = :tagId")
+    suspend fun taskIdsWithTag(tagId: String): List<String>
+
+    @Query("UPDATE tasks SET urgencyId = :newId WHERE urgencyId = :oldId")
+    suspend fun replaceUrgency(oldId: String, newId: String)
+
+    @Query("SELECT * FROM sync_state WHERE id = 1")
+    suspend fun syncState(): SyncStateEntity?
+
+    @Upsert
+    suspend fun saveSyncState(state: SyncStateEntity)
 }
