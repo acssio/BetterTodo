@@ -32,7 +32,13 @@ import io.github.acssio.bettertodo.data.SessionStore
 import io.github.acssio.bettertodo.local.LocalApi
 import io.github.acssio.bettertodo.local.LocalDatabase
 import io.github.acssio.bettertodo.sync.SyncEngine
+import io.github.acssio.bettertodo.notify.ReminderScheduler
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+
+/** Délai avant de replanifier les rappels après une modification. */
+private const val REMINDERS_DELAY_MS = 1000L
 
 /**
  * L'écran affiché : la machine d'état de l'app.
@@ -104,7 +110,25 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         private set
 
     init {
+        local.onWrite = { scheduleReminders() } // Une tâche a changé : ses rappels aussi (8-7)
+        scheduleReminders()
         start()
+    }
+
+    private var reminders: Job? = null
+
+    /** Replanifie les rappels un peu plus tard (plusieurs modifications d'affilée = une seule fois). */
+    fun scheduleReminders() {
+        reminders?.cancel()
+        reminders = viewModelScope.launch {
+            delay(REMINDERS_DELAY_MS)
+            ReminderScheduler.reschedule(getApplication())
+        }
+    }
+
+    override fun onCleared() {
+        if (SyncEngine.current === sync) SyncEngine.current = null // App fermée : les notifications font sans elle
+        local.onWrite = null
     }
 
     /** Au lancement : le mode enregistré. Avec un serveur, les listes s'ouvrent sans attendre le réseau. */
@@ -278,9 +302,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 /** Racine de l'interface : affiche l'écran correspondant à l'état. */
 @Composable
 fun App(app: AppViewModel = viewModel()) {
-    // Une synchronisation a changé la base : le compte a pu changer aussi
+    // Une synchronisation a changé la base : le compte a pu changer aussi, et les rappels
     LaunchedEffect(app.sync.version) {
-        if (app.sync.version > 0) app.reloadUser()
+        if (app.sync.version > 0) {
+            app.reloadUser()
+            app.scheduleReminders()
+        }
     }
 
     when (val screen = app.screen) {
@@ -304,7 +331,7 @@ fun App(app: AppViewModel = viewModel()) {
         is Screen.Home -> HomeScreen(
             api = app.local,
             server = screen.server,
-            sync = if (screen.server != null) app.sync else null,
+            sync = app.sync, // Aussi sans serveur : sa version recharge les écrans après un bouton de notification
             user = screen.user,
             sessionKey = screen.sessionKey,
             onLogout = app::logout,

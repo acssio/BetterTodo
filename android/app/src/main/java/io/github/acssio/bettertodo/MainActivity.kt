@@ -1,6 +1,7 @@
 package io.github.acssio.bettertodo
 
 import android.graphics.Color
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
@@ -14,7 +15,9 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import io.github.acssio.bettertodo.data.AppearanceStore
+import io.github.acssio.bettertodo.notify.Notifier
 import io.github.acssio.bettertodo.ui.App
+import io.github.acssio.bettertodo.ui.AppLinks
 import io.github.acssio.bettertodo.ui.theme.BetterTodoTheme
 import io.github.acssio.bettertodo.ui.theme.ThemeMode
 import io.github.acssio.bettertodo.ui.theme.isDark
@@ -27,6 +30,8 @@ import io.github.acssio.bettertodo.ui.theme.isDark
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        Notifier.createChannels(this)
+        handleOpen(intent)
         enableEdgeToEdge() // Dès la première image ; le style des icônes est corrigé plus bas selon le thème
         val appearance = AppearanceStore(this)
         setContent {
@@ -48,5 +53,21 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    /** App déjà ouverte (launchMode singleTop) : une notification touchée arrive ici. */
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        handleOpen(intent)
+    }
+
+    /** Une notification demande d'ouvrir « Aujourd'hui ». */
+    private fun handleOpen(intent: Intent?) {
+        if (intent?.getStringExtra(EXTRA_OPEN) == OPEN_TODAY) AppLinks.openToday = true
+    }
+
+    companion object {
+        const val EXTRA_OPEN = "open"
+        const val OPEN_TODAY = "today"
     }
 }

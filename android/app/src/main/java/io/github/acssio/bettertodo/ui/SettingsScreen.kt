@@ -565,6 +565,12 @@ fun SettingsScreen(model: SettingsModel, onBack: () -> Unit, onConnectServer: ()
                 FilterChip(user.quickTaskDue == User.QUICK_DUE_TODAY, onClick = { model.setQuickTaskDue(User.QUICK_DUE_TODAY) }, label = { Text("Aujourd'hui") })
                 FilterChip(user.quickTaskDue == User.QUICK_DUE_TOMORROW, onClick = { model.setQuickTaskDue(User.QUICK_DUE_TOMORROW) }, label = { Text("Demain") })
             }
+
+            HorizontalDivider(color = Palette.border)
+
+            // --- Notifications (8-7) : par téléphone ---
+            SectionTitle("Notifications")
+            NotificationSettingsSection()
             Box(Modifier.height(24.dp))
         }
     }

@@ -62,14 +62,20 @@ class LocalApi(private val db: LocalDatabase) : TodoApi {
     @Volatile
     var onRecorded: (() -> Unit)? = null
 
+    /** Appelé après chaque modification, serveur ou non (les rappels sont replanifiés, 8-7). */
+    @Volatile
+    var onWrite: (() -> Unit)? = null
+
     /** Note la requête que le serveur devra recevoir (seulement si un serveur est relié). */
     private suspend fun record(method: String, path: String, body: JsonObject? = null) {
+        onWrite?.invoke()
         if (!recording) return
         dao.insertOutbox(OutboxEntity(method = method, path = path, body = body?.toString()))
         onRecorded?.invoke()
     }
 
     private suspend fun record(method: String, path: String, body: String) {
+        onWrite?.invoke()
         if (!recording) return
         dao.insertOutbox(OutboxEntity(method = method, path = path, body = body))
         onRecorded?.invoke()

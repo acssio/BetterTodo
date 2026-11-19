@@ -412,7 +412,7 @@ class HomeViewModel(
  * Même disposition que l'accueil mobile du site (MobileHome).
  *
  * @param server le serveur (pour le mot de passe), ou null sans serveur : pas de bouton de déconnexion
- * @param sync la synchronisation avec ce serveur, ou null sans serveur
+ * @param sync la synchronisation (sans serveur, elle ne fait rien mais sa version recharge l'écran)
  * @param sessionKey change à chaque connexion : un nouveau HomeViewModel est créé
  * @param onConnectServer Paramètres › Se connecter à un serveur (sans serveur seulement)
  */
@@ -432,10 +432,18 @@ fun HomeScreen(
     val model: HomeViewModel = viewModel(key = sessionKey) { HomeViewModel(api, QuickTaskMemory(context), sync) }
     val snackbar = remember { SnackbarHostState() }
 
-    // Une synchronisation a changé la base : l'accueil et l'écran ouvert se rechargent
+    // Une synchronisation (ou un bouton de notification) a changé la base : l'accueil et l'écran ouvert se rechargent
     val syncVersion = sync?.version ?: 0
     LaunchedEffect(syncVersion) {
         if (syncVersion > 0) model.reloadAfterSync()
+    }
+
+    // Notification touchée : on ouvre « Aujourd'hui » (8-7)
+    LaunchedEffect(AppLinks.openToday) {
+        if (AppLinks.openToday) {
+            AppLinks.openToday = false
+            model.openSmart(SmartKind.TODAY)
+        }
     }
 
     // Message court en bas de l'écran (Quick task créée)

@@ -4,6 +4,13 @@
     <!-- Appels à l'API BetterTodo -->
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!-- Rappels (8-7) : afficher des notifications (demandé à partir d'Android 13),
+         alarmes à la minute près (l'utilisateur l'autorise dans les réglages Android, sinon quelques minutes de retard possibles),
+         reposer les alarmes après un redémarrage -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
     <!--
         allowBackup="false" : la sauvegarde Google ne copie pas le jeton de session sur un autre téléphone.
         networkSecurityConfig : HTTPS obligatoire, sauf en debug pour le Docker local (voir src/debug/res/xml).
@@ -18,15 +25,29 @@
         android:theme="@style/Theme.BetterTodo">
 
         <!-- windowSoftInputMode="adjustResize" : l'écran rétrécit quand le clavier s'ouvre -->
+        <!-- launchMode singleTop : une notification touchée revient dans l'app ouverte (onNewIntent) -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
+            android:launchMode="singleTop"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Rappels (8-7) : alarme arrivée, boutons des notifications, alarmes à reposer -->
+        <receiver android:name=".notify.ReminderReceiver" android:exported="false" />
+        <receiver android:name=".notify.ReminderActionReceiver" android:exported="false" />
+        <receiver android:name=".notify.RescheduleReceiver" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>

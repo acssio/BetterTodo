@@ -68,8 +68,12 @@ interface SyncServer {
  * Les valeurs observées par Compose (syncing, pending, error, version…) sont des mutableStateOf :
  * l'écran Paramètres et l'accueil se mettent à jour tout seuls.
  */
-class SyncEngine(private val db: LocalDatabase, private val local: LocalApi, private val scope: CoroutineScope) {
+class SyncEngine(private val db: LocalDatabase, val local: LocalApi, private val scope: CoroutineScope) {
     private val dao = db.dao()
+
+    init {
+        current = this // Les notifications passent par celle de l'app quand elle est ouverte (8-7)
+    }
     private val mutex = Mutex()
     private var scheduled: Job? = null
 
@@ -95,6 +99,11 @@ class SyncEngine(private val db: LocalDatabase, private val local: LocalApi, pri
     /** Augmente quand la récupération a changé la base : les écrans se rechargent. */
     var version by mutableIntStateOf(0)
         private set
+
+    /** La base a changé ailleurs (bouton d'une notification) : les écrans se rechargent. */
+    fun touched() {
+        version++
+    }
 
     /** Appelé sur un 401 (session expirée) : AppViewModel affiche la connexion. */
     var onExpired: (() -> Unit)? = null
@@ -472,6 +481,10 @@ class SyncEngine(private val db: LocalDatabase, private val local: LocalApi, pri
 
     companion object {
         private const val TAG = "SyncEngine" // Filtre Logcat : tag:SyncEngine
+
+        /** Celle de l'app ouverte (AppViewModel), ou null : les notifications l'utilisent si elle existe. */
+        @Volatile
+        var current: SyncEngine? = null
         private const val SCHEDULE_DELAY_MS = 1500L
         private val UUID_PATTERN = Regex("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
 
