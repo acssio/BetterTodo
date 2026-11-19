@@ -34,6 +34,37 @@ object DueDates {
         }
     }
 
+    /** Texte d'une échéance avec son heure : "Aujourd'hui 14:30" (comme DueDate dans TaskCard.tsx). */
+    fun format(iso: String, time: String?, today: LocalDate = LocalDate.now()): String {
+        return if (time == null) format(iso, today) else "${format(iso, today)} $time"
+    }
+
+    /**
+     * Heure tapée → "HH:MM", ou null si on ne la comprend pas.
+     * Le clavier numérique du téléphone n'a pas toujours « : », alors on accepte aussi
+     * "1430", "930", "14h30", "14h", "9" et "14.30". Une chaîne vide n'est PAS une heure : null.
+     * Après « : », les minutes ont 2 chiffres ("9:1" est refusé : on ne devine pas).
+     */
+    fun parseTime(input: String): String? {
+        val text = input.trim().lowercase().replace('h', ':').replace('.', ':')
+        val (hours, minutes) = when {
+            text.contains(':') -> {
+                val parts = text.split(':')
+                if (parts.size != 2) return null
+                if (parts[1].length == 1) return null  // "9:1" : 09:01 ou 09:10 ? On ne devine pas
+                parts[0] to parts[1].ifEmpty { "0" } // "14:" ou "14h" → 14:00
+            }
+            text.length in 1..2 -> text to "0"                            // "9" → 09:00
+            text.length in 3..4 -> text.dropLast(2) to text.takeLast(2)   // "930" → 09:30, "1430" → 14:30
+            else -> return null
+        }
+        if (hours.isEmpty() || hours.length > 2 || minutes.length > 2) return null
+        val h = hours.toIntOrNull() ?: return null
+        val m = minutes.toIntOrNull() ?: return null
+        if (h !in 0..23 || m !in 0..59) return null
+        return "%02d:%02d".format(h, m)
+    }
+
     /** Vrai si l'échéance est aujourd'hui ou déjà passée (affichée en rouge). */
     fun isDueOrLate(iso: String, today: LocalDate = LocalDate.now()): Boolean {
         return daysFromToday(iso, today) <= 0

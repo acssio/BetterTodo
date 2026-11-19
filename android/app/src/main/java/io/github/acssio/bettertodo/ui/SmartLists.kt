@@ -41,7 +41,7 @@ object SmartLists {
      */
     fun sections(tasks: List<DueTask>, kind: SmartKind, today: LocalDate = LocalDate.now()): List<DueSection> {
         val sections = linkedMapOf<String, DueSection>() // Garde l'ordre d'arrivée, donc l'ordre des dates
-        for (due in tasks.filter { it.task.dueDate != null }.sortedBy { it.task.dueDate }) {
+        for (due in tasks.filter { it.task.dueDate != null }.sortedWith(compareBy({ it.task.dueDate }, { it.task.dueTime ?: "99:99" }))) {
             val iso = due.task.dueDate!!
             val days = DueDates.daysFromToday(iso, today)
             val key = when {

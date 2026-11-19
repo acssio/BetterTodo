@@ -15,6 +15,8 @@ class TaskChangesTest {
     @Test
     fun nullPourEffacer() {
         assertEquals("""{"due_date":null,"urgency_id":null}""", TaskChanges().dueDate(null).urgencyId(null).toJson())
+        assertEquals("""{"due_time":"14:30"}""", TaskChanges().dueTime("14:30").toJson())
+        assertEquals("""{"due_time":null}""", TaskChanges().dueTime(null).toJson())
     }
 
     @Test

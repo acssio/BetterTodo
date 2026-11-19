@@ -304,10 +304,11 @@ class HomeViewModel(private val api: ApiClient, private val quickTaskMemory: Qui
     val orderedLists: List<TodoList>
         get() = lists.filter { it.folderId == null } + folders.flatMap { folder -> lists.filter { it.folderId == folder.id } }
 
-    fun openQuickTask() {
+    fun openQuickTask(user: User) {
         quickTask = QuickTaskModel(
             api,
             orderedLists,
+            user.quickTaskDue,
             quickTaskMemory,
             viewModelScope,
             onUnauthorized = { sessionExpired = true },
@@ -449,7 +450,7 @@ fun HomeScreen(
             // Bouton flottant centré en bas, seulement s'il y a une liste où ajouter
             if (model.state == LoadState.Ready && model.lists.isNotEmpty()) {
                 ExtendedFloatingActionButton(
-                    onClick = model::openQuickTask,
+                    onClick = { model.openQuickTask(user) },
                     icon = { Icon(painterResource(R.drawable.lucide_ic_plus), contentDescription = null, modifier = Modifier.size(20.dp)) },
                     text = { Text("Quick task", fontWeight = FontWeight.SemiBold) },
                     containerColor = Palette.primaryBg,

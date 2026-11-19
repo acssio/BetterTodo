@@ -3,9 +3,11 @@ package io.github.acssio.bettertodo
 import io.github.acssio.bettertodo.api.BoardGroup
 import io.github.acssio.bettertodo.api.TodoList
 import io.github.acssio.bettertodo.ui.PlacePicker
+import io.github.acssio.bettertodo.ui.QuickTaskModel
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
+import java.time.LocalDate
 
 /** Comme quickTask.test.ts du site. */
 class QuickTaskTest {
@@ -29,5 +31,14 @@ class QuickTaskTest {
         assertEquals("g2", PlacePicker.chooseGroup("g2", groups))
         assertEquals("g1", PlacePicker.chooseGroup("d'une autre liste", groups))
         assertNull(PlacePicker.chooseGroup(null, emptyList()))
+    }
+
+    @Test
+    fun echeanceProposee() {
+        val today = LocalDate.of(2026, 11, 19)
+        assertNull(QuickTaskModel.dueDateFor("none", today))
+        assertEquals("2026-11-19", QuickTaskModel.dueDateFor("today", today))
+        assertEquals("2026-11-20", QuickTaskModel.dueDateFor("tomorrow", today))
+        assertEquals("2026-11-19", QuickTaskModel.dueDateFor("inconnue", today)) // Valeur d'un serveur plus récent
     }
 }

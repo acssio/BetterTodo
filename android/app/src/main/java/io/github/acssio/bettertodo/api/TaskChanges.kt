@@ -31,6 +31,9 @@ class TaskChanges {
     /** @param dueDate "2026-11-18", ou null pour enlever l'échéance */
     fun dueDate(dueDate: String?) = apply { fields["due_date"] = dueDate?.let { JsonPrimitive(it) } ?: JsonNull }
 
+    /** @param dueTime "14:30", ou null pour enlever l'heure (la tâche doit avoir une échéance) */
+    fun dueTime(dueTime: String?) = apply { fields["due_time"] = dueTime?.let { JsonPrimitive(it) } ?: JsonNull }
+
     /** @param urgencyId id du niveau, ou null pour enlever l'urgence */
     fun urgencyId(urgencyId: String?) = apply { fields["urgency_id"] = urgencyId?.let { JsonPrimitive(it) } ?: JsonNull }
 

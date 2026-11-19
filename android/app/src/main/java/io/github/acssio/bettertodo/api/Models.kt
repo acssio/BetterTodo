@@ -17,7 +17,15 @@ data class User(
     @SerialName("default_view") val defaultView: String = "columns",              // Vue des nouvelles listes
     @SerialName("is_admin") val isAdmin: Boolean = false,
     @SerialName("must_change_password") val mustChangePassword: Boolean = false, // Mot de passe donné par l'admin
-)
+    @SerialName("quick_task_due") val quickTaskDue: String = QUICK_DUE_TODAY,       // Échéance proposée par la Quick task
+) {
+    companion object {
+        // Valeurs de quick_task_due
+        const val QUICK_DUE_NONE = "none"
+        const val QUICK_DUE_TODAY = "today"
+        const val QUICK_DUE_TOMORROW = "tomorrow"
+    }
+}
 
 /** Réponse de POST /auth/login : le jeton est à envoyer ensuite en "Authorization: Bearer". */
 @Serializable
@@ -63,6 +71,7 @@ data class Task(
     val title: String,
     val notes: String = "",
     @SerialName("due_date") val dueDate: String? = null,     // "2026-11-18", ou null
+    @SerialName("due_time") val dueTime: String? = null,     // "14:30", ou null (jamais d'heure sans date)
     @SerialName("urgency_id") val urgencyId: String? = null, // null = pas d'urgence
     val done: Boolean = false,
     val position: Int,

@@ -49,11 +49,17 @@ class ApiClient(private val serverUrl: String, private val token: String? = null
      * Modifie le compte : nom affiché, langue ("fr" / "en") ou vue par défaut ("columns" / "sections").
      * Seuls les champs non null sont envoyés.
      */
-    suspend fun updateMe(displayName: String? = null, language: String? = null, defaultView: String? = null): User {
+    suspend fun updateMe(
+        displayName: String? = null,
+        language: String? = null,
+        defaultView: String? = null,
+        quickTaskDue: String? = null,
+    ): User {
         val body = buildJsonObject {
             displayName?.let { put("display_name", it) }
             language?.let { put("language", it) }
             defaultView?.let { put("default_view", it) }
+            quickTaskDue?.let { put("quick_task_due", it) }
         }.toString()
         return json.decodeFromString(send("PATCH", "/me", body))
     }

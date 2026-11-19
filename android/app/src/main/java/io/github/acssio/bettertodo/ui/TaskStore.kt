@@ -281,10 +281,22 @@ abstract class TaskStore(
         }
     }
 
-    /** @param dueDate "2026-11-18", ou null pour enlever l'échéance */
+    /**
+     * @param dueDate "2026-11-18", ou null pour enlever l'échéance.
+     * Sans échéance, plus d'heure non plus : le serveur l'enlève de lui-même, on fait pareil à l'écran.
+     */
     fun setDueDate(task: Task, dueDate: String?) {
         if (dueDate != task.dueDate) {
-            updateTask(task, task.copy(dueDate = dueDate), TaskChanges().dueDate(dueDate))
+            val after = if (dueDate == null) task.copy(dueDate = null, dueTime = null) else task.copy(dueDate = dueDate)
+            updateTask(task, after, TaskChanges().dueDate(dueDate))
+        }
+    }
+
+    /** @param dueTime "14:30", ou null pour enlever l'heure. Ignoré sans échéance (pas d'heure sans date). */
+    fun setDueTime(task: Task, dueTime: String?) {
+        if (task.dueDate == null) return
+        if (dueTime != task.dueTime) {
+            updateTask(task, task.copy(dueTime = dueTime), TaskChanges().dueTime(dueTime))
         }
     }
 

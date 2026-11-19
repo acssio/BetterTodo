@@ -243,6 +243,11 @@ class SettingsModel(
         if (view != user.defaultView) updateMe(user.copy(defaultView = view)) { api.updateMe(defaultView = view) }
     }
 
+    /** @param due "none", "today" ou "tomorrow" */
+    fun setQuickTaskDue(due: String) {
+        if (due != user.quickTaskDue) updateMe(user.copy(quickTaskDue = due)) { api.updateMe(quickTaskDue = due) }
+    }
+
     /** L'écran d'abord, puis l'API ; en cas d'erreur, le compte d'avant et un message. */
     private fun updateMe(after: User, call: suspend () -> User) {
         val before = user
@@ -414,6 +419,17 @@ fun SettingsScreen(model: SettingsModel, onBack: () -> Unit) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 FilterChip(user.defaultView == TodoList.VIEW_COLUMNS, onClick = { model.setDefaultView(TodoList.VIEW_COLUMNS) }, label = { Text("Colonnes") })
                 FilterChip(user.defaultView == TodoList.VIEW_SECTIONS, onClick = { model.setDefaultView(TodoList.VIEW_SECTIONS) }, label = { Text("Sections") })
+            }
+
+            HorizontalDivider(color = Palette.border)
+
+            // --- Quick task (8-2) : réglage du compte, comme sur le site ---
+            SectionTitle("Quick task")
+            Text("Échéance proposée quand on ouvre la Quick task.", color = Palette.muted, fontSize = 14.sp)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(user.quickTaskDue == User.QUICK_DUE_NONE, onClick = { model.setQuickTaskDue(User.QUICK_DUE_NONE) }, label = { Text("Aucune") })
+                FilterChip(user.quickTaskDue == User.QUICK_DUE_TODAY, onClick = { model.setQuickTaskDue(User.QUICK_DUE_TODAY) }, label = { Text("Aujourd'hui") })
+                FilterChip(user.quickTaskDue == User.QUICK_DUE_TOMORROW, onClick = { model.setQuickTaskDue(User.QUICK_DUE_TOMORROW) }, label = { Text("Demain") })
             }
             Box(Modifier.height(24.dp))
         }
