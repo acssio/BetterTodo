@@ -51,7 +51,7 @@ mcp/
 
 ### Page web
 
-- L'overlay a une ligne « Échéance | Heure » (champ Heure de 104 px, assez pour « 23:59 » et l'icône d'horloge), puis « Groupe » sur sa propre ligne. **Écart avec la maquette**, qui mettait les trois sur une ligne : avec de vrais champs date et heure, la date était coupée (« 23.11.2 ») dans les 360 px de l'overlay.
+- L'overlay a une ligne « Échéance | Heure » (le champ Heure prend la largeur de son contenu : « 23:59 » ou « 11:59 PM » selon le navigateur, plus l'icône d'horloge), puis « Groupe » sur sa propre ligne. **Écart avec la maquette**, qui mettait les trois sur une ligne : avec de vrais champs date et heure, la date était coupée (« 23.11.2 ») dans les 360 px de l'overlay.
 - **L'heure est enregistrée en quittant le champ ou avec Entrée** (comme le titre), pas à chaque chiffre. Un premier essai qui enregistrait à chaque changement ne marchait pas : la réponse de l'API réécrivait le champ pendant la frappe et le navigateur perdait la saisie (09:15 devenait 14:05). L'heure en cours de frappe est donc dans `TaskPopover.state.dueTime`, envoyée par `saveDueTime` (aussi à la fermeture de l'overlay).
 - Vider l'échéance envoie `{due_date: null, due_time: null}` et vide le champ Heure.
 - `DueDate` (carte, ligne, listes intelligentes) affiche « Aujourd'hui 14:30 », « 23 nov. 09:15 »…
