@@ -233,7 +233,7 @@ fun ListEditSheet(model: BoardModel, folders: List<Folder>) {
 }
 
 @Composable
-private fun SheetField(label: String, content: @Composable () -> Unit) {
+fun SheetField(label: String, content: @Composable () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(label.uppercase(), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Palette.faint)
         content()
@@ -242,7 +242,7 @@ private fun SheetField(label: String, content: @Composable () -> Unit) {
 
 /** Une couleur de la palette : rond plein, anneau autour si choisie. */
 @Composable
-private fun ColorDot(hex: String, selected: Boolean, onClick: () -> Unit) {
+fun ColorDot(hex: String, selected: Boolean, onClick: () -> Unit) {
     val color = ListIcons.color(hex)
     Box(
         Modifier
@@ -258,7 +258,7 @@ private fun ColorDot(hex: String, selected: Boolean, onClick: () -> Unit) {
 
 /** Une icône à choisir : dans la couleur de la liste, sur fond teinté si choisie. */
 @Composable
-private fun IconChoice(name: String, listColor: String, selected: Boolean, onClick: () -> Unit) {
+fun IconChoice(name: String, listColor: String, selected: Boolean, onClick: () -> Unit) {
     val color = ListIcons.color(listColor)
     val shape = RoundedCornerShape(8.dp)
     Box(

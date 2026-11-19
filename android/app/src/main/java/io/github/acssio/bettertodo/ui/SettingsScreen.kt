@@ -51,6 +51,8 @@ import androidx.compose.ui.unit.sp
 import com.composables.icons.lucide.R // Icônes de la bibliothèque icons-lucide-android
 import io.github.acssio.bettertodo.api.ApiClient
 import io.github.acssio.bettertodo.api.ApiError
+import io.github.acssio.bettertodo.api.SmartList
+import io.github.acssio.bettertodo.api.SmartListChanges
 import io.github.acssio.bettertodo.api.Tag
 import io.github.acssio.bettertodo.api.TodoApi
 import io.github.acssio.bettertodo.api.TodoList
@@ -113,6 +115,18 @@ class SettingsModel(
     var tags by mutableStateOf<List<Tag>>(emptyList())
         private set
 
+    // --- Listes intelligentes (8-6) ---
+    var smartLists by mutableStateOf<List<SmartList>>(emptyList())
+        private set
+
+    /** Panneau « Nouvelle liste intelligente » / « Modifier » ouvert (null = fermé). */
+    var smartForm by mutableStateOf<SmartListForm?>(null)
+        private set
+    var smartError by mutableStateOf<String?>(null) // Refus affiché dans le panneau
+        private set
+    var smartToDelete by mutableStateOf<SmartListForm?>(null) // Suppression qui attend sa confirmation
+        private set
+
     /** Boîte ouverte (nom, couleur ou confirmation), null = aucune. */
     var dialog by mutableStateOf<SettingsDialog?>(null)
         private set
@@ -123,8 +137,10 @@ class SettingsModel(
                 coroutineScope { // Obligatoire autour des async (étape 6-1)
                     val levelsCall = async { api.urgencyLevels() }
                     val tagsCall = async { api.tags() }
+                    val smartCall = async { api.smartLists() }
                     levels = levelsCall.await().sortedBy { it.rank }
                     tags = tagsCall.await()
+                    smartLists = smartCall.await()
                 }
             } catch (e: ApiError) {
                 failed(e)
@@ -263,6 +279,82 @@ class SettingsModel(
         if (view != user.defaultView) updateMe(user.copy(defaultView = view)) { api.updateMe(defaultView = view) }
     }
 
+    // --- Listes intelligentes (8-6) ----------------------------------------------
+
+    /** Interrupteur « Aujourd'hui » / « Planifié » : tuile affichée ou non sur l'accueil (réglage du compte). */
+    fun setShowToday(show: Boolean) {
+        updateMe(user.copy(showToday = show)) { api.updateMe(showToday = show) }
+    }
+
+    fun setShowScheduled(show: Boolean) {
+        updateMe(user.copy(showScheduled = show)) { api.updateMe(showScheduled = show) }
+    }
+
+    /** Interrupteur d'une liste perso : l'écran d'abord, puis la base. */
+    fun setSmartVisible(list: SmartList, visible: Boolean) {
+        val before = smartLists
+        smartLists = smartLists.map { if (it.id == list.id) it.copy(visible = visible) else it }
+        scope.launch {
+            try {
+                api.updateSmartList(list.id, SmartListChanges().visible(visible))
+            } catch (e: ApiError) {
+                smartLists = before
+                failed(e)
+            }
+        }
+    }
+
+    /** Crayon (list) ou « Nouvelle liste intelligente » (null). */
+    fun openSmartForm(list: SmartList?) {
+        smartError = null
+        smartForm = list?.let { SmartListForm.of(it) } ?: SmartListForm()
+    }
+
+    fun editSmartForm(form: SmartListForm) {
+        smartForm = form
+    }
+
+    fun closeSmartForm() {
+        smartForm = null
+    }
+
+    /** « Créer » / « Enregistrer » : le panneau se ferme si la base accepte, sinon le refus s'affiche dedans. */
+    fun saveSmartForm() {
+        val form = smartForm ?: return
+        if (!form.canSave) return
+        scope.launch {
+            try {
+                if (form.id == null) api.createSmartList(form.toChanges()) else api.updateSmartList(form.id, form.toChanges())
+                smartLists = api.smartLists()
+                smartForm = null
+            } catch (e: ApiError) {
+                if (e.status == 401) onUnauthorized() else smartError = e.message
+            }
+        }
+    }
+
+    fun askDeleteSmart() {
+        smartToDelete = smartForm
+    }
+
+    fun cancelDeleteSmart() {
+        smartToDelete = null
+    }
+
+    fun confirmDeleteSmart() {
+        val id = smartToDelete?.id ?: return
+        smartToDelete = null
+        smartForm = null
+        scope.launch {
+            try {
+                api.deleteSmartList(id)
+                smartLists = api.smartLists()
+            } catch (e: ApiError) {
+                failed(e)
+            }
+        }
+    }
+
     /** @param due "none", "today" ou "tomorrow" */
     fun setQuickTaskDue(due: String) {
         if (due != user.quickTaskDue) updateMe(user.copy(quickTaskDue = due)) { api.updateMe(quickTaskDue = due) }
@@ -390,6 +482,12 @@ fun SettingsScreen(model: SettingsModel, onBack: () -> Unit, onConnectServer: ()
 
             HorizontalDivider(color = Palette.border)
 
+            // --- Listes intelligentes (8-6) ---
+            SectionTitle("Listes intelligentes")
+            SmartListsSection(model)
+
+            HorizontalDivider(color = Palette.border)
+
             // --- Serveur : sans serveur, on peut en ajouter un (8-3) ; avec, l'état de la synchronisation (8-5) ---
             SectionTitle("Serveur")
             if (!model.hasServer) {
@@ -472,6 +570,16 @@ fun SettingsScreen(model: SettingsModel, onBack: () -> Unit, onConnectServer: ()
     }
 
     SettingsDialogs(model) // Boîtes de nom, de couleur et confirmations (6-7b)
+    model.smartForm?.let { SmartListSheet(model, it) } // Nouvelle liste intelligente / Modifier (8-6)
+    model.smartToDelete?.let { form ->
+        ConfirmDialog(
+            "Supprimer la liste intelligente ?",
+            "Supprimer la liste intelligente « ${form.name} » ? Les tâches ne sont pas supprimées.", // Texte du site
+            "Supprimer",
+            onConfirm = model::confirmDeleteSmart,
+            onDismiss = model::cancelDeleteSmart,
+        )
+    }
 }
 
 /** Changer son mot de passe : actuel, nouveau, confirmation ; erreurs et confirmation sous le formulaire. */

@@ -55,12 +55,16 @@ class ApiClient(val serverUrl: String, private val token: String? = null) : Todo
         language: String?,
         defaultView: String?,
         quickTaskDue: String?,
+        showToday: Boolean?,
+        showScheduled: Boolean?,
     ): User {
         val body = buildJsonObject {
             displayName?.let { put("display_name", it) }
             language?.let { put("language", it) }
             defaultView?.let { put("default_view", it) }
             quickTaskDue?.let { put("quick_task_due", it) }
+            showToday?.let { put("show_today", it) }
+            showScheduled?.let { put("show_scheduled", it) }
         }.toString()
         return json.decodeFromString(send("PATCH", "/me", body))
     }
@@ -189,8 +193,11 @@ class ApiClient(val serverUrl: String, private val token: String? = null) : Todo
      * @param until "AAAA-MM-JJ" : seulement jusqu'à cette date (Aujourd'hui), ou null pour toutes (Planifié)
      */
     override suspend fun dueTasks(until: String?): List<DueTask> {
-        val text = send("GET", if (until != null) "/tasks/due?until=$until" else "/tasks/due")
-        // Le même JSON lu deux fois : les champs de Task, puis la liste et le groupe (ignoreUnknownKeys)
+        return parseDueTasks(send("GET", if (until != null) "/tasks/due?until=$until" else "/tasks/due"))
+    }
+
+    /** Le même JSON lu deux fois : les champs de Task, puis la liste et le groupe (ignoreUnknownKeys). */
+    private fun parseDueTasks(text: String): List<DueTask> {
         val tasks = json.decodeFromString<List<Task>>(text)
         val infos = json.decodeFromString<List<DueInfo>>(text)
         return tasks.zip(infos) { task, info -> DueTask(task, info.list, info.groupName) }
@@ -199,6 +206,23 @@ class ApiClient(val serverUrl: String, private val token: String? = null) : Todo
     /** @param today date du jour du téléphone ("AAAA-MM-JJ") : c'est l'app qui connaît le fuseau horaire */
     override suspend fun dueCounts(today: String): DueCounts {
         return json.decodeFromString(send("GET", "/tasks/due/counts?today=$today"))
+    }
+
+    // --- Listes intelligentes personnalisées (8-6) ------------------------------
+
+    override suspend fun smartLists(): List<SmartList> = json.decodeFromString(send("GET", "/smart-lists"))
+
+    override suspend fun smartTasks(smartListId: String): List<DueTask> =
+        parseDueTasks(send("GET", "/smart-lists/$smartListId/tasks"))
+
+    override suspend fun createSmartList(changes: SmartListChanges): SmartList =
+        json.decodeFromString(send("POST", "/smart-lists", changes.toJson()))
+
+    override suspend fun updateSmartList(smartListId: String, changes: SmartListChanges): SmartList =
+        json.decodeFromString(send("PATCH", "/smart-lists/$smartListId", changes.toJson()))
+
+    override suspend fun deleteSmartList(smartListId: String) {
+        send("DELETE", "/smart-lists/$smartListId")
     }
 
     // --- Paramètres ----------------------------------------------------------

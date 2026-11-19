@@ -29,6 +29,7 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -62,8 +63,14 @@ fun SmartScreen(model: SmartModel, lists: List<TodoList>, onBack: () -> Unit) {
                 },
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        SmartIconBox(model.kind)
-                        Text(model.kind.title, fontWeight = FontWeight.SemiBold)
+                        SmartIconBox(model.icon, model.color)
+                        Column {
+                            Text(model.title, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            // Liste perso : son filtre en petit (« urgence Haute ou Moyenne », « #boulot et #réunion »)
+                            model.custom?.let {
+                                Text(it.summary, fontSize = 12.sp, color = Palette.muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            }
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Palette.header), // Grise, comme une liste
@@ -103,7 +110,7 @@ private fun SmartSections(model: SmartModel) {
 
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(vertical = 8.dp)) {
         if (sections.isEmpty()) {
-            item { Text(model.kind.empty, color = Palette.muted, modifier = Modifier.padding(24.dp)) }
+            item { Text(model.empty, color = Palette.muted, modifier = Modifier.padding(24.dp)) }
         }
         for (section in sections) {
             item(key = "section-" + section.key) {
@@ -111,7 +118,11 @@ private fun SmartSections(model: SmartModel) {
                     section.title,
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 14.sp,
-                    color = if (section.late) Palette.danger else Palette.text,
+                    color = when {
+                        section.late -> Palette.danger
+                        section.color != null -> ListIcons.color(section.color) // Section d'un niveau d'urgence
+                        else -> Palette.text
+                    },
                     modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 6.dp).animateItem(),
                 )
             }
@@ -136,11 +147,11 @@ private fun SmartSections(model: SmartModel) {
 
 /** Icône d'une liste intelligente : blanche sur un carré de sa couleur (comme les tuiles du site). */
 @Composable
-fun SmartIconBox(kind: SmartKind, size: Int = 30) {
+fun SmartIconBox(icon: Int, color: String, size: Int = 30) {
     Box(
-        Modifier.size(size.dp).background(ListIcons.color(kind.color), RoundedCornerShape(8.dp)),
+        Modifier.size(size.dp).background(ListIcons.color(color), RoundedCornerShape(8.dp)),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(painterResource(kind.icon), contentDescription = null, tint = Color.White, modifier = Modifier.size((size * 0.6).dp))
+        Icon(painterResource(icon), contentDescription = null, tint = Color.White, modifier = Modifier.size((size * 0.6).dp))
     }
 }

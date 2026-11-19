@@ -24,6 +24,8 @@ interface TodoApi {
         language: String? = null,
         defaultView: String? = null,
         quickTaskDue: String? = null,
+        showToday: Boolean? = null,
+        showScheduled: Boolean? = null,
     ): User
 
     // --- Groupes de listes et listes -------------------------------------------
@@ -64,6 +66,17 @@ interface TodoApi {
 
     /** @param today date du jour du téléphone ("AAAA-MM-JJ") */
     suspend fun dueCounts(today: String): DueCounts
+
+    // --- Listes intelligentes personnalisées (8-6) -----------------------------------
+
+    /** Dans leur ordre, avec leur nombre de tâches à faire. */
+    suspend fun smartLists(): List<SmartList>
+
+    /** Les tâches à faire qui correspondent (format de dueTasks). */
+    suspend fun smartTasks(smartListId: String): List<DueTask>
+    suspend fun createSmartList(changes: SmartListChanges): SmartList
+    suspend fun updateSmartList(smartListId: String, changes: SmartListChanges): SmartList
+    suspend fun deleteSmartList(smartListId: String)
 
     // --- Niveaux d'urgence et tags -------------------------------------------------
 

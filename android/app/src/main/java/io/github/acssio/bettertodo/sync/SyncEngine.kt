@@ -15,6 +15,8 @@ import io.github.acssio.bettertodo.local.ListEntity
 import io.github.acssio.bettertodo.local.LocalApi
 import io.github.acssio.bettertodo.local.LocalDatabase
 import io.github.acssio.bettertodo.local.OutboxEntity
+import io.github.acssio.bettertodo.local.SmartListEntity
+import io.github.acssio.bettertodo.local.SmartMatch
 import io.github.acssio.bettertodo.local.SyncStateEntity
 import io.github.acssio.bettertodo.local.TagEntity
 import io.github.acssio.bettertodo.local.TaskEntity
@@ -279,6 +281,16 @@ class SyncEngine(private val db: LocalDatabase, private val local: LocalApi, pri
                 }
             }
         }
+        for (smart in data.smartLists) {
+            if (!keep(smart.id)) continue
+            val createdAt = dao.smartList(smart.id)?.createdAt ?: now()
+            dao.upsertSmartList(
+                SmartListEntity(
+                    smart.id, smart.name, smart.color, smart.icon, smart.kind, smart.tagMatch,
+                    smart.tagIds.joinToString(","), smart.urgencyIds.joinToString(","), smart.visible, smart.position, createdAt,
+                )
+            )
+        }
         for (deleted in data.deleted) {
             if (!keep(deleted.id)) continue
             when (deleted.type) { // Ce qui en dépend part en cascade, comme sur le serveur
@@ -288,7 +300,7 @@ class SyncEngine(private val db: LocalDatabase, private val local: LocalApi, pri
                 "task" -> dao.deleteTask(deleted.id)
                 "urgency_level" -> dao.deleteUrgencyLevel(deleted.id)
                 "tag" -> dao.deleteTag(deleted.id)
-                // smart_list : pas encore dans l'app (8-6)
+                "smart_list" -> dao.deleteSmartList(deleted.id)
             }
         }
         return changed
@@ -305,6 +317,7 @@ class SyncEngine(private val db: LocalDatabase, private val local: LocalApi, pri
             dao.deleteTag(sameName.id) // Libère le nom (ses liens partent en cascade…)
             dao.upsertTag(TagEntity(id, name))
             taskIds.forEach { dao.insertTaskTag(TaskTagEntity(it, id)) } // …et sont refaits vers le tag du serveur
+            replaceInSmartLists(sameName.id, id)
         } else {
             dao.upsertTag(TagEntity(id, name))
         }
@@ -332,6 +345,7 @@ class SyncEngine(private val db: LocalDatabase, private val local: LocalApi, pri
                 dao.upsertUrgencyLevel(UrgencyEntity(twin.id, twin.name, twin.color, twin.rank, level.createdAt))
                 dao.replaceUrgency(level.id, twin.id)
                 dao.deleteUrgencyLevel(level.id)
+                replaceInSmartLists(level.id, twin.id)
             }
             // Tags du même nom : idem
             for (tag in remote.tags) upsertTagByName(tag.id, tag.name)
@@ -422,7 +436,29 @@ class SyncEngine(private val db: LocalDatabase, private val local: LocalApi, pri
                 }
             }
         }
+        for (smart in dao.smartLists()) {
+            op("POST", "/smart-lists", buildJsonObject {
+                put("id", smart.id)
+                put("name", smart.name)
+                put("color", smart.color)
+                put("icon", smart.icon)
+                put("kind", smart.kind)
+                put("tag_match", smart.tagMatch)
+                put("tag_ids", buildJsonArray { SmartMatch.split(smart.tagIds).forEach { add(JsonPrimitive(it)) } })
+                put("urgency_ids", buildJsonArray { SmartMatch.split(smart.urgencyIds).forEach { add(JsonPrimitive(it)) } })
+                put("visible", smart.visible)
+            })
+        }
         return ops
+    }
+
+    /** Un tag ou un niveau fusionné : les listes intelligentes qui le citaient citent son remplaçant. */
+    private suspend fun replaceInSmartLists(oldId: String, newId: String) {
+        for (smart in dao.smartLists()) {
+            val tags = SmartMatch.split(smart.tagIds).map { if (it == oldId) newId else it }.distinct()
+            val levels = SmartMatch.split(smart.urgencyIds).map { if (it == oldId) newId else it }.distinct()
+            dao.updateSmartList(smart.copy(tagIds = tags.joinToString(","), urgencyIds = levels.joinToString(",")))
+        }
     }
 
     /** Une écriture refusée par la base (élément parent absent…) est ignorée : la synchro suivante corrigera. */

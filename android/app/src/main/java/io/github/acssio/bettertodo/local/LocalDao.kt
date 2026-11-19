@@ -266,4 +266,42 @@ interface LocalDao {
 
     @Upsert
     suspend fun saveSyncState(state: SyncStateEntity)
+
+    // --- Listes intelligentes personnalisées (8-6) -----------------------------
+
+    @Query("SELECT * FROM smart_lists ORDER BY position, createdAt")
+    suspend fun smartLists(): List<SmartListEntity>
+
+    @Query("SELECT * FROM smart_lists WHERE id = :id")
+    suspend fun smartList(id: String): SmartListEntity?
+
+    @Insert
+    suspend fun insertSmartList(list: SmartListEntity)
+
+    @Update
+    suspend fun updateSmartList(list: SmartListEntity)
+
+    @Upsert
+    suspend fun upsertSmartList(list: SmartListEntity)
+
+    @Query("DELETE FROM smart_lists WHERE id = :id")
+    suspend fun deleteSmartList(id: String)
+
+    /** Toutes les tâches à faire, avec de quoi les trier comme le serveur (positions de leur liste et de leur groupe). */
+    @Query(
+        """SELECT t.*, l.position AS listPosition, g.position AS groupPosition FROM tasks t
+           JOIN task_groups g ON g.id = t.groupId JOIN lists l ON l.id = g.listId WHERE NOT t.done"""
+    )
+    suspend fun openTasksWithPlace(): List<OpenTask>
+
+    /** Tous les liens tâche ↔ tag. */
+    @Query("SELECT * FROM task_tags")
+    suspend fun allTaskTags(): List<TaskTagEntity>
 }
+
+/** Une tâche à faire et la position de sa liste et de son groupe (tri des listes intelligentes). */
+data class OpenTask(
+    @androidx.room.Embedded val task: TaskEntity,
+    val listPosition: Int,
+    val groupPosition: Int,
+)

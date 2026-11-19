@@ -25,8 +25,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         ProfileEntity::class,
         OutboxEntity::class,
         SyncStateEntity::class,
+        SmartListEntity::class,
     ],
-    version = 3, // 2 : file d'attente de la synchronisation ; 3 : email du compte (8-5)
+    version = 4, // 2 : file d'attente de la synchronisation ; 3 : email du compte (8-5) ; 4 : listes intelligentes (8-6)
     exportSchema = false,
 )
 abstract class LocalDatabase : RoomDatabase() {
@@ -54,6 +55,20 @@ abstract class LocalDatabase : RoomDatabase() {
             }
         }
 
+        /** 3 → 4 : listes intelligentes personnalisées, tuiles Aujourd'hui / Planifié affichées ou non (8-6). */
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `smart_lists` (`id` TEXT NOT NULL, `name` TEXT NOT NULL, `color` TEXT NOT NULL, " +
+                        "`icon` TEXT NOT NULL, `kind` TEXT NOT NULL, `tagMatch` TEXT NOT NULL, `tagIds` TEXT NOT NULL, " +
+                        "`urgencyIds` TEXT NOT NULL, `visible` INTEGER NOT NULL, `position` INTEGER NOT NULL, " +
+                        "`createdAt` INTEGER NOT NULL, PRIMARY KEY(`id`))"
+                )
+                db.execSQL("ALTER TABLE `profile` ADD COLUMN `showToday` INTEGER NOT NULL DEFAULT 1")
+                db.execSQL("ALTER TABLE `profile` ADD COLUMN `showScheduled` INTEGER NOT NULL DEFAULT 1")
+            }
+        }
+
         @Volatile
         private var instance: LocalDatabase? = null
 
@@ -61,7 +76,7 @@ abstract class LocalDatabase : RoomDatabase() {
         fun get(context: Context): LocalDatabase {
             return instance ?: synchronized(this) {
                 instance ?: Room.databaseBuilder(context.applicationContext, LocalDatabase::class.java, "bettertodo.db")
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                     .build()
                     .also { instance = it }
             }

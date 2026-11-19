@@ -222,4 +222,51 @@ class LocalApiTest {
         assertEquals(folder.id, api.updateList(list.id, ListChanges().folderId(folder.id)).folderId)
         assertTrue(api.setFolderCollapsed(folder.id, true).collapsed)
     }
+
+    @Test
+    fun listesIntelligentes() = runBlocking {
+        val group = api.board(api.createList("Liste", null).id).groups.first().id
+        val (basse, moyenne, haute) = api.urgencyLevels()
+        val a = api.createTask(group, "A", dueDate = "2026-11-20")
+        val b = api.createTask(group, "B")
+        val c = api.createTask(group, "C", dueDate = "2026-11-19")
+        api.updateTask(a.id, TaskChanges().urgencyId(moyenne.id).tags(listOf("boulot", "réunion")))
+        api.updateTask(b.id, TaskChanges().urgencyId(haute.id).tags(listOf("boulot")))
+        api.updateTask(c.id, TaskChanges().urgencyId(haute.id))
+        val boulot = api.tags().first { it.name == "boulot" }
+        val reunion = api.tags().first { it.name == "réunion" }
+
+        // Refus, comme le serveur
+        expectError(400) { api.createSmartList(io.github.acssio.bettertodo.api.SmartListChanges().name("X").kind("tags")) }
+        expectError(400) { api.createSmartList(io.github.acssio.bettertodo.api.SmartListChanges().name("X").kind("tags").tagIds(listOf("inconnu"))) }
+
+        val urgent = api.createSmartList(io.github.acssio.bettertodo.api.SmartListChanges().name("Urgent").kind("urgency").urgencyIds(listOf(moyenne.id, haute.id)))
+        assertEquals(listOf("Haute", "Moyenne"), urgent.labels) // Du plus urgent au moins urgent
+        assertEquals(3, urgent.openTasks)
+        // Par urgence : Haute d'abord (C a une échéance, B non : C avant B), puis Moyenne
+        assertEquals(listOf("C", "B", "A"), api.smartTasks(urgent.id).map { it.task.title })
+
+        val tous = api.createSmartList(
+            io.github.acssio.bettertodo.api.SmartListChanges().name("Réunions").kind("tags").tagMatch("all").tagIds(listOf(boulot.id, reunion.id))
+        )
+        assertEquals(listOf("A"), api.smartTasks(tous.id).map { it.task.title })
+        assertEquals("#boulot et #réunion", tous.summary)
+
+        // Tâche cochée : n'y est plus ; tag supprimé : ignoré (il reste « boulot » seul → B et A)
+        api.updateTask(c.id, TaskChanges().done(true))
+        assertEquals(2, api.smartLists().first { it.id == urgent.id }.openTasks)
+        api.deleteTag(reunion.id)
+        assertEquals(listOf("A", "B"), api.smartTasks(tous.id).map { it.task.title }.sorted())
+
+        // Masquée, puis supprimée
+        assertEquals(false, api.updateSmartList(urgent.id, io.github.acssio.bettertodo.api.SmartListChanges().visible(false)).visible)
+        api.deleteSmartList(urgent.id)
+        assertEquals(listOf("Réunions"), api.smartLists().map { it.name })
+        expectError(404) { api.smartTasks(urgent.id) }
+
+        // Tuiles Aujourd'hui / Planifié
+        val me = api.updateMe(showToday = false)
+        assertEquals(false, me.showToday)
+        assertEquals(true, me.showScheduled)
+    }
 }

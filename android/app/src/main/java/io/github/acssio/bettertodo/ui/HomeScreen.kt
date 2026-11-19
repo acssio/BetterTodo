@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -64,6 +65,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.composables.icons.lucide.R // Icônes de la bibliothèque icons-lucide-android
 import io.github.acssio.bettertodo.api.ApiClient
+import io.github.acssio.bettertodo.api.SmartList
 import io.github.acssio.bettertodo.api.TodoApi
 import io.github.acssio.bettertodo.sync.SyncEngine
 import io.github.acssio.bettertodo.api.ApiError
@@ -138,6 +140,8 @@ class HomeViewModel(
     var lists by mutableStateOf<List<TodoList>>(emptyList())
         private set
     var dueCounts by mutableStateOf(DueCounts())
+        private set
+    var smartLists by mutableStateOf<List<SmartList>>(emptyList()) // Listes intelligentes perso (8-6)
         private set
 
     /** Panneau Quick task ouvert (null = fermé). */
@@ -322,7 +326,14 @@ class HomeViewModel(
 
     /** Toucher « Aujourd'hui » ou « Planifié ». */
     fun openSmart(kind: SmartKind) {
-        val smart = SmartModel(api, kind, viewModelScope, onUnauthorized = { sessionExpired = true })
+        val smart = SmartModel(api, kind, custom = null, viewModelScope, onUnauthorized = { sessionExpired = true })
+        page = HomePage.OpenSmart(smart)
+        syncFirst(smart)
+    }
+
+    /** Toucher une liste intelligente perso (8-6). */
+    fun openCustomSmart(list: SmartList) {
+        val smart = SmartModel(api, kind = null, custom = list, viewModelScope, onUnauthorized = { sessionExpired = true })
         page = HomePage.OpenSmart(smart)
         syncFirst(smart)
     }
@@ -371,8 +382,10 @@ class HomeViewModel(
                     val foldersCall = async { api.folders() }
                     val listsCall = async { api.lists() }
                     val countsCall = async { api.dueCounts(DueDates.todayIso()) } // Date du jour du téléphone
+                    val smartCall = async { api.smartLists() }
                     lists = listsCall.await().sortedBy { it.position }
                     dueCounts = countsCall.await()
+                    smartLists = smartCall.await()
                     foldersCall.await().sortedBy { it.position }
                 }
                 collapsedIds = newFolders.filter { it.collapsed }.map { it.id }.toSet() // Retenu sur le serveur, comme sur le site
@@ -586,10 +599,20 @@ private fun HomeLists(model: HomeViewModel, user: User) {
             item { Notice(model.error ?: "") }
         }
 
-        item {
+        // Tuiles des listes intelligentes, deux par ligne : Aujourd'hui et Planifié (si affichées), puis les perso visibles
+        val tiles = buildList {
+            if (user.showToday) add(Tile(SmartKind.TODAY.icon, SmartKind.TODAY.color, SmartKind.TODAY.title, model.dueCounts.today) { model.openSmart(SmartKind.TODAY) })
+            if (user.showScheduled) {
+                add(Tile(SmartKind.SCHEDULED.icon, SmartKind.SCHEDULED.color, SmartKind.SCHEDULED.title, model.dueCounts.scheduled) { model.openSmart(SmartKind.SCHEDULED) })
+            }
+            model.smartLists.filter { it.visible }.forEach { smart ->
+                add(Tile(ListIcons.drawable(smart.icon), smart.color, smart.name, smart.openTasks) { model.openCustomSmart(smart) })
+            }
+        }
+        items(tiles.chunked(2)) { row ->
             Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                SmartTile(SmartKind.TODAY, model.dueCounts.today, Modifier.weight(1f), onClick = { model.openSmart(SmartKind.TODAY) })
-                SmartTile(SmartKind.SCHEDULED, model.dueCounts.scheduled, Modifier.weight(1f), onClick = { model.openSmart(SmartKind.SCHEDULED) })
+                row.forEach { tile -> SmartTile(tile, Modifier.weight(1f)) }
+                if (row.size == 1) Spacer(Modifier.weight(1f)) // Nombre impair : la tuile garde sa largeur
             }
         }
 
@@ -677,24 +700,27 @@ private fun ListRow(list: TodoList, onOpen: (TodoList) -> Unit) {
     }
 }
 
-/** Tuile « Aujourd'hui » ou « Planifié » : icône, compteur, nom (comme les tuiles de MobileHome). */
+/** Une tuile de liste intelligente : icône, couleur, nom, nombre de tâches, et ce que fait le toucher. */
+private class Tile(val icon: Int, val color: String, val title: String, val count: Int, val onClick: () -> Unit)
+
+/** Tuile d'une liste intelligente : icône, compteur, nom (comme les tuiles de MobileHome). */
 @Composable
-private fun SmartTile(kind: SmartKind, count: Int, modifier: Modifier, onClick: () -> Unit) {
+private fun SmartTile(tile: Tile, modifier: Modifier) {
     val shape = RoundedCornerShape(12.dp)
     Column(
         modifier
             .clip(shape)
             .background(Palette.surface)
             .border(1.dp, Palette.border, shape)
-            .clickable(onClick = onClick)
+            .clickable(onClick = tile.onClick)
             .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            SmartIconBox(kind)
-            Text(count.toString(), fontSize = 22.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.End, modifier = Modifier.weight(1f))
+            SmartIconBox(tile.icon, tile.color)
+            Text(tile.count.toString(), fontSize = 22.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.End, modifier = Modifier.weight(1f))
         }
-        Text(kind.title, fontWeight = FontWeight.SemiBold, color = Palette.muted)
+        Text(tile.title, fontWeight = FontWeight.SemiBold, color = Palette.muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 

@@ -229,4 +229,27 @@ class SyncEngineTest {
         assertEquals(0, db.dao().outboxCount())
         assertEquals(false, db.dao().syncState()?.linked)
     }
+
+    @Test
+    fun listesIntelligentesSynchronisees() = runBlocking {
+        linked()
+        val haute = local.urgencyLevels().last()
+        val smart = local.createSmartList(
+            io.github.acssio.bettertodo.api.SmartListChanges().name("Urgent").kind("urgency").urgencyIds(listOf(haute.id))
+        )
+        engine.syncNow()
+        assertEquals(listOf("POST /smart-lists"), server.received)
+        assertTrue(server.bodies[0]!!.contains("\"id\":\"${smart.id}\""))
+
+        // Créée sur le site, puis supprimée
+        server.next = SyncData(
+            cursor = "c1", user = user,
+            smartLists = listOf(io.github.acssio.bettertodo.api.SmartList("s0000000-0000-0000-0000-000000000001", "Du site", "#2F6FEB", "list", "urgency", urgencyIds = listOf(haute.id))),
+        )
+        engine.syncNow()
+        assertEquals(listOf("Urgent", "Du site"), local.smartLists().map { it.name })
+        server.next = SyncData(cursor = "c2", user = user, deleted = listOf(SyncDeletion("smart_list", smart.id)))
+        engine.syncNow()
+        assertEquals(listOf("Du site"), local.smartLists().map { it.name })
+    }
 }

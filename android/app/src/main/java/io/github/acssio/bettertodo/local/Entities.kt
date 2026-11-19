@@ -127,6 +127,8 @@ data class ProfileEntity(
     val defaultView: String = "columns",
     val quickTaskDue: String = "today",
     @ColumnInfo(defaultValue = "") val email: String = "", // Celui du compte du serveur relié (8-5), "" sans serveur
+    @ColumnInfo(defaultValue = "1") val showToday: Boolean = true,     // Tuile « Aujourd'hui » (8-6)
+    @ColumnInfo(defaultValue = "1") val showScheduled: Boolean = true, // Tuile « Planifié » (8-6)
 )
 
 /**
@@ -150,4 +152,23 @@ data class SyncStateEntity(
     val linked: Boolean = false, // Les données du téléphone ont déjà été envoyées à ce serveur (premier lien fait)
     val cursor: String? = null,  // Renvoyé par GET /sync, à redonner la fois suivante
     val lastSync: Long? = null,  // Dernière synchronisation réussie (millisecondes)
+)
+
+/**
+ * Une liste intelligente personnalisée (smart_lists, 8-6). Les tags et niveaux sont des listes d'id
+ * séparés par des virgules ; un tag ou un niveau supprimé y reste, il est juste ignoré (comme le serveur).
+ */
+@Entity(tableName = "smart_lists")
+data class SmartListEntity(
+    @PrimaryKey val id: String,
+    val name: String,
+    val color: String,
+    val icon: String,
+    val kind: String,       // "tags" ou "urgency"
+    val tagMatch: String,   // "any" ou "all"
+    val tagIds: String,     // "id1,id2"
+    val urgencyIds: String, // "id1,id2"
+    val visible: Boolean,
+    val position: Int,
+    val createdAt: Long,
 )

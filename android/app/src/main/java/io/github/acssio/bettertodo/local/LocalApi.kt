@@ -9,6 +9,8 @@ import io.github.acssio.bettertodo.api.DueTask
 import io.github.acssio.bettertodo.api.Folder
 import io.github.acssio.bettertodo.api.ListChanges
 import io.github.acssio.bettertodo.api.ListRef
+import io.github.acssio.bettertodo.api.SmartList
+import io.github.acssio.bettertodo.api.SmartListChanges
 import io.github.acssio.bettertodo.api.Tag
 import io.github.acssio.bettertodo.api.Task
 import io.github.acssio.bettertodo.api.TaskChanges
@@ -77,7 +79,14 @@ class LocalApi(private val db: LocalDatabase) : TodoApi {
 
     override suspend fun me(): User = profile().toUser()
 
-    override suspend fun updateMe(displayName: String?, language: String?, defaultView: String?, quickTaskDue: String?): User {
+    override suspend fun updateMe(
+        displayName: String?,
+        language: String?,
+        defaultView: String?,
+        quickTaskDue: String?,
+        showToday: Boolean?,
+        showScheduled: Boolean?,
+    ): User {
         var profile = profile()
         if (displayName != null) profile = profile.copy(displayName = cleanName(displayName, "Le nom affiché"))
         if (language != null) {
@@ -91,6 +100,8 @@ class LocalApi(private val db: LocalDatabase) : TodoApi {
             }
             profile = profile.copy(quickTaskDue = quickTaskDue)
         }
+        if (showToday != null) profile = profile.copy(showToday = showToday)
+        if (showScheduled != null) profile = profile.copy(showScheduled = showScheduled)
         db.withTransaction {
             dao.updateProfile(profile)
             record("PATCH", "/me", buildJsonObject {
@@ -98,6 +109,8 @@ class LocalApi(private val db: LocalDatabase) : TodoApi {
                 language?.let { put("language", it) }
                 defaultView?.let { put("default_view", it) }
                 quickTaskDue?.let { put("quick_task_due", it) }
+                showToday?.let { put("show_today", it) }
+                showScheduled?.let { put("show_scheduled", it) }
             })
         }
         return profile.toUser()
@@ -113,6 +126,8 @@ class LocalApi(private val db: LocalDatabase) : TodoApi {
                 defaultView = user.defaultView,
                 quickTaskDue = user.quickTaskDue,
                 email = user.email,
+                showToday = user.showToday,
+                showScheduled = user.showScheduled,
             )
         )
     }
@@ -140,6 +155,8 @@ class LocalApi(private val db: LocalDatabase) : TodoApi {
         language = language,
         defaultView = defaultView,
         quickTaskDue = quickTaskDue,
+        showToday = showToday,
+        showScheduled = showScheduled,
     )
 
     // --- Groupes de listes -----------------------------------------------------------
@@ -443,6 +460,140 @@ class LocalApi(private val db: LocalDatabase) : TodoApi {
             dao.insertTaskTag(TaskTagEntity(taskId, tag.id))
         }
     }
+
+    // --- Listes intelligentes personnalisées (8-6) ----------------------------------------
+
+    override suspend fun smartLists(): List<SmartList> {
+        val context = smartContext()
+        return dao.smartLists().map { context.toSmartList(it) }
+    }
+
+    /** Même tri que le serveur : par urgence du plus urgent (liste « par urgence »), puis échéance, heure, liste, groupe, tâche. */
+    override suspend fun smartTasks(smartListId: String): List<DueTask> {
+        val entity = dao.smartList(smartListId) ?: throw notFound()
+        val context = smartContext()
+        val list = context.toSmartList(entity)
+        val rank = context.levels.associate { it.id to it.rank }
+        val matching = context.openTasks.filter { context.matches(list, it.task) }.sortedWith(
+            compareBy<OpenTask>(
+                { if (list.kind == SmartList.KIND_URGENCY) -(rank[it.task.urgencyId] ?: -1) else 0 },
+                { it.task.dueDate ?: "9999-99-99" },
+                { it.task.dueTime ?: "99:99" },
+                { it.listPosition },
+                { it.groupPosition },
+                { it.task.position },
+            )
+        )
+        val tasks = toTasks(matching.map { it.task })
+        return tasks.mapNotNull { task ->
+            val group = dao.group(task.groupId) ?: return@mapNotNull null
+            val owner = dao.list(group.listId) ?: return@mapNotNull null
+            DueTask(task, ListRef(owner.id, owner.name, owner.color, owner.icon), group.name)
+        }
+    }
+
+    override suspend fun createSmartList(changes: SmartListChanges): SmartList {
+        val fields = parse(changes.toJson())
+        val kind = fields.string("kind") ?: throw badRequest("kind doit valoir tags ou urgency")
+        var entity = SmartListEntity(
+            id = newId(), name = "", color = DEFAULT_LIST_COLOR, icon = DEFAULT_LIST_ICON, kind = kind,
+            tagMatch = SmartList.MATCH_ANY, tagIds = "", urgencyIds = "", visible = true,
+            position = nextPosition(dao.smartLists().map { it.position }), createdAt = now(),
+        )
+        entity = applySmartChanges(entity, fields, creating = true)
+        db.withTransaction {
+            dao.insertSmartList(entity)
+            record("POST", "/smart-lists", changes.toJson(id = entity.id))
+        }
+        return smartContext().toSmartList(entity)
+    }
+
+    override suspend fun updateSmartList(smartListId: String, changes: SmartListChanges): SmartList {
+        val fields = parse(changes.toJson())
+        val entity = applySmartChanges(dao.smartList(smartListId) ?: throw notFound(), fields, creating = false)
+        db.withTransaction {
+            dao.updateSmartList(entity)
+            record("PATCH", "/smart-lists/$smartListId", changes.toJson())
+        }
+        return smartContext().toSmartList(entity)
+    }
+
+    override suspend fun deleteSmartList(smartListId: String) {
+        dao.smartList(smartListId) ?: throw notFound()
+        db.withTransaction {
+            dao.deleteSmartList(smartListId)
+            record("DELETE", "/smart-lists/$smartListId")
+        }
+    }
+
+    /** Les champs envoyés, vérifiés comme le serveur (Create / Update de smartlists.go). */
+    private suspend fun applySmartChanges(start: SmartListEntity, fields: JsonObject, creating: Boolean): SmartListEntity {
+        var entity = start
+        if (creating && "name" !in fields) throw badRequest("Le nom doit faire entre 1 et $MAX_NAME caractères")
+        fields.string("name")?.let { entity = entity.copy(name = cleanName(it, "Le nom")) }
+        fields.string("color")?.let { entity = entity.copy(color = checkColor(it)) }
+        fields.string("icon")?.let {
+            if (!ICON_PATTERN.matches(it)) throw badRequest("Nom d'icône invalide (lettres minuscules, chiffres et tirets)")
+            entity = entity.copy(icon = it)
+        }
+        fields.string("kind")?.let {
+            if (it != SmartList.KIND_TAGS && it != SmartList.KIND_URGENCY) throw badRequest("kind doit valoir tags ou urgency")
+            entity = entity.copy(kind = it)
+        }
+        fields.string("tag_match")?.let {
+            if (it != SmartList.MATCH_ANY && it != SmartList.MATCH_ALL) throw badRequest("tag_match doit valoir any ou all")
+            entity = entity.copy(tagMatch = it)
+        }
+        if ("tag_ids" in fields) {
+            val ids = fields.getValue("tag_ids").jsonArray.map { it.jsonPrimitive.content }.distinct()
+            ids.forEach { dao.tag(it) ?: throw badRequest("Tag inconnu") }
+            entity = entity.copy(tagIds = ids.joinToString(","))
+        }
+        if ("urgency_ids" in fields) {
+            val ids = fields.getValue("urgency_ids").jsonArray.map { it.jsonPrimitive.content }.distinct()
+            ids.forEach { dao.urgencyLevel(it) ?: throw badRequest("Niveau d'urgence inconnu") }
+            entity = entity.copy(urgencyIds = ids.joinToString(","))
+        }
+        if ("visible" in fields) entity = entity.copy(visible = fields.getValue("visible").jsonPrimitive.boolean)
+        // Le filtre du type choisi doit avoir au moins un élément
+        if (entity.kind == SmartList.KIND_TAGS && SmartMatch.split(entity.tagIds).isEmpty()) throw badRequest("Choisir au moins un tag")
+        if (entity.kind == SmartList.KIND_URGENCY && SmartMatch.split(entity.urgencyIds).isEmpty()) {
+            throw badRequest("Choisir au moins un niveau d'urgence")
+        }
+        return entity
+    }
+
+    /** Ce qu'il faut pour afficher et filtrer les listes intelligentes : tags, niveaux, tâches à faire et leurs tags. */
+    private inner class SmartContext(
+        val tags: Map<String, String>, // id → nom
+        val levels: List<UrgencyEntity>,
+        val openTasks: List<OpenTask>,
+        val taskTags: Map<String, Set<String>>, // tâche → ids de ses tags
+    ) {
+        /** L'entité → le modèle des écrans (tags et niveaux qui existent encore, libellés, compteur). */
+        fun toSmartList(entity: SmartListEntity): SmartList {
+            val tagIds = SmartMatch.split(entity.tagIds).filter { it in tags }.sortedBy { tags.getValue(it) }
+            val levelIds = SmartMatch.split(entity.urgencyIds).toSet()
+            val chosenLevels = levels.filter { it.id in levelIds }.sortedByDescending { it.rank }
+            val labels = if (entity.kind == SmartList.KIND_TAGS) tagIds.map { "#" + tags.getValue(it) } else chosenLevels.map { it.name }
+            val list = SmartList(
+                entity.id, entity.name, entity.color, entity.icon, entity.kind, entity.tagMatch,
+                tagIds, chosenLevels.map { it.id }, labels, entity.visible, entity.position,
+            )
+            return list.copy(openTasks = openTasks.count { matches(list, it.task) })
+        }
+
+        fun matches(list: SmartList, task: TaskEntity): Boolean = SmartMatch.matches(
+            list.kind, list.tagMatch, list.tagIds.toSet(), list.urgencyIds.toSet(), taskTags[task.id] ?: emptySet(), task.urgencyId,
+        )
+    }
+
+    private suspend fun smartContext(): SmartContext = SmartContext(
+        tags = dao.allTags().associate { it.id to it.name },
+        levels = dao.urgencyLevels(),
+        openTasks = dao.openTasksWithPlace(),
+        taskTags = dao.allTaskTags().groupBy({ it.taskId }, { it.tagId }).mapValues { it.value.toSet() },
+    )
 
     // --- Niveaux d'urgence -------------------------------------------------------------
 

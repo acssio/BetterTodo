@@ -76,7 +76,7 @@ class SmartListsTest {
     @Test
     fun tacheCocheeEncoreVisibleUnInstant() {
         val checked = due("a", "2027-11-17", done = true) // Date lointaine : la vue « Planifié » ne dépend pas d'aujourd'hui
-        assertEquals(emptyList<DueTask>(), SmartModel.visible(listOf(checked), SmartKind.SCHEDULED, emptySet()))
-        assertEquals(listOf(checked), SmartModel.visible(listOf(checked), SmartKind.SCHEDULED, setOf("a")))
+        assertEquals(emptyList<DueTask>(), SmartModel.visible(listOf(checked), emptySet()) { SmartLists.belongs(it, SmartKind.SCHEDULED) })
+        assertEquals(listOf(checked), SmartModel.visible(listOf(checked), setOf("a")) { SmartLists.belongs(it, SmartKind.SCHEDULED) })
     }
 }
