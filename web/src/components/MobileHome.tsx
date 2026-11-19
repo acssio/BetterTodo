@@ -125,21 +125,18 @@ export class MobileHome extends React.Component<MobileHomeProps, MobileHomeState
                     )}
                 </div>
 
+                {/* Pied compact : nom, puis console admin, paramètres et déconnexion en icônes seules */}
                 <footer className="mhome-foot">
-                    {user.is_admin && (
-                        <button className="mhome-row" onClick={this.props.onOpenAdmin}>
-                            <ShieldUser size={20} className="mhome-row-icon" />
-                            <span className="mhome-row-name">Console admin</span>
-                            <ChevronRight size={16} className="mhome-chevron" />
-                        </button>
-                    )}
-                    <button className="mhome-row" onClick={this.props.onOpenSettings}>
-                        <Settings size={20} className="mhome-row-icon" />
-                        <span className="mhome-row-name">Paramètres</span>
-                        <ChevronRight size={16} className="mhome-chevron" />
-                    </button>
                     <div className="mhome-user">
                         <span className="mhome-user-name">{user.display_name}</span>
+                        {user.is_admin && (
+                            <button className="mhome-btn" aria-label="Console admin" title="Console admin" onClick={this.props.onOpenAdmin}>
+                                <ShieldUser size={18} />
+                            </button>
+                        )}
+                        <button className="mhome-btn" aria-label="Paramètres" title="Paramètres" onClick={this.props.onOpenSettings}>
+                            <Settings size={18} />
+                        </button>
                         <button className="mhome-btn" aria-label={`Se déconnecter (${user.display_name})`} onClick={this.props.onLogout}>
                             <LogOut size={18} />
                         </button>
