@@ -66,9 +66,15 @@
     min-width: 0;
 }
 
-/* Champ « Heure » : étroit, à côté de l'échéance (assez large pour « 23:59 » et l'icône d'horloge) */
+/* Champ « Heure » : prend la largeur de son contenu, à côté de l'échéance.
+   Le format dépend du navigateur : « 23:59 » ou « 11:59 PM » (plus large), plus l'icône d'horloge. */
 .pop-row .pop-field.pop-time {
-    flex: 0 0 104px;
+    flex: 0 0 auto;
+}
+
+.pop-time input {
+    flex: none;
+    width: auto;
 }
 
 .pop-time input:disabled {
