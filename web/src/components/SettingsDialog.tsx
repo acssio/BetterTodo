@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { Check, Columns3, Copy, GripVertical, KeyRound, Monitor, Moon, Plus, Rows2, Sun, Trash2, X } from 'lucide-react'
 import { api, ApiError } from '../api/ApiClient'
-import type { ApiToken, Language, ListView, Tag, UrgencyLevel, User, UserChanges } from '../api/types'
+import type { ApiToken, Language, ListView, QuickTaskDue, Tag, UrgencyLevel, User, UserChanges } from '../api/types'
 import { computeDropIndex } from '../utils/dragDrop'
 import { moveItem } from '../utils/moveItem'
 import { theme } from '../utils/theme'
@@ -51,7 +51,7 @@ class SettingsDialogState {
 }
 
 /**
- * Écran Paramètres (écran 6 de la maquette) : apparence (clair / sombre), compte, niveaux d'urgence, tags, vue par défaut,
+ * Écran Paramètres (écran 6 de la maquette) : apparence (clair / sombre), compte, échéance de la Quick task, niveaux d'urgence, tags, vue par défaut,
  * jetons d'accès (pour Claude via MCP).
  *
  * Exception à la règle « seul Workspace parle à l'API » : c'est un écran à part,
@@ -119,6 +119,12 @@ export class SettingsDialog extends React.Component<SettingsDialogProps, Setting
             this.setState({ displayName: this.props.user.display_name }) // Nom vide refusé
         } else if (name !== this.props.user.display_name) {
             void this.updateUser({ display_name: name })
+        }
+    }
+
+    onQuickTaskDueClick = (due: QuickTaskDue): void => {
+        if (due !== this.props.user.quick_task_due) {
+            void this.updateUser({ quick_task_due: due })
         }
     }
 
@@ -321,6 +327,7 @@ export class SettingsDialog extends React.Component<SettingsDialogProps, Setting
                         {this.renderPassword()}
                         {this.renderLevels()}
                         {this.renderTags()}
+                        {this.renderQuickTask()}
                         {this.renderDefaultView()}
                         {this.renderTokens()}
                     </div>
@@ -578,6 +585,28 @@ export class SettingsDialog extends React.Component<SettingsDialogProps, Setting
                             <Plus size={11} />Nouveau tag
                         </button>
                     )}
+                </div>
+            </section>
+        )
+    }
+
+    private renderQuickTask(): React.ReactNode {
+        const due = this.props.user.quick_task_due
+        const choices: { value: QuickTaskDue, label: string }[] = [
+            { value: 'none', label: 'Aucune' },
+            { value: 'today', label: "Aujourd'hui" },
+            { value: 'tomorrow', label: 'Demain' },
+        ]
+        return (
+            <section>
+                <h3>Quick task</h3>
+                <p className="settings-desc">Échéance proposée quand on ouvre la Quick task (on peut la changer à chaque fois).</p>
+                <div className="header-views settings-views">
+                    {choices.map(choice => (
+                        <button key={choice.value} className={due === choice.value ? 'on' : ''} onClick={() => this.onQuickTaskDueClick(choice.value)}>
+                            {choice.label}
+                        </button>
+                    ))}
                 </div>
             </section>
         )

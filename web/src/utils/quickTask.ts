@@ -3,7 +3,8 @@
 // (testé dans quickTask.test.ts)
 // =============================================================================
 
-import type { Group, TodoList } from '../api/types'
+import type { Group, QuickTaskDue, TodoList } from '../api/types'
+import { todayIso, tomorrowIso } from './dates'
 
 const MEMORY_KEY = 'bettertodo.quickTask' // Dans le navigateur : retenu par appareil
 
@@ -23,6 +24,13 @@ export function chooseList(savedListId: string | null, lists: TodoList[]): strin
 export function chooseGroup(savedGroupId: string | null, groups: Group[]): string | null {
     if (savedGroupId && groups.some(group => group.id === savedGroupId)) return savedGroupId
     return groups[0]?.id ?? null
+}
+
+/** Échéance proposée à l'ouverture de la Quick task, selon le réglage du compte (null = aucune). */
+export function quickTaskDueDate(due: QuickTaskDue, today: Date = new Date()): string | null {
+    if (due === 'today') return todayIso(today)
+    if (due === 'tomorrow') return tomorrowIso(today)
+    return null
 }
 
 /** Lit la mémoire enregistrée. Une valeur abîmée ou absente donne null. */

@@ -6,12 +6,16 @@
 /** Langue du compte. Sert pour l'instant au nom du groupe créé avec chaque nouvelle liste. */
 export type Language = 'fr' | 'en'
 
+/** Échéance proposée quand on ouvre la Quick task (Paramètres). */
+export type QuickTaskDue = 'none' | 'today' | 'tomorrow'
+
 export interface User {
     id: string
     email: string
     display_name: string
     default_view: ListView // Vue des nouvelles listes (Paramètres)
     language: Language
+    quick_task_due: QuickTaskDue
     is_admin: boolean // Accès à la console admin (premier compte créé)
     must_change_password: boolean // Mot de passe donné par l'admin : à changer avant d'ouvrir les listes
     created_at: string
@@ -29,6 +33,7 @@ export interface UserChanges {
     display_name?: string
     default_view?: ListView
     language?: Language
+    quick_task_due?: QuickTaskDue
 }
 
 /** Réponse à une connexion ou à l'installation (premier compte). */

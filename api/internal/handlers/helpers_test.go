@@ -87,6 +87,19 @@ func TestValidTime(t *testing.T) {
 	}
 }
 
+func TestValidQuickTaskDue(t *testing.T) {
+	for _, due := range []string{"none", "today", "tomorrow"} {
+		if !validQuickTaskDue(due) {
+			t.Errorf("validQuickTaskDue(%q) devrait être vrai", due)
+		}
+	}
+	for _, due := range []string{"", "Today", "demain", "week"} {
+		if validQuickTaskDue(due) {
+			t.Errorf("validQuickTaskDue(%q) devrait être faux", due)
+		}
+	}
+}
+
 func TestUpdateBuilder(t *testing.T) {
 	u := newUpdate("tasks")
 	u.set("title", "x")

@@ -776,7 +776,127 @@
       ]
     },
     {
-      "name": "26 Profil – jeton inventé",
+      "name": "26 Profil – Quick task : échéance par défaut",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/me",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ]
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('quick_task_due = today', () => pm.expect(pm.response.json().quick_task_due).to.eql('today'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "27 Profil – Quick task : valeur invalide",
+      "request": {
+        "method": "PATCH",
+        "url": "{{baseUrl}}/me",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"quick_task_due\": \"week\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('400', () => pm.response.to.have.status(400));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "28 Profil – Quick task : refusée à null",
+      "request": {
+        "method": "PATCH",
+        "url": "{{baseUrl}}/me",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"quick_task_due\": null\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('400', () => pm.response.to.have.status(400));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "29 Profil – Quick task : sans échéance",
+      "request": {
+        "method": "PATCH",
+        "url": "{{baseUrl}}/me",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"quick_task_due\": \"none\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('quick_task_due = none', () => pm.expect(pm.response.json().quick_task_due).to.eql('none'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "30 Profil – jeton inventé",
       "request": {
         "method": "GET",
         "url": "{{baseUrl}}/me",
@@ -800,7 +920,7 @@
       ]
     },
     {
-      "name": "27 Connexion – mauvais mot de passe",
+      "name": "31 Connexion – mauvais mot de passe",
       "request": {
         "method": "POST",
         "url": "{{baseUrl}}/auth/login",
@@ -831,7 +951,7 @@
       ]
     },
     {
-      "name": "28 Connexion – email inconnu",
+      "name": "32 Connexion – email inconnu",
       "request": {
         "method": "POST",
         "url": "{{baseUrl}}/auth/login",
@@ -862,7 +982,7 @@
       ]
     },
     {
-      "name": "29 Connexion – OK (2e session)",
+      "name": "33 Connexion – OK (2e session)",
       "request": {
         "method": "POST",
         "url": "{{baseUrl}}/auth/login",
@@ -895,7 +1015,7 @@
       ]
     },
     {
-      "name": "30 Déconnexion (2e session)",
+      "name": "34 Déconnexion (2e session)",
       "request": {
         "method": "POST",
         "url": "{{baseUrl}}/auth/logout",
@@ -919,7 +1039,7 @@
       ]
     },
     {
-      "name": "31 Profil – session fermée",
+      "name": "35 Profil – session fermée",
       "request": {
         "method": "GET",
         "url": "{{baseUrl}}/me",
@@ -943,7 +1063,7 @@
       ]
     },
     {
-      "name": "32 Profil – 1re session toujours valide",
+      "name": "36 Profil – 1re session toujours valide",
       "request": {
         "method": "GET",
         "url": "{{baseUrl}}/me",
@@ -967,7 +1087,7 @@
       ]
     },
     {
-      "name": "33 Mot de passe – ouvrir une 2e session",
+      "name": "37 Mot de passe – ouvrir une 2e session",
       "request": {
         "method": "POST",
         "url": "{{baseUrl}}/auth/login",
@@ -996,7 +1116,7 @@
       ]
     },
     {
-      "name": "34 Mot de passe – actuel incorrect",
+      "name": "38 Mot de passe – actuel incorrect",
       "request": {
         "method": "POST",
         "url": "{{baseUrl}}/me/password",
@@ -1031,7 +1151,7 @@
       ]
     },
     {
-      "name": "35 Mot de passe – nouveau trop court",
+      "name": "39 Mot de passe – nouveau trop court",
       "request": {
         "method": "POST",
         "url": "{{baseUrl}}/me/password",
@@ -1063,7 +1183,7 @@
       ]
     },
     {
-      "name": "36 Mot de passe – identique à l'actuel",
+      "name": "40 Mot de passe – identique à l'actuel",
       "request": {
         "method": "POST",
         "url": "{{baseUrl}}/me/password",
@@ -1095,7 +1215,7 @@
       ]
     },
     {
-      "name": "37 Mot de passe – changé",
+      "name": "41 Mot de passe – changé",
       "request": {
         "method": "POST",
         "url": "{{baseUrl}}/me/password",
@@ -1130,7 +1250,7 @@
       ]
     },
     {
-      "name": "38 Mot de passe – la session en cours reste ouverte",
+      "name": "42 Mot de passe – la session en cours reste ouverte",
       "request": {
         "method": "GET",
         "url": "{{baseUrl}}/me",
@@ -1154,7 +1274,7 @@
       ]
     },
     {
-      "name": "39 Mot de passe – les autres sessions sont fermées",
+      "name": "43 Mot de passe – les autres sessions sont fermées",
       "request": {
         "method": "GET",
         "url": "{{baseUrl}}/me",
@@ -1178,7 +1298,7 @@
       ]
     },
     {
-      "name": "40 Mot de passe – connexion avec le nouveau",
+      "name": "44 Mot de passe – connexion avec le nouveau",
       "request": {
         "method": "POST",
         "url": "{{baseUrl}}/auth/login",
@@ -1210,7 +1330,7 @@
       ]
     },
     {
-      "name": "41 Jetons d'accès – liste vide",
+      "name": "45 Jetons d'accès – liste vide",
       "request": {
         "method": "GET",
         "url": "{{baseUrl}}/me/tokens",
@@ -1237,7 +1357,7 @@
       ]
     },
     {
-      "name": "42 Jetons d'accès – nom vide",
+      "name": "46 Jetons d'accès – nom vide",
       "request": {
         "method": "POST",
         "url": "{{baseUrl}}/me/tokens",
@@ -1269,7 +1389,7 @@
       ]
     },
     {
-      "name": "43 Jetons d'accès – créer",
+      "name": "47 Jetons d'accès – créer",
       "request": {
         "method": "POST",
         "url": "{{baseUrl}}/me/tokens",
@@ -1308,7 +1428,7 @@
       ]
     },
     {
-      "name": "44 Jeton d'accès – lire les listes",
+      "name": "48 Jeton d'accès – lire les listes",
       "request": {
         "method": "GET",
         "url": "{{baseUrl}}/lists",
@@ -1332,7 +1452,7 @@
       ]
     },
     {
-      "name": "45 Jetons d'accès – date d'utilisation notée, jeton jamais renvoyé",
+      "name": "49 Jetons d'accès – date d'utilisation notée, jeton jamais renvoyé",
       "request": {
         "method": "GET",
         "url": "{{baseUrl}}/me/tokens",
@@ -1362,7 +1482,7 @@
       ]
     },
     {
-      "name": "46 Jeton d'accès – refusé pour gérer les jetons",
+      "name": "50 Jeton d'accès – refusé pour gérer les jetons",
       "request": {
         "method": "GET",
         "url": "{{baseUrl}}/me/tokens",
@@ -1386,7 +1506,7 @@
       ]
     },
     {
-      "name": "47 Jeton d'accès – refusé pour le mot de passe",
+      "name": "51 Jeton d'accès – refusé pour le mot de passe",
       "request": {
         "method": "POST",
         "url": "{{baseUrl}}/me/password",
@@ -1418,7 +1538,7 @@
       ]
     },
     {
-      "name": "48 Jeton d'accès – refusé pour la déconnexion",
+      "name": "52 Jeton d'accès – refusé pour la déconnexion",
       "request": {
         "method": "POST",
         "url": "{{baseUrl}}/auth/logout",
@@ -1442,7 +1562,7 @@
       ]
     },
     {
-      "name": "49 Jetons d'accès – révoquer",
+      "name": "53 Jetons d'accès – révoquer",
       "request": {
         "method": "DELETE",
         "url": "{{baseUrl}}/me/tokens/{{apiTokenId}}",
@@ -1466,7 +1586,7 @@
       ]
     },
     {
-      "name": "50 Jeton d'accès révoqué – refusé",
+      "name": "54 Jeton d'accès révoqué – refusé",
       "request": {
         "method": "GET",
         "url": "{{baseUrl}}/lists",
@@ -1490,7 +1610,7 @@
       ]
     },
     {
-      "name": "51 Jetons d'accès – déjà révoqué",
+      "name": "55 Jetons d'accès – déjà révoqué",
       "request": {
         "method": "DELETE",
         "url": "{{baseUrl}}/me/tokens/{{apiTokenId}}",
@@ -1514,7 +1634,7 @@
       ]
     },
     {
-      "name": "52 Jetons d'accès – en créer un autre",
+      "name": "56 Jetons d'accès – en créer un autre",
       "request": {
         "method": "POST",
         "url": "{{baseUrl}}/me/tokens",
@@ -1547,7 +1667,7 @@
       ]
     },
     {
-      "name": "53 Admin – liste des comptes",
+      "name": "57 Admin – liste des comptes",
       "request": {
         "method": "GET",
         "url": "{{baseUrl}}/admin/users",
@@ -1576,7 +1696,7 @@
       ]
     },
     {
-      "name": "54 Admin – mot de passe trop court",
+      "name": "58 Admin – mot de passe trop court",
       "request": {
         "method": "PATCH",
         "url": "{{baseUrl}}/admin/users/{{userId}}",
@@ -1608,7 +1728,7 @@
       ]
     },
     {
-      "name": "55 Admin – réinitialise le mot de passe",
+      "name": "59 Admin – réinitialise le mot de passe",
       "request": {
         "method": "PATCH",
         "url": "{{baseUrl}}/admin/users/{{userId}}",
@@ -1640,7 +1760,7 @@
       ]
     },
     {
-      "name": "56 Les sessions du compte sont fermées",
+      "name": "60 Les sessions du compte sont fermées",
       "request": {
         "method": "GET",
         "url": "{{baseUrl}}/me",
@@ -1664,7 +1784,7 @@
       ]
     },
     {
-      "name": "57 Connexion avec le nouveau mot de passe",
+      "name": "61 Connexion avec le nouveau mot de passe",
       "request": {
         "method": "POST",
         "url": "{{baseUrl}}/auth/login",
@@ -1693,7 +1813,7 @@
       ]
     },
     {
-      "name": "58 Admin – ne peut pas se supprimer",
+      "name": "62 Admin – ne peut pas se supprimer",
       "request": {
         "method": "DELETE",
         "url": "{{baseUrl}}/admin/users/{{adminId}}",
@@ -1717,7 +1837,7 @@
       ]
     },
     {
-      "name": "59 Admin – supprime le compte de test",
+      "name": "63 Admin – supprime le compte de test",
       "request": {
         "method": "DELETE",
         "url": "{{baseUrl}}/admin/users/{{userId}}",
@@ -1741,7 +1861,7 @@
       ]
     },
     {
-      "name": "60 Le compte supprimé ne peut plus se connecter",
+      "name": "64 Le compte supprimé ne peut plus se connecter",
       "request": {
         "method": "POST",
         "url": "{{baseUrl}}/auth/login",
@@ -1769,7 +1889,7 @@
       ]
     },
     {
-      "name": "61 Le jeton d'accès du compte supprimé est refusé",
+      "name": "65 Le jeton d'accès du compte supprimé est refusé",
       "request": {
         "method": "GET",
         "url": "{{baseUrl}}/lists",
@@ -1793,7 +1913,7 @@
       ]
     },
     {
-      "name": "62 Admin – compte déjà supprimé",
+      "name": "66 Admin – compte déjà supprimé",
       "request": {
         "method": "DELETE",
         "url": "{{baseUrl}}/admin/users/{{userId}}",

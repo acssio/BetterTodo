@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Group, TodoList } from '../api/types'
-import { chooseGroup, chooseList, parseQuickTaskMemory } from './quickTask'
+import { chooseGroup, chooseList, parseQuickTaskMemory, quickTaskDueDate } from './quickTask'
 
 const list = (id: string): TodoList => ({
     id, folder_id: null, name: id, color: '#2F6FEB', icon: 'list',
@@ -51,5 +51,18 @@ describe('parseQuickTaskMemory', () => {
         expect(parseQuickTaskMemory('pas du json')).toBeNull()
         expect(parseQuickTaskMemory('{"listId":"l1"}')).toBeNull()
         expect(parseQuickTaskMemory('null')).toBeNull()
+    })
+})
+
+describe('quickTaskDueDate', () => {
+    const today = new Date(2026, 10, 30) // 30 novembre 2026
+
+    it('propose aujourd\'hui ou demain selon le réglage', () => {
+        expect(quickTaskDueDate('today', today)).toBe('2026-11-30')
+        expect(quickTaskDueDate('tomorrow', today)).toBe('2026-12-01')
+    })
+
+    it('« none » : pas d\'échéance', () => {
+        expect(quickTaskDueDate('none', today)).toBeNull()
     })
 })

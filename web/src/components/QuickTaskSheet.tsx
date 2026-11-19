@@ -1,16 +1,17 @@
 import * as React from 'react'
 import { CalendarDays, X } from 'lucide-react'
-import type { Folder, Group, TodoList } from '../api/types'
+import type { Folder, Group, QuickTaskDue, TodoList } from '../api/types'
 import { formatDueDate, todayIso, tomorrowIso } from '../utils/dates'
 import { KeyboardListener } from '../utils/mobileLayout'
 import { DismissListener } from '../utils/popover'
-import { chooseList, readQuickTaskMemory, writeQuickTaskMemory, type QuickTaskMemory } from '../utils/quickTask'
+import { chooseList, quickTaskDueDate, readQuickTaskMemory, writeQuickTaskMemory, type QuickTaskMemory } from '../utils/quickTask'
 import { ListGroupPicker, type PickedPlace } from './ListGroupPicker'
 import './QuickTaskSheet.css'
 
 interface QuickTaskSheetProps {
     folders: Folder[]
     lists: TodoList[]
+    defaultDue: QuickTaskDue // Échéance proposée à l'ouverture (Paramètres › Quick task)
     onLoadGroups: (listId: string) => Promise<Group[]>
     // where : « Liste › Groupe », pour le message de confirmation. Renvoie true si la tâche est créée.
     onCreate: (groupId: string, title: string, dueDate: string | null, where: string) => Promise<boolean>
@@ -20,7 +21,7 @@ interface QuickTaskSheetProps {
 class QuickTaskSheetState {
     title: string = ''
     place: PickedPlace | null = null    // Liste et groupe choisis (null pendant le chargement)
-    dueDate: string | null = todayIso() // « Aujourd'hui » proposé par défaut
+    dueDate: string | null = null       // Proposée à l'ouverture selon defaultDue (null = aucune)
     busy: boolean = false               // Création en cours : évite un double envoi
     keyboard: number = 0                // Hauteur cachée par le clavier du téléphone
 }
@@ -43,7 +44,7 @@ export class QuickTaskSheet extends React.Component<QuickTaskSheetProps, QuickTa
 
     constructor(props: QuickTaskSheetProps) {
         super(props)
-        this.state = new QuickTaskSheetState()
+        this.state = { ...new QuickTaskSheetState(), dueDate: quickTaskDueDate(props.defaultDue) }
     }
 
     componentDidMount(): void {

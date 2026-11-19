@@ -1261,6 +1261,7 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
                     <QuickTaskSheet
                         folders={this.state.folders}
                         lists={this.state.lists}
+                        defaultDue={this.props.user.quick_task_due}
                         onLoadGroups={this.loadGroups}
                         onCreate={this.createQuickTask}
                         onClose={this.onCloseQuickTask}

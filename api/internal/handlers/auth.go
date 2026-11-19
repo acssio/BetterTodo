@@ -50,17 +50,18 @@ type userResponse struct {
 	DisplayName        string    `json:"display_name"`
 	DefaultView        string    `json:"default_view"`         // Vue des nouvelles listes : "columns" ou "sections"
 	Language           string    `json:"language"`             // "fr" ou "en"
+	QuickTaskDue       string    `json:"quick_task_due"`       // Échéance proposée par la Quick task : "none", "today" ou "tomorrow"
 	IsAdmin            bool      `json:"is_admin"`             // Accès à la console admin
 	MustChangePassword bool      `json:"must_change_password"` // Mot de passe donné par l'admin : à changer
 	CreatedAt          time.Time `json:"created_at"`
 }
 
 // userColumns : colonnes lues pour construire un userResponse (dans l'ordre de scanTargets).
-const userColumns = `id, email, display_name, default_view, language, is_admin, must_change_password, created_at`
+const userColumns = `id, email, display_name, default_view, language, quick_task_due, is_admin, must_change_password, created_at`
 
 // scanTargets : les champs de u, dans l'ordre de userColumns.
 func (u *userResponse) scanTargets() []any {
-	return []any{&u.ID, &u.Email, &u.DisplayName, &u.DefaultView, &u.Language, &u.IsAdmin, &u.MustChangePassword, &u.CreatedAt}
+	return []any{&u.ID, &u.Email, &u.DisplayName, &u.DefaultView, &u.Language, &u.QuickTaskDue, &u.IsAdmin, &u.MustChangePassword, &u.CreatedAt}
 }
 
 // sessionResponse : réponse à une installation ou une connexion réussie.
@@ -191,16 +192,18 @@ type updateMeRequest struct {
 	DisplayName Optional[string] `json:"display_name"`
 	DefaultView Optional[string] `json:"default_view"`
 	Language    Optional[string] `json:"language"`
+	QuickTask   Optional[string] `json:"quick_task_due"` // "none", "today" ou "tomorrow"
 }
 
-// UpdateMe : PATCH /api/v1/me (connexion requise) → modifie le nom affiché et/ou la vue par défaut
+// UpdateMe : PATCH /api/v1/me (connexion requise) → modifie le nom affiché, la vue par défaut,
+// la langue et/ou l'échéance proposée par la Quick task
 func (h *AuthHandler) UpdateMe(w http.ResponseWriter, r *http.Request) {
 	var req updateMeRequest
 	if !httpjson.Read(w, r, &req) {
 		return
 	}
-	if req.DisplayName.IsNull() || req.DefaultView.IsNull() || req.Language.IsNull() {
-		badRequest(w, "display_name, default_view et language ne peuvent pas être null")
+	if req.DisplayName.IsNull() || req.DefaultView.IsNull() || req.Language.IsNull() || req.QuickTask.IsNull() {
+		badRequest(w, "display_name, default_view, language et quick_task_due ne peuvent pas être null")
 		return
 	}
 
@@ -226,6 +229,13 @@ func (h *AuthHandler) UpdateMe(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		changes.set("language", *req.Language.Value)
+	}
+	if req.QuickTask.Set {
+		if !validQuickTaskDue(*req.QuickTask.Value) {
+			badRequest(w, "quick_task_due doit valoir none, today ou tomorrow")
+			return
+		}
+		changes.set("quick_task_due", *req.QuickTask.Value)
 	}
 
 	ctx := r.Context()
@@ -405,4 +415,9 @@ func validatePassword(password string) string {
 func isUniqueViolation(err error) bool {
 	var pgErr *pgconn.PgError
 	return errors.As(err, &pgErr) && pgErr.Code == "23505"
+}
+
+// validQuickTaskDue : échéance proposée par la Quick task (voir migration 010).
+func validQuickTaskDue(due string) bool {
+	return due == "none" || due == "today" || due == "tomorrow"
 }
