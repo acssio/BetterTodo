@@ -70,6 +70,7 @@ func main() {
 	dueHandler := handlers.NewDueHandler(pool)
 	adminHandler := handlers.NewAdminHandler(pool)
 	tokenHandler := handlers.NewTokenHandler(pool)
+	smartListHandler := handlers.NewSmartListHandler(pool)
 
 	// Routes -------------------------------------------------------------------
 	mux := http.NewServeMux()
@@ -128,6 +129,13 @@ func main() {
 	private("POST /api/v1/urgency-levels", urgencyHandler.Create)
 	private("PATCH /api/v1/urgency-levels/{id}", urgencyHandler.Update)
 	private("DELETE /api/v1/urgency-levels/{id}", urgencyHandler.Delete)
+
+	// Listes intelligentes personnalisées (par tags ou par urgence)
+	private("GET /api/v1/smart-lists", smartListHandler.List)
+	private("POST /api/v1/smart-lists", smartListHandler.Create)
+	private("PATCH /api/v1/smart-lists/{id}", smartListHandler.Update)
+	private("DELETE /api/v1/smart-lists/{id}", smartListHandler.Delete)
+	private("GET /api/v1/smart-lists/{id}/tasks", smartListHandler.Tasks)
 
 	private("GET /api/v1/tags", tagHandler.List)
 	private("POST /api/v1/tags", tagHandler.Create)

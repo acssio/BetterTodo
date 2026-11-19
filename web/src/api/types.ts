@@ -16,6 +16,8 @@ export interface User {
     default_view: ListView // Vue des nouvelles listes (Paramètres)
     language: Language
     quick_task_due: QuickTaskDue
+    show_today: boolean     // « Aujourd'hui » affiché (barre latérale, accueil mobile)
+    show_scheduled: boolean // « Planifié » affiché
     is_admin: boolean // Accès à la console admin (premier compte créé)
     must_change_password: boolean // Mot de passe donné par l'admin : à changer avant d'ouvrir les listes
     created_at: string
@@ -34,6 +36,8 @@ export interface UserChanges {
     default_view?: ListView
     language?: Language
     quick_task_due?: QuickTaskDue
+    show_today?: boolean
+    show_scheduled?: boolean
 }
 
 /** Réponse à une connexion ou à l'installation (premier compte). */
@@ -152,6 +156,25 @@ export interface Tag {
 export interface DueTask extends Task {
     list: { id: string, name: string, color: string, icon: string }
     group_name: string
+}
+
+/**
+ * Liste intelligente personnalisée (GET /smart-lists) : les tâches à faire de toutes les listes,
+ * filtrées par tags (au moins un / tous) ou par niveaux d'urgence.
+ */
+export interface SmartList {
+    id: string
+    name: string
+    color: string
+    icon: string
+    kind: 'tags' | 'urgency'
+    tag_match: 'any' | 'all' // Par tags : au moins un des tags, ou tous
+    tag_ids: string[]
+    urgency_ids: string[]    // Du plus urgent au moins urgent
+    labels: string[]         // Pour l'affichage : ["#boulot", …] ou ["Haute", …]
+    visible: boolean         // Affichée dans la barre latérale et sur l'accueil mobile
+    position: number
+    open_tasks: number       // Tâches à faire qui correspondent
 }
 
 /** Compteurs des listes intelligentes (GET /tasks/due/counts). */

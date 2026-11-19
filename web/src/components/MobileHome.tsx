@@ -2,8 +2,8 @@ import * as React from 'react'
 import {
     Check, ChevronDown, ChevronRight, Ellipsis, FolderPlus, ListPlus, LogOut, Pencil, Plus, Settings, ShieldUser, Trash2,
 } from 'lucide-react'
-import type { DueCounts, Folder, TodoList, User } from '../api/types'
-import { SMART_SCHEDULED, SMART_TODAY, type SmartKind } from '../utils/smartLists'
+import type { DueCounts, Folder, SmartList, TodoList, User } from '../api/types'
+import { SMART_SCHEDULED, SMART_TODAY, smartPaneId, type SmartKind } from '../utils/smartLists'
 import { InlineInput } from './InlineInput'
 import { ListIcon } from './ListIcon'
 import { Menu } from './Menu'
@@ -15,6 +15,7 @@ interface MobileHomeProps {
     folders: Folder[]
     lists: TodoList[]
     dueCounts: DueCounts | null
+    smartLists: SmartList[] // Listes intelligentes perso (seules les visibles sont affichées)
     onSelectList: (listId: string) => void // Liste ou liste intelligente : ouvre l'écran de la liste
     onToggleFolder: (folder: Folder) => void
     onCreateList: (name: string, folderId: string | null) => Promise<void>
@@ -84,8 +85,9 @@ export class MobileHome extends React.Component<MobileHomeProps, MobileHomeState
                 <div className="mhome-main">
                     <div className="mhome-scroll">
                         <nav className="mhome-smart">
-                            {this.renderSmart(SMART_TODAY)}
-                            {this.renderSmart(SMART_SCHEDULED)}
+                            {this.props.user.show_today && this.renderSmart(SMART_TODAY)}
+                            {this.props.user.show_scheduled && this.renderSmart(SMART_SCHEDULED)}
+                            {this.props.smartLists.filter(smart => smart.visible).map(smart => this.renderCustomSmart(smart))}
                         </nav>
 
                         <div className="mhome-label">Listes</div>
@@ -151,16 +153,23 @@ export class MobileHome extends React.Component<MobileHomeProps, MobileHomeState
     private renderSmart(kind: SmartKind): React.ReactNode {
         const info = SMART_INFO[kind]
         const count = (kind === SMART_TODAY ? this.props.dueCounts?.today : this.props.dueCounts?.scheduled) ?? 0
+        return this.renderTile(kind, info.title, info.color, <info.icon size={18} color="#FFFFFF" />, count)
+    }
 
+    /** Tuile d'une liste intelligente perso (par tags ou par urgence). */
+    private renderCustomSmart(smart: SmartList): React.ReactNode {
+        const icon = <ListIcon icon={smart.icon} color="#FFFFFF" size={18} />
+        return this.renderTile(smartPaneId(smart.id), smart.name, smart.color, icon, smart.open_tasks)
+    }
+
+    private renderTile(paneId: string, title: string, color: string, icon: React.ReactNode, count: number): React.ReactNode {
         return (
-            <button className="mhome-tile" onClick={() => this.props.onSelectList(kind)}>
+            <button key={paneId} className="mhome-tile" onClick={() => this.props.onSelectList(paneId)}>
                 <span className="mhome-tile-top">
-                    <span className="mhome-tile-icon" style={{ background: info.color }}>
-                        <info.icon size={18} color="#FFFFFF" />
-                    </span>
+                    <span className="mhome-tile-icon" style={{ background: color }}>{icon}</span>
                     <span className="mhome-tile-count">{count}</span>
                 </span>
-                <span className="mhome-tile-name">{info.title}</span>
+                <span className="mhome-tile-name">{title}</span>
             </button>
         )
     }

@@ -2,8 +2,8 @@ import * as React from 'react'
 import { PanelRightOpen, SquareCheck, SquareMinus, Trash2, X } from 'lucide-react'
 import { api, ApiError } from '../api/ApiClient'
 import type {
-    Board as BoardData, BoardGroup, DueCounts, DueTask, Folder, Group, ListChanges, ListView, Task, TaskChanges, TodoList,
-    UrgencyLevel, User,
+    Board as BoardData, BoardGroup, DueCounts, DueTask, Folder, Group, ListChanges, ListView, SmartList, Task, TaskChanges,
+    TodoList, UrgencyLevel, User,
 } from '../api/types'
 import {
     appendTask, boardWithGroup, boardWithTask, countDoneTasks, countOpenTasks, dropAnchor, findTask, hideDoneTasks,
@@ -13,7 +13,7 @@ import { todayIso } from '../utils/dates'
 import { AUTO_SCROLL, autoScrollSpeed, computeDropIndex, sideEdge, type DragState, type DropTarget } from '../utils/dragDrop'
 import { detectMobileLayout } from '../utils/mobileLayout'
 import { selectRange } from '../utils/selection'
-import { groupDueTasks, isSmart, SMART_TODAY, type SmartKind } from '../utils/smartLists'
+import { customSmartId, isBuiltInSmart, isSmart, smartSections, SMART_TODAY } from '../utils/smartLists'
 import { SIDEBAR, sidebarMode } from '../utils/sidebarLayout'
 import type { TaskViewActions, TaskViewProps } from './actions'
 import { Board } from './Board'
@@ -100,6 +100,7 @@ class WorkspaceState {
     folders: Folder[] = []
     lists: TodoList[] = []
     dueCounts: DueCounts | null = null       // Compteurs « Aujourd'hui » / « Planifié »
+    smartLists: SmartList[] = []             // Listes intelligentes perso (avec leurs compteurs)
     leavingTaskIds: string[] = []            // Tâches cochées qui s'effacent d'une liste intelligente
     urgencyLevels: UrgencyLevel[] = []
     panes: Pane[] = []          // 1 liste affichée, ou 2 en vue scindée (gauche, droite)
@@ -161,17 +162,21 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
         window.addEventListener('popstate', this.onPopState)
         document.addEventListener('keydown', this.onDocumentKeyDown)
         try {
-            // Les trois appels partent en même temps
-            const [folders, lists, urgencyLevels] = await Promise.all([
+            // Les quatre appels partent en même temps
+            const [folders, lists, urgencyLevels, smartLists] = await Promise.all([
                 api.getFolders(),
                 api.getLists(),
                 api.getUrgencyLevels(),
+                api.getSmartLists(),
             ])
-            this.setState({ folders, lists, urgencyLevels, loading: false })
+            this.setState({ folders, lists, urgencyLevels, smartLists, loading: false })
             void this.refreshCounts()
 
             // Rouvre les listes de la dernière visite (si elles existent encore), sinon la première
-            const saved = readSavedPanes().filter(id => isSmart(id) || lists.some(list => list.id === id))
+            const exists = (id: string): boolean => isBuiltInSmart(id)
+                || smartLists.some(smart => smart.id === customSmartId(id))
+                || lists.some(list => list.id === id)
+            const saved = readSavedPanes().filter(exists)
             const listIds = saved.length > 0 ? saved : lists.slice(0, 1).map(list => list.id)
             for (let index = 0; index < listIds.length; index++) {
                 await this.openList(listIds[index], index)
@@ -507,10 +512,16 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
         }
     }
 
-    /** Recharge une liste intelligente : « Aujourd'hui » = échéances jusqu'à aujourd'hui (date LOCALE). */
+    /**
+     * Recharge une liste intelligente : « Aujourd'hui » = échéances jusqu'à aujourd'hui (date LOCALE),
+     * « Planifié » = toutes les échéances, liste perso = ses tâches (filtrées par le serveur).
+     */
     private async reloadSmart(id: string): Promise<void> {
         try {
-            const due = await api.getDueTasks(id === SMART_TODAY ? todayIso() : undefined)
+            const customId = customSmartId(id)
+            const due = customId
+                ? await api.getSmartListTasks(customId)
+                : await api.getDueTasks(id === SMART_TODAY ? todayIso() : undefined)
             this.setState(state => ({
                 panes: state.panes.map(pane => (pane.listId === id ? { ...pane, due } : pane)),
             }))
@@ -519,9 +530,17 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
         }
     }
 
+    /** Liste intelligente perso affichée dans une moitié (undefined pour une vraie liste ou Aujourd'hui / Planifié). */
+    private findSmartList(paneId: string): SmartList | undefined {
+        const id = customSmartId(paneId)
+        return id ? this.state.smartLists.find(smart => smart.id === id) : undefined
+    }
+
+    /** Compteurs de la barre latérale : Aujourd'hui / Planifié, et listes intelligentes perso. */
     private async refreshCounts(): Promise<void> {
         try {
-            this.setState({ dueCounts: await api.getDueCounts(todayIso()) })
+            const [dueCounts, smartLists] = await Promise.all([api.getDueCounts(todayIso()), api.getSmartLists()])
+            this.setState({ dueCounts, smartLists })
         } catch (error) {
             this.handleError(error)
         }
@@ -772,7 +791,8 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
                 return board.groups.flatMap(group => group.tasks.map(task => task.id))
             }
             if (pane.due && isSmart(pane.listId) && pane.due.some(task => task.id === taskId)) {
-                return groupDueTasks(pane.due, pane.listId as SmartKind).flatMap(section => section.tasks.map(task => task.id))
+                return smartSections(pane.listId, pane.due, this.findSmartList(pane.listId), this.state.urgencyLevels)
+                    .flatMap(section => section.tasks.map(task => task.id))
             }
         }
         return []
@@ -1244,6 +1264,7 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
                         folders={this.state.folders}
                         lists={this.state.lists}
                         dueCounts={this.state.dueCounts}
+                        smartLists={this.state.smartLists}
                         onSelectList={this.onMobileSelectList}
                         onToggleFolder={this.onToggleFolder}
                         onCreateList={this.onCreateList}
@@ -1338,9 +1359,10 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
                 className={classes.join(' ')}
                 onMouseDown={() => this.onPaneMouseDown(index)}
             >
-                {isSmart(pane.listId) && (
+                {(isBuiltInSmart(pane.listId) || this.findSmartList(pane.listId)) && (
                     <SmartView
-                        kind={pane.listId}
+                        paneId={pane.listId}
+                        smartList={this.findSmartList(pane.listId)}
                         tasks={pane.due}
                         urgencyLevels={this.state.urgencyLevels}
                         openTaskId={this.state.openTask?.id ?? null}
@@ -1446,6 +1468,7 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
                 folders={this.state.folders}
                 lists={this.state.lists}
                 dueCounts={this.state.dueCounts}
+                smartLists={this.state.smartLists}
                 selectedListId={panes[activePane]?.listId ?? null}
                 secondaryListId={this.splitVisible() ? panes[1 - activePane]?.listId ?? null : null}
                 width={width}

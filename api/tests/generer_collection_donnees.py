@@ -1,5 +1,5 @@
 """
-Génère la collection Postman des données (étape 2b, complétée en 3c-2b, 3e et 7-3).
+Génère la collection Postman des données (étape 2b, complétée en 3c-2b, 3e, 7-3 et 7-5).
 
 Usage, depuis la racine du projet :
     python3 api/tests/generer_collection_donnees.py api/tests/bettertodo-api-donnees.postman_collection.json
@@ -265,6 +265,79 @@ req("Heure – refusée sur une tâche sans date", "PATCH", "/tasks/{{due_Sans_d
 req("Heure – enlever l'échéance enlève l'heure", "PATCH", "/tasks/{{due_Du_jour}}", body={"due_date": None}, tests=[
     status(200), J, "pm.test('date et heure à null', () => { pm.expect(b.due_date).to.eql(null); pm.expect(b.due_time).to.eql(null); });"])
 req("Supprimer la liste des échéances", "DELETE", "/lists/{{listDue}}", tests=[status(204)])
+
+# --- Listes intelligentes personnalisées (étape 7-5) -------------------------------
+# Niveaux à ce stade : Critique (rank 0), Basse, Moyenne, Haute (rank 3, le plus urgent).
+req("Liste pour les listes intelligentes", "POST", "/lists", body={"name": "Intelligentes"}, tests=[
+    status(201), J, "pm.collectionVariables.set('listSmart', b.id);"])
+req("Son groupe", "GET", "/lists/{{listSmart}}/board", tests=[
+    status(200), J, "pm.collectionVariables.set('groupSmart', b.groups[0].id);"])
+for var, title, body in [
+    ("smartSpec", "Spec", {"tags": ["boulot"], "urgency_id": "{{urgHaute}}", "due_date": "2026-06-10"}),
+    ("smartReunion", "Réunion", {"tags": ["boulot", "réunion"], "due_date": "2026-06-05"}),
+    ("smartCourrier", "Courrier", {"tags": ["réunion"], "urgency_id": "{{urgCritique}}"}),
+    ("smartDone", "Déjà faite", {"tags": ["boulot"], "urgency_id": "{{urgHaute}}"}),
+]:
+    req(f"Tâche « {title} »", "POST", "/groups/{{groupSmart}}/tasks", body={"title": title, **body}, tests=[
+        status(201), J, f"pm.collectionVariables.set('{var}', b.id);"])
+req("… « Déjà faite » cochée", "PATCH", "/tasks/{{smartDone}}", body={"done": True}, tests=[status(200)])
+req("Ids des tags boulot et réunion", "GET", "/tags", tests=[
+    status(200), J,
+    "pm.collectionVariables.set('tagBoulot', b.find(t => t.name === 'boulot').id);",
+    "pm.collectionVariables.set('tagReunion', b.find(t => t.name === 'réunion').id);"])
+
+req("Liste intelligente – par tags sans tag", "POST", "/smart-lists",
+    body={"name": "X", "kind": "tags", "tag_ids": []}, tests=[status(400)])
+req("Liste intelligente – type inconnu", "POST", "/smart-lists",
+    body={"name": "X", "kind": "dates", "tag_ids": ["{{tagBoulot}}"]}, tests=[status(400)])
+req("Liste intelligente « Travail » (au moins #boulot)", "POST", "/smart-lists",
+    body={"name": "Travail", "color": "#8250DF", "icon": "tag", "kind": "tags", "tag_ids": ["{{tagBoulot}}"]}, tests=[
+        status(201), J,
+        "pm.test('valeurs par défaut', () => {",
+        "    pm.expect(b.tag_match).to.eql('any');",
+        "    pm.expect(b.visible).to.eql(true);",
+        "    pm.expect(b.labels).to.eql(['#boulot']);",
+        "    pm.expect(b.open_tasks).to.eql(2);",
+        "});",
+        "pm.collectionVariables.set('smartTravail', b.id);"])
+req("Travail : tâches à faire triées par échéance", "GET", "/smart-lists/{{smartTravail}}/tasks", tests=[
+    status(200), J,
+    "pm.test('Réunion (5 juin) puis Spec (10 juin), pas la tâche faite', () => pm.expect(b.map(t => t.title)).to.eql(['Réunion', 'Spec']));",
+    "pm.test('avec la liste d\'origine', () => pm.expect(b[0].list.name).to.eql('Intelligentes'));"])
+req("Travail : tous les tags #boulot et #réunion", "PATCH", "/smart-lists/{{smartTravail}}",
+    body={"tag_match": "all", "tag_ids": ["{{tagBoulot}}", "{{tagReunion}}"]}, tests=[
+        status(200), J, "pm.test('2 tags, 1 tâche', () => { pm.expect(b.tag_ids.length).to.eql(2); pm.expect(b.open_tasks).to.eql(1); });"])
+req("Travail (tous) : seulement Réunion", "GET", "/smart-lists/{{smartTravail}}/tasks", tests=[
+    status(200), J, "pm.test('Réunion', () => pm.expect(b.map(t => t.title)).to.eql(['Réunion']));"])
+req("Liste intelligente – liste de tags vide refusée", "PATCH", "/smart-lists/{{smartTravail}}",
+    body={"tag_ids": []}, tests=[status(400)])
+req("Liste intelligente – changer de type sans ses niveaux", "PATCH", "/smart-lists/{{smartTravail}}",
+    body={"kind": "urgency"}, tests=[status(400)])
+req("Liste intelligente « Urgent » (Haute, Critique)", "POST", "/smart-lists",
+    body={"name": "Urgent", "color": "#E5484D", "icon": "flag", "kind": "urgency",
+          "urgency_ids": ["{{urgCritique}}", "{{urgHaute}}"]}, tests=[
+        status(201), J,
+        "pm.test('niveaux du plus urgent au moins urgent', () => pm.expect(b.labels).to.eql(['Haute', 'Critique']));",
+        "pm.test('position 1', () => pm.expect(b.position).to.eql(1));",
+        "pm.collectionVariables.set('smartUrgent', b.id);"])
+req("Urgent : du plus urgent au moins urgent", "GET", "/smart-lists/{{smartUrgent}}/tasks", tests=[
+    status(200), J, "pm.test('Spec (Haute) puis Courrier (Critique)', () => pm.expect(b.map(t => t.title)).to.eql(['Spec', 'Courrier']));"])
+req("Urgent : masquée", "PATCH", "/smart-lists/{{smartUrgent}}", body={"visible": False}, tests=[
+    status(200), J, "pm.test('visible = false', () => pm.expect(b.visible).to.eql(false));"])
+req("Urgent remontée en tête", "PATCH", "/smart-lists/{{smartUrgent}}", body={"position": 0}, tests=[status(200)])
+req("Ordre des listes intelligentes", "GET", "/smart-lists", tests=[
+    status(200), J, "pm.test('Urgent, Travail', () => pm.expect(b.map(s => s.name)).to.eql(['Urgent', 'Travail']));"])
+req("B ne voit pas les listes intelligentes de A", "GET", "/smart-lists", token="tokenB", tests=[
+    status(200), "pm.test('liste vide', () => pm.expect(pm.response.json()).to.eql([]));"])
+req("B ne peut pas lire les tâches d'une liste de A", "GET", "/smart-lists/{{smartTravail}}/tasks", token="tokenB",
+    tests=[status(404)])
+req("B ne peut pas utiliser un tag de A", "POST", "/smart-lists", token="tokenB",
+    body={"name": "X", "kind": "tags", "tag_ids": ["{{tagBoulot}}"]}, tests=[status(400)])
+req("Masquer « Aujourd'hui » et « Planifié »", "PATCH", "/me", body={"show_today": False, "show_scheduled": False}, tests=[
+    status(200), J, "pm.test('masqués', () => { pm.expect(b.show_today).to.eql(false); pm.expect(b.show_scheduled).to.eql(false); });"])
+req("Supprimer la liste intelligente Urgent", "DELETE", "/smart-lists/{{smartUrgent}}", tests=[status(204)])
+req("Elle n'existe plus", "GET", "/smart-lists/{{smartUrgent}}/tasks", tests=[status(404)])
+req("Supprimer la liste « Intelligentes »", "DELETE", "/lists/{{listSmart}}", tests=[status(204)])
 
 # --- Suppressions ----------------------------------------------------------------
 req("Supprimer le groupe de listes Personnel", "DELETE", "/folders/{{folderPerso}}", tests=[status(204)])

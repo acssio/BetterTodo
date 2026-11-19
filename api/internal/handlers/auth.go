@@ -51,17 +51,21 @@ type userResponse struct {
 	DefaultView        string    `json:"default_view"`         // Vue des nouvelles listes : "columns" ou "sections"
 	Language           string    `json:"language"`             // "fr" ou "en"
 	QuickTaskDue       string    `json:"quick_task_due"`       // Échéance proposée par la Quick task : "none", "today" ou "tomorrow"
+	ShowToday          bool      `json:"show_today"`           // « Aujourd'hui » affiché dans la barre latérale
+	ShowScheduled      bool      `json:"show_scheduled"`       // « Planifié » affiché dans la barre latérale
 	IsAdmin            bool      `json:"is_admin"`             // Accès à la console admin
 	MustChangePassword bool      `json:"must_change_password"` // Mot de passe donné par l'admin : à changer
 	CreatedAt          time.Time `json:"created_at"`
 }
 
 // userColumns : colonnes lues pour construire un userResponse (dans l'ordre de scanTargets).
-const userColumns = `id, email, display_name, default_view, language, quick_task_due, is_admin, must_change_password, created_at`
+const userColumns = `id, email, display_name, default_view, language, quick_task_due, show_today, show_scheduled,
+	is_admin, must_change_password, created_at`
 
 // scanTargets : les champs de u, dans l'ordre de userColumns.
 func (u *userResponse) scanTargets() []any {
-	return []any{&u.ID, &u.Email, &u.DisplayName, &u.DefaultView, &u.Language, &u.QuickTaskDue, &u.IsAdmin, &u.MustChangePassword, &u.CreatedAt}
+	return []any{&u.ID, &u.Email, &u.DisplayName, &u.DefaultView, &u.Language, &u.QuickTaskDue, &u.ShowToday, &u.ShowScheduled,
+		&u.IsAdmin, &u.MustChangePassword, &u.CreatedAt}
 }
 
 // sessionResponse : réponse à une installation ou une connexion réussie.
@@ -193,17 +197,20 @@ type updateMeRequest struct {
 	DefaultView Optional[string] `json:"default_view"`
 	Language    Optional[string] `json:"language"`
 	QuickTask   Optional[string] `json:"quick_task_due"` // "none", "today" ou "tomorrow"
+	ShowToday   Optional[bool]   `json:"show_today"`
+	ShowSched   Optional[bool]   `json:"show_scheduled"`
 }
 
 // UpdateMe : PATCH /api/v1/me (connexion requise) → modifie le nom affiché, la vue par défaut,
-// la langue et/ou l'échéance proposée par la Quick task
+// la langue, l'échéance proposée par la Quick task et/ou l'affichage d'Aujourd'hui / Planifié
 func (h *AuthHandler) UpdateMe(w http.ResponseWriter, r *http.Request) {
 	var req updateMeRequest
 	if !httpjson.Read(w, r, &req) {
 		return
 	}
-	if req.DisplayName.IsNull() || req.DefaultView.IsNull() || req.Language.IsNull() || req.QuickTask.IsNull() {
-		badRequest(w, "display_name, default_view, language et quick_task_due ne peuvent pas être null")
+	if req.DisplayName.IsNull() || req.DefaultView.IsNull() || req.Language.IsNull() || req.QuickTask.IsNull() ||
+		req.ShowToday.IsNull() || req.ShowSched.IsNull() {
+		badRequest(w, "Aucun champ ne peut être null")
 		return
 	}
 
@@ -236,6 +243,12 @@ func (h *AuthHandler) UpdateMe(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		changes.set("quick_task_due", *req.QuickTask.Value)
+	}
+	if req.ShowToday.Set {
+		changes.set("show_today", *req.ShowToday.Value)
+	}
+	if req.ShowSched.Set {
+		changes.set("show_scheduled", *req.ShowSched.Value)
 	}
 
 	ctx := r.Context()
