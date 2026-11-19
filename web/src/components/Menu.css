@@ -43,3 +43,18 @@
 .Menu button.danger {
     color: var(--danger);
 }
+
+/* Menu du clic droit : placé à la position de la souris (left / top donnés par Menu.tsx) */
+.Menu.at {
+    position: fixed;
+    top: auto;
+    right: auto;
+}
+
+/* Raccourci affiché à droite d'une entrée */
+.menu-kbd {
+    margin-left: auto;
+    padding-left: 16px;
+    font-size: 11px;
+    color: var(--faint);
+}

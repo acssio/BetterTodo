@@ -12,7 +12,7 @@
 }
 
 .TaskRow:hover {
-    background: #FBFBFA;
+    background: var(--sidebar);
 }
 
 .TaskRow:focus-visible {
@@ -21,8 +21,13 @@
 }
 
 /* Tâche sélectionnée (Cmd+clic) : fond bleuté */
+/* Menu du clic droit ouvert sur cette tâche */
+.TaskRow.menu-on {
+    background: var(--hover);
+}
+
 .TaskRow.selected {
-    background: #EAF1FD;
+    background: var(--selected);
 }
 
 /* Overlay ouvert, ou titre en cours de modification : trait bleu à gauche */
@@ -79,7 +84,7 @@
     max-width: 160px;
     padding: 2px 7px;
     border-radius: 6px;
-    background: #F0F0EE;
+    background: var(--tag-bg);
     color: var(--muted);
     font-size: 11px;
     font-weight: 500;
@@ -118,7 +123,7 @@
 }
 
 .row-none {
-    color: #C2C2BE;
+    color: var(--placeholder);
 }
 
 /* Quand la place manque : on enlève les tags, puis l'échéance */

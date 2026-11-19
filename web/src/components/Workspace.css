@@ -17,7 +17,7 @@
     margin: 12px 24px 0;
     padding: 8px 12px;
     border-radius: var(--radius);
-    background: #FDE8E8;
+    background: var(--danger-bg);
     color: var(--danger);
     font-weight: 500;
 }
@@ -75,7 +75,7 @@
 }
 
 .pane + .pane {
-    border-left: 1px solid #D4D4D0;
+    border-left: 1px solid var(--border-strong);
 }
 
 /* Moitié active (où s'ouvre une liste cliquée) : trait bleu sous l'en-tête */
@@ -99,7 +99,7 @@
     align-items: center;
     justify-content: center;
     margin: 8px;
-    border: 2px dashed #B9CCF5;
+    border: 2px dashed var(--selected-border);
     border-radius: var(--radius-lg);
     background: rgba(47, 111, 235, 0.04);
     transition: background 0.1s, border-color 0.1s;
@@ -140,7 +140,7 @@
     max-width: min(560px, calc(100vw - 32px));
     padding: 10px 14px;
     border-radius: var(--radius-md);
-    background: var(--text);
+    background: var(--toast-bg);
     color: #FFFFFF;
     box-shadow: var(--shadow-pop);
 }
@@ -165,7 +165,7 @@
     max-width: calc(100vw - 32px);
     padding: 8px 8px 8px 16px;
     border-radius: var(--radius-md);
-    background: var(--text);
+    background: var(--toast-bg);
     color: #FFFFFF;
     box-shadow: var(--shadow-pop);
     white-space: nowrap;

@@ -22,6 +22,7 @@
     flex-shrink: 0;
     border-radius: 7px;
     background: var(--text);
+    color: var(--bg);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -85,8 +86,8 @@
     height: 52px;
     padding: 0 20px 0 16px;
     border-radius: 26px;
-    background: var(--text);
-    color: #FFFFFF;
+    background: var(--primary-bg);
+    color: var(--primary-text);
     font-size: 15px;
     font-weight: 600;
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);

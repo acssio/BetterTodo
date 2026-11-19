@@ -24,7 +24,7 @@
     height: 18px;
     flex-shrink: 0;
     border-radius: 50%;
-    border: 1.5px solid #B5B5B1;
+    border: 1.5px solid var(--check-border);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -64,6 +64,15 @@
 .pop-row .pop-field {
     flex: 1;
     min-width: 0;
+}
+
+/* Champ « Heure » : étroit, à côté de l'échéance (assez large pour « 23:59 » et l'icône d'horloge) */
+.pop-row .pop-field.pop-time {
+    flex: 0 0 104px;
+}
+
+.pop-time input:disabled {
+    opacity: 0.5;
 }
 
 .pop-field {
@@ -141,7 +150,7 @@ select.pop-input {
     gap: 4px;
     padding: 3px 4px 3px 8px;
     border-radius: var(--radius-sm);
-    background: #F0F0EE;
+    background: var(--tag-bg);
     font-size: 12px;
 }
 
@@ -153,7 +162,7 @@ select.pop-input {
 }
 
 .pop-tag button:hover {
-    background: #E2E2DE;
+    background: var(--count-bg);
     color: var(--text);
 }
 
@@ -162,7 +171,7 @@ select.pop-input {
     align-items: center;
     gap: 4px;
     padding: 3px 8px;
-    border: 1px dashed #CFCFCB;
+    border: 1px dashed var(--border-strong);
     border-radius: var(--radius-sm);
     color: var(--faint);
     font-size: 12px;
@@ -222,7 +231,7 @@ select.pop-input {
     position: fixed;
     inset: 0;
     z-index: 9; /* Sous le panneau (z-index 10) */
-    background: rgba(20, 20, 18, 0.38);
+    background: var(--backdrop);
 }
 
 /* bottom est donné par le composant : 0, ou la hauteur du clavier */
@@ -245,7 +254,7 @@ select.pop-input {
     width: 40px;
     height: 5px;
     border-radius: 3px;
-    background: #D4D4D0;
+    background: var(--border-strong);
 }
 
 /* Au doigt : zones plus grandes, texte plus lisible */

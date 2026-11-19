@@ -63,7 +63,7 @@ export class LoginPage extends React.Component<LoginPageProps, LoginPageState> {
             <div className="LoginPage">
                 <form className="login-card" onSubmit={this.onSubmit}>
                     <div className="login-brand">
-                        <span className="login-logo"><Check size={18} color="#FFFFFF" strokeWidth={3} /></span>
+                        <span className="login-logo"><Check size={18} strokeWidth={3} /></span>
                         BetterTodo
                     </div>
 

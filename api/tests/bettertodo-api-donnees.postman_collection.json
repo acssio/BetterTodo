@@ -2181,7 +2181,232 @@
       ]
     },
     {
-      "name": "70 Supprimer la liste des échéances",
+      "name": "70 Heure – tâche du jour à 09:00",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/groups/{{groupDue}}/tasks",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"Du jour 9h\",\n  \"due_date\": \"2026-06-15\",\n  \"due_time\": \"09:00\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('201', () => pm.response.to.have.status(201));",
+              "const b = pm.response.json();",
+              "pm.test('heure renvoyée', () => pm.expect(b.due_time).to.eql('09:00'));",
+              "pm.collectionVariables.set('dueNine', b.id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "71 Heure – sans date refusée",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/groups/{{groupDue}}/tasks",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"X\",\n  \"due_time\": \"09:00\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('400', () => pm.response.to.have.status(400));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "72 Heure – format invalide",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/groups/{{groupDue}}/tasks",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"X\",\n  \"due_date\": \"2026-06-15\",\n  \"due_time\": \"25:00\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('400', () => pm.response.to.have.status(400));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "73 Heure – ajouter 14:30 à « Du jour »",
+      "request": {
+        "method": "PATCH",
+        "url": "{{baseUrl}}/tasks/{{due_Du_jour}}",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"due_time\": \"14:30\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200', () => pm.response.to.have.status(200));",
+              "const b = pm.response.json();",
+              "pm.test('14:30, date gardée', () => { pm.expect(b.due_time).to.eql('14:30'); pm.expect(b.due_date).to.eql('2026-06-15'); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "74 Heure – triées par date puis heure",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/tasks/due?until=2026-06-15",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ]
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200', () => pm.response.to.have.status(200));",
+              "const b = pm.response.json();",
+              "pm.test('retard, 09:00, 14:30', () => pm.expect(b.map(t => t.title)).to.eql(['En retard', 'Du jour 9h', 'Du jour']));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "75 Heure – refusée sur une tâche sans date",
+      "request": {
+        "method": "PATCH",
+        "url": "{{baseUrl}}/tasks/{{due_Sans_date}}",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"due_time\": \"10:00\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('400', () => pm.response.to.have.status(400));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "76 Heure – enlever l'échéance enlève l'heure",
+      "request": {
+        "method": "PATCH",
+        "url": "{{baseUrl}}/tasks/{{due_Du_jour}}",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"due_date\": null\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200', () => pm.response.to.have.status(200));",
+              "const b = pm.response.json();",
+              "pm.test('date et heure à null', () => { pm.expect(b.due_date).to.eql(null); pm.expect(b.due_time).to.eql(null); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "77 Supprimer la liste des échéances",
       "request": {
         "method": "DELETE",
         "url": "{{baseUrl}}/lists/{{listDue}}",
@@ -2205,7 +2430,858 @@
       ]
     },
     {
-      "name": "71 Supprimer le groupe de listes Personnel",
+      "name": "78 Liste pour les listes intelligentes",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/lists",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Intelligentes\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('201', () => pm.response.to.have.status(201));",
+              "const b = pm.response.json();",
+              "pm.collectionVariables.set('listSmart', b.id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "79 Son groupe",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/lists/{{listSmart}}/board",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ]
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200', () => pm.response.to.have.status(200));",
+              "const b = pm.response.json();",
+              "pm.collectionVariables.set('groupSmart', b.groups[0].id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "80 Tâche « Spec »",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/groups/{{groupSmart}}/tasks",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"Spec\",\n  \"tags\": [\n    \"boulot\"\n  ],\n  \"urgency_id\": \"{{urgHaute}}\",\n  \"due_date\": \"2026-06-10\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('201', () => pm.response.to.have.status(201));",
+              "const b = pm.response.json();",
+              "pm.collectionVariables.set('smartSpec', b.id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "81 Tâche « Réunion »",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/groups/{{groupSmart}}/tasks",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"Réunion\",\n  \"tags\": [\n    \"boulot\",\n    \"réunion\"\n  ],\n  \"due_date\": \"2026-06-05\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('201', () => pm.response.to.have.status(201));",
+              "const b = pm.response.json();",
+              "pm.collectionVariables.set('smartReunion', b.id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "82 Tâche « Courrier »",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/groups/{{groupSmart}}/tasks",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"Courrier\",\n  \"tags\": [\n    \"réunion\"\n  ],\n  \"urgency_id\": \"{{urgCritique}}\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('201', () => pm.response.to.have.status(201));",
+              "const b = pm.response.json();",
+              "pm.collectionVariables.set('smartCourrier', b.id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "83 Tâche « Déjà faite »",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/groups/{{groupSmart}}/tasks",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"Déjà faite\",\n  \"tags\": [\n    \"boulot\"\n  ],\n  \"urgency_id\": \"{{urgHaute}}\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('201', () => pm.response.to.have.status(201));",
+              "const b = pm.response.json();",
+              "pm.collectionVariables.set('smartDone', b.id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "84 … « Déjà faite » cochée",
+      "request": {
+        "method": "PATCH",
+        "url": "{{baseUrl}}/tasks/{{smartDone}}",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"done\": true\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200', () => pm.response.to.have.status(200));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "85 Ids des tags boulot et réunion",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/tags",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ]
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200', () => pm.response.to.have.status(200));",
+              "const b = pm.response.json();",
+              "pm.collectionVariables.set('tagBoulot', b.find(t => t.name === 'boulot').id);",
+              "pm.collectionVariables.set('tagReunion', b.find(t => t.name === 'réunion').id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "86 Liste intelligente – par tags sans tag",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/smart-lists",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"X\",\n  \"kind\": \"tags\",\n  \"tag_ids\": []\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('400', () => pm.response.to.have.status(400));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "87 Liste intelligente – type inconnu",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/smart-lists",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"X\",\n  \"kind\": \"dates\",\n  \"tag_ids\": [\n    \"{{tagBoulot}}\"\n  ]\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('400', () => pm.response.to.have.status(400));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "88 Liste intelligente « Travail » (au moins #boulot)",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/smart-lists",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Travail\",\n  \"color\": \"#8250DF\",\n  \"icon\": \"tag\",\n  \"kind\": \"tags\",\n  \"tag_ids\": [\n    \"{{tagBoulot}}\"\n  ]\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('201', () => pm.response.to.have.status(201));",
+              "const b = pm.response.json();",
+              "pm.test('valeurs par défaut', () => {",
+              "    pm.expect(b.tag_match).to.eql('any');",
+              "    pm.expect(b.visible).to.eql(true);",
+              "    pm.expect(b.labels).to.eql(['#boulot']);",
+              "    pm.expect(b.open_tasks).to.eql(2);",
+              "});",
+              "pm.collectionVariables.set('smartTravail', b.id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "89 Travail : tâches à faire triées par échéance",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/smart-lists/{{smartTravail}}/tasks",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ]
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200', () => pm.response.to.have.status(200));",
+              "const b = pm.response.json();",
+              "pm.test('Réunion (5 juin) puis Spec (10 juin), pas la tâche faite', () => pm.expect(b.map(t => t.title)).to.eql(['Réunion', 'Spec']));",
+              "pm.test('avec la liste d'origine', () => pm.expect(b[0].list.name).to.eql('Intelligentes'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "90 Travail : tous les tags #boulot et #réunion",
+      "request": {
+        "method": "PATCH",
+        "url": "{{baseUrl}}/smart-lists/{{smartTravail}}",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"tag_match\": \"all\",\n  \"tag_ids\": [\n    \"{{tagBoulot}}\",\n    \"{{tagReunion}}\"\n  ]\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200', () => pm.response.to.have.status(200));",
+              "const b = pm.response.json();",
+              "pm.test('2 tags, 1 tâche', () => { pm.expect(b.tag_ids.length).to.eql(2); pm.expect(b.open_tasks).to.eql(1); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "91 Travail (tous) : seulement Réunion",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/smart-lists/{{smartTravail}}/tasks",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ]
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200', () => pm.response.to.have.status(200));",
+              "const b = pm.response.json();",
+              "pm.test('Réunion', () => pm.expect(b.map(t => t.title)).to.eql(['Réunion']));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "92 Liste intelligente – liste de tags vide refusée",
+      "request": {
+        "method": "PATCH",
+        "url": "{{baseUrl}}/smart-lists/{{smartTravail}}",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"tag_ids\": []\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('400', () => pm.response.to.have.status(400));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "93 Liste intelligente – changer de type sans ses niveaux",
+      "request": {
+        "method": "PATCH",
+        "url": "{{baseUrl}}/smart-lists/{{smartTravail}}",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"kind\": \"urgency\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('400', () => pm.response.to.have.status(400));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "94 Liste intelligente « Urgent » (Haute, Critique)",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/smart-lists",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Urgent\",\n  \"color\": \"#E5484D\",\n  \"icon\": \"flag\",\n  \"kind\": \"urgency\",\n  \"urgency_ids\": [\n    \"{{urgCritique}}\",\n    \"{{urgHaute}}\"\n  ]\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('201', () => pm.response.to.have.status(201));",
+              "const b = pm.response.json();",
+              "pm.test('niveaux du plus urgent au moins urgent', () => pm.expect(b.labels).to.eql(['Haute', 'Critique']));",
+              "pm.test('position 1', () => pm.expect(b.position).to.eql(1));",
+              "pm.collectionVariables.set('smartUrgent', b.id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "95 Urgent : du plus urgent au moins urgent",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/smart-lists/{{smartUrgent}}/tasks",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ]
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200', () => pm.response.to.have.status(200));",
+              "const b = pm.response.json();",
+              "pm.test('Spec (Haute) puis Courrier (Critique)', () => pm.expect(b.map(t => t.title)).to.eql(['Spec', 'Courrier']));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "96 Urgent : masquée",
+      "request": {
+        "method": "PATCH",
+        "url": "{{baseUrl}}/smart-lists/{{smartUrgent}}",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"visible\": false\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200', () => pm.response.to.have.status(200));",
+              "const b = pm.response.json();",
+              "pm.test('visible = false', () => pm.expect(b.visible).to.eql(false));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "97 Urgent remontée en tête",
+      "request": {
+        "method": "PATCH",
+        "url": "{{baseUrl}}/smart-lists/{{smartUrgent}}",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"position\": 0\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200', () => pm.response.to.have.status(200));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "98 Ordre des listes intelligentes",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/smart-lists",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ]
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200', () => pm.response.to.have.status(200));",
+              "const b = pm.response.json();",
+              "pm.test('Urgent, Travail', () => pm.expect(b.map(s => s.name)).to.eql(['Urgent', 'Travail']));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "99 B ne voit pas les listes intelligentes de A",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/smart-lists",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{tokenB}}"
+          }
+        ]
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200', () => pm.response.to.have.status(200));",
+              "pm.test('liste vide', () => pm.expect(pm.response.json()).to.eql([]));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "100 B ne peut pas lire les tâches d'une liste de A",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/smart-lists/{{smartTravail}}/tasks",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{tokenB}}"
+          }
+        ]
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('404', () => pm.response.to.have.status(404));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "101 B ne peut pas utiliser un tag de A",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/smart-lists",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{tokenB}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"X\",\n  \"kind\": \"tags\",\n  \"tag_ids\": [\n    \"{{tagBoulot}}\"\n  ]\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('400', () => pm.response.to.have.status(400));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "102 Masquer « Aujourd'hui » et « Planifié »",
+      "request": {
+        "method": "PATCH",
+        "url": "{{baseUrl}}/me",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"show_today\": false,\n  \"show_scheduled\": false\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200', () => pm.response.to.have.status(200));",
+              "const b = pm.response.json();",
+              "pm.test('masqués', () => { pm.expect(b.show_today).to.eql(false); pm.expect(b.show_scheduled).to.eql(false); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "103 Supprimer la liste intelligente Urgent",
+      "request": {
+        "method": "DELETE",
+        "url": "{{baseUrl}}/smart-lists/{{smartUrgent}}",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ]
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('204', () => pm.response.to.have.status(204));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "104 Elle n'existe plus",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/smart-lists/{{smartUrgent}}/tasks",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ]
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('404', () => pm.response.to.have.status(404));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "105 Supprimer la liste « Intelligentes »",
+      "request": {
+        "method": "DELETE",
+        "url": "{{baseUrl}}/lists/{{listSmart}}",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ]
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('204', () => pm.response.to.have.status(204));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "106 Supprimer le groupe de listes Personnel",
       "request": {
         "method": "DELETE",
         "url": "{{baseUrl}}/folders/{{folderPerso}}",
@@ -2229,7 +3305,7 @@
       ]
     },
     {
-      "name": "72 La liste Perso est passée hors groupe",
+      "name": "107 La liste Perso est passée hors groupe",
       "request": {
         "method": "GET",
         "url": "{{baseUrl}}/lists",
@@ -2255,7 +3331,7 @@
       ]
     },
     {
-      "name": "73 Supprimer le groupe Courses",
+      "name": "108 Supprimer le groupe Courses",
       "request": {
         "method": "DELETE",
         "url": "{{baseUrl}}/groups/{{groupA}}",
@@ -2279,7 +3355,7 @@
       ]
     },
     {
-      "name": "74 Ses tâches sont supprimées (ou déjà vidées)",
+      "name": "109 Ses tâches sont supprimées (ou déjà vidées)",
       "request": {
         "method": "GET",
         "url": "{{baseUrl}}/tasks/{{task1}}",
@@ -2303,7 +3379,7 @@
       ]
     },
     {
-      "name": "75 Supprimer la liste",
+      "name": "110 Supprimer la liste",
       "request": {
         "method": "DELETE",
         "url": "{{baseUrl}}/lists/{{listId}}",
@@ -2327,7 +3403,7 @@
       ]
     },
     {
-      "name": "76 La liste n'existe plus",
+      "name": "111 La liste n'existe plus",
       "request": {
         "method": "GET",
         "url": "{{baseUrl}}/lists/{{listId}}/board",
@@ -2351,7 +3427,7 @@
       ]
     },
     {
-      "name": "77 Lait (dans Administratif) est supprimé avec la liste",
+      "name": "112 Lait (dans Administratif) est supprimé avec la liste",
       "request": {
         "method": "GET",
         "url": "{{baseUrl}}/tasks/{{task2}}",
@@ -2375,7 +3451,7 @@
       ]
     },
     {
-      "name": "78 Admin supprime le compte A",
+      "name": "113 Admin supprime le compte A",
       "request": {
         "method": "DELETE",
         "url": "{{baseUrl}}/admin/users/{{tokenId}}",
@@ -2399,7 +3475,7 @@
       ]
     },
     {
-      "name": "79 Admin supprime le compte B",
+      "name": "114 Admin supprime le compte B",
       "request": {
         "method": "DELETE",
         "url": "{{baseUrl}}/admin/users/{{tokenBId}}",
@@ -2423,7 +3499,7 @@
       ]
     },
     {
-      "name": "80 La session de B ne marche plus",
+      "name": "115 La session de B ne marche plus",
       "request": {
         "method": "GET",
         "url": "{{baseUrl}}/lists",

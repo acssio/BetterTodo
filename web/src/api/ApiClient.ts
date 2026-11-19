@@ -1,6 +1,6 @@
 import type {
-    ApiToken, Board, CreatedApiToken, DueCounts, DueTask, Folder, Group, ListChanges, NewUser, Session, Tag, Task,
-    TaskChanges, TodoList, UrgencyChanges, UrgencyLevel, User, UserChanges,
+    ApiToken, Board, CreatedApiToken, DueCounts, DueTask, Folder, Group, ListChanges, NewUser, Session, SmartList, SmartListChanges, Tag,
+    Task, TaskChanges, TodoList, UrgencyChanges, UrgencyLevel, User, UserChanges,
 } from './types'
 
 /** Erreur renvoyée par l'API : le code HTTP et le message de {"error": "..."} */
@@ -172,6 +172,28 @@ export class ApiClient {
     /** Compteurs « Aujourd'hui » / « Planifié ». today = date locale du jour. */
     getDueCounts(today: string): Promise<DueCounts> {
         return this.request('GET', `/tasks/due/counts?today=${today}`)
+    }
+
+    /** Listes intelligentes personnalisées, avec leur compteur de tâches à faire. */
+    getSmartLists(): Promise<SmartList[]> {
+        return this.request('GET', '/smart-lists')
+    }
+
+    /** Tâches à faire d'une liste intelligente personnalisée (même format que getDueTasks). */
+    getSmartListTasks(id: string): Promise<DueTask[]> {
+        return this.request('GET', `/smart-lists/${id}/tasks`)
+    }
+
+    createSmartList(list: SmartListChanges): Promise<SmartList> {
+        return this.request('POST', '/smart-lists', list)
+    }
+
+    updateSmartList(id: string, changes: SmartListChanges): Promise<SmartList> {
+        return this.request('PATCH', `/smart-lists/${id}`, changes)
+    }
+
+    deleteSmartList(id: string): Promise<void> {
+        return this.request('DELETE', `/smart-lists/${id}`)
     }
 
     getUrgencyLevels(): Promise<UrgencyLevel[]> {

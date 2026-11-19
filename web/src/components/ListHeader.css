@@ -5,8 +5,8 @@
     align-items: center;
     gap: 12px;
     padding: 0 24px;
-    background: var(--surface);
-    border-bottom: 1px solid var(--border);
+    background: var(--header);              /* Gris : se distingue du reste de la page */
+    border-bottom: 1px solid var(--header-border);
 }
 
 .header-icon {
@@ -67,7 +67,7 @@
     display: flex;
     padding: 3px;
     border-radius: var(--radius);
-    background: #F0F0EE;
+    background: var(--views-bg);
 }
 
 .header-views button {
@@ -100,7 +100,7 @@
 
 /* Tâches faites masquées : le bouton reste « allumé » pour qu'on le remarque */
 .header-tool.on {
-    background: #EAF1FD;
+    background: var(--selected);
     color: var(--accent);
 }
 

@@ -6,12 +6,18 @@
 /** Langue du compte. Sert pour l'instant au nom du groupe créé avec chaque nouvelle liste. */
 export type Language = 'fr' | 'en'
 
+/** Échéance proposée quand on ouvre la Quick task (Paramètres). */
+export type QuickTaskDue = 'none' | 'today' | 'tomorrow'
+
 export interface User {
     id: string
     email: string
     display_name: string
     default_view: ListView // Vue des nouvelles listes (Paramètres)
     language: Language
+    quick_task_due: QuickTaskDue
+    show_today: boolean     // « Aujourd'hui » affiché (barre latérale, accueil mobile)
+    show_scheduled: boolean // « Planifié » affiché
     is_admin: boolean // Accès à la console admin (premier compte créé)
     must_change_password: boolean // Mot de passe donné par l'admin : à changer avant d'ouvrir les listes
     created_at: string
@@ -29,6 +35,9 @@ export interface UserChanges {
     display_name?: string
     default_view?: ListView
     language?: Language
+    quick_task_due?: QuickTaskDue
+    show_today?: boolean
+    show_scheduled?: boolean
 }
 
 /** Réponse à une connexion ou à l'installation (premier compte). */
@@ -86,6 +95,7 @@ export interface Task {
     title: string
     notes: string
     due_date: string | null   // "2026-11-18"
+    due_time: string | null   // "14:30" (jamais sans due_date)
     urgency_id: string | null
     done: boolean
     done_at: string | null
@@ -107,12 +117,13 @@ export interface Board {
 
 /**
  * Champs modifiables d'une tâche (PATCH /tasks/{id}).
- * Un champ absent n'est pas modifié ; null efface l'échéance ou l'urgence.
+ * Un champ absent n'est pas modifié ; null efface l'échéance (et son heure), l'heure ou l'urgence.
  */
 export interface TaskChanges {
     title?: string
     notes?: string
     due_date?: string | null
+    due_time?: string | null // Demande une échéance
     urgency_id?: string | null
     done?: boolean
     group_id?: string
@@ -145,6 +156,41 @@ export interface Tag {
 export interface DueTask extends Task {
     list: { id: string, name: string, color: string, icon: string }
     group_name: string
+}
+
+/**
+ * Liste intelligente personnalisée (GET /smart-lists) : les tâches à faire de toutes les listes,
+ * filtrées par tags (au moins un / tous) ou par niveaux d'urgence.
+ */
+export interface SmartList {
+    id: string
+    name: string
+    color: string
+    icon: string
+    kind: 'tags' | 'urgency'
+    tag_match: 'any' | 'all' // Par tags : au moins un des tags, ou tous
+    tag_ids: string[]
+    urgency_ids: string[]    // Du plus urgent au moins urgent
+    labels: string[]         // Pour l'affichage : ["#boulot", …] ou ["Haute", …]
+    visible: boolean         // Affichée dans la barre latérale et sur l'accueil mobile
+    position: number
+    open_tasks: number       // Tâches à faire qui correspondent
+}
+
+/**
+ * Ce qu'on envoie pour créer ou modifier une liste intelligente (POST /smart-lists, PATCH /smart-lists/{id}).
+ * Changer de type demande d'envoyer aussi ses ids ; une liste d'ids envoyée ne peut pas être vide.
+ */
+export interface SmartListChanges {
+    name?: string
+    color?: string
+    icon?: string
+    kind?: 'tags' | 'urgency'
+    tag_match?: 'any' | 'all'
+    tag_ids?: string[]
+    urgency_ids?: string[]
+    visible?: boolean
+    position?: number
 }
 
 /** Compteurs des listes intelligentes (GET /tasks/due/counts). */

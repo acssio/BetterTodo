@@ -3,8 +3,8 @@ import {
     Check, ChevronDown, ChevronRight, Ellipsis, FolderPlus, LogOut, PanelLeftClose, PanelLeftOpen,
     Pencil, Plus, Settings, ShieldUser, Trash2,
 } from 'lucide-react'
-import type { DueCounts, Folder, TodoList, User } from '../api/types'
-import { SMART_SCHEDULED, SMART_TODAY, type SmartKind } from '../utils/smartLists'
+import type { DueCounts, Folder, SmartList, TodoList, User } from '../api/types'
+import { SMART_SCHEDULED, SMART_TODAY, smartPaneId, type SmartKind } from '../utils/smartLists'
 import { InlineInput } from './InlineInput'
 import { ListIcon } from './ListIcon'
 import { Menu } from './Menu'
@@ -16,6 +16,7 @@ interface SidebarProps {
     folders: Folder[]
     lists: TodoList[]
     dueCounts: DueCounts | null // Compteurs « Aujourd'hui » / « Planifié »
+    smartLists: SmartList[]     // Listes intelligentes perso (seules les visibles sont affichées)
     selectedListId: string | null  // Liste de la moitié active
     secondaryListId: string | null // Liste de l'autre moitié (vue scindée), ou null
     width: number     // Largeur en pixels
@@ -84,7 +85,7 @@ export class Sidebar extends React.Component<SidebarProps, SidebarState> {
         return (
             <aside className={classes.join(' ')} style={{ width }}>
                 <div className="sidebar-brand">
-                    <span className="sidebar-logo"><Check size={14} color="#FFFFFF" strokeWidth={3} /></span>
+                    <span className="sidebar-logo"><Check size={14} strokeWidth={3} /></span>
                     <span className="sidebar-brand-name">BetterTodo</span>
                     {!compact && (
                         <button className="icon-btn" title="Réduire la barre (icônes seules)" onClick={this.props.onCollapse}>
@@ -94,8 +95,9 @@ export class Sidebar extends React.Component<SidebarProps, SidebarState> {
                 </div>
 
                 <nav className="sidebar-smart">
-                    {this.renderSmart(SMART_TODAY)}
-                    {this.renderSmart(SMART_SCHEDULED)}
+                    {this.props.user.show_today && this.renderSmart(SMART_TODAY)}
+                    {this.props.user.show_scheduled && this.renderSmart(SMART_SCHEDULED)}
+                    {this.props.smartLists.filter(smart => smart.visible).map(smart => this.renderCustomSmart(smart))}
                 </nav>
 
                 {compact ? (
@@ -173,30 +175,40 @@ export class Sidebar extends React.Component<SidebarProps, SidebarState> {
         )
     }
 
-    /** « Aujourd'hui » ou « Planifié » : s'ouvre comme une liste (clic, Cmd+clic, glisser). */
+    /** « Aujourd'hui » ou « Planifié ». */
     private renderSmart(kind: SmartKind): React.ReactNode {
         const info = SMART_INFO[kind]
         const count = kind === SMART_TODAY ? this.props.dueCounts?.today : this.props.dueCounts?.scheduled
+        return this.renderSmartItem(kind, info.title, <info.icon size={16} color={info.color} />, count)
+    }
 
+    /** Liste intelligente perso (par tags ou par urgence). */
+    private renderCustomSmart(smart: SmartList): React.ReactNode {
+        return this.renderSmartItem(smartPaneId(smart.id), smart.name, <ListIcon icon={smart.icon} color={smart.color} />, smart.open_tasks)
+    }
+
+    /** Une liste intelligente : s'ouvre comme une liste (clic, Cmd+clic, glisser). */
+    private renderSmartItem(paneId: string, title: string, icon: React.ReactNode, count: number | undefined): React.ReactNode {
         const classes = ['sidebar-item']
-        if (kind === this.props.selectedListId) classes.push('active')
-        if (kind === this.props.secondaryListId) classes.push('open-side')
+        if (paneId === this.props.selectedListId) classes.push('active')
+        if (paneId === this.props.secondaryListId) classes.push('open-side')
 
         return (
             <button
+                key={paneId}
                 className={classes.join(' ')}
-                title={this.props.compact ? info.title : 'Cmd+clic ou glisser à droite : ouvrir à côté'}
+                title={this.props.compact ? title : 'Cmd+clic ou glisser à droite : ouvrir à côté'}
                 draggable
-                onClick={event => this.props.onSelectList(kind, event.metaKey || event.ctrlKey)}
+                onClick={event => this.props.onSelectList(paneId, event.metaKey || event.ctrlKey)}
                 onDragStart={event => {
-                    event.dataTransfer.setData('text/plain', info.title)
+                    event.dataTransfer.setData('text/plain', title)
                     event.dataTransfer.effectAllowed = 'copy'
-                    this.props.onListDragStart(kind)
+                    this.props.onListDragStart(paneId)
                 }}
                 onDragEnd={this.props.onListDragEnd}
             >
-                <info.icon size={16} color={info.color} />
-                <span className="sidebar-item-name">{info.title}</span>
+                {icon}
+                <span className="sidebar-item-name">{title}</span>
                 {count !== undefined && count > 0 && <span className="sidebar-count">{count}</span>}
             </button>
         )

@@ -13,11 +13,14 @@ interface TaskRowProps {
     urgency: UrgencyLevel | undefined
     opened: boolean   // Son overlay est ouvert
     selected: boolean // Fait partie de la sélection (Cmd+clic)
+    menuOpen: boolean // Son menu du clic droit est ouvert
     dragging: boolean
     onToggle: (task: Task) => void
     onOpen: (task: Task, anchor: DOMRect) => void
     onRename: (task: Task, title: string) => void
     onToggleSelection: (task: Task) => void
+    onSelectRange: (task: Task) => void                                  // Maj+clic
+    onOpenMenu: (task: Task, x: number, y: number, anchor: DOMRect) => void // Clic droit
     onStartEditing: (task: Task) => void
     onDragStart: (task: Task) => void
     onDragEnd: () => void
@@ -25,7 +28,7 @@ interface TaskRowProps {
     canDrag?: boolean  // false dans les listes intelligentes (l'ordre vient des dates)
     leaving?: boolean  // Tâche cochée qui va disparaître (courte animation)
     tapToOpen?: boolean // Mode mobile : toucher la ligne ouvre l'overlay (pas de titre sur place ni de glisser)
-    selecting?: boolean // Mode mobile, sélection en cours : toucher = sélectionner / désélectionner
+    selecting?: boolean // Sélection en cours : clic (ou toucher) = sélectionner / désélectionner, pas de modification
     // Mode mobile : glisser au doigt après un appui long (absents = pas de glisser, ex. listes intelligentes)
     onTouchDragStart?: (task: Task, x: number, y: number) => void
     onTouchDragMove?: (x: number, y: number) => void
@@ -41,7 +44,8 @@ class TaskRowState {
 /**
  * Une tâche dans la vue sections : une ligne avec, de gauche à droite,
  * case à cocher, titre, note, puis les colonnes tags / échéance / urgence.
- * Même comportement que TaskCard : clic → titre sur place, Cmd+clic → sélection,
+ * Même comportement que TaskCard : clic → titre sur place, Cmd+clic → sélection, Maj+clic → plage,
+ * clic droit → menu,
  * bouton au survol → overlay, case → cocher, glissable.
  * Mode mobile : même comportement que TaskCard (toucher, appui long, glisser au doigt, sélection).
  */
@@ -90,6 +94,10 @@ export class TaskRow extends React.Component<TaskRowProps, TaskRowState> {
     onClick = (event: React.MouseEvent<HTMLDivElement>): void => {
         if (this.state.editing) return
         if (this.longPress.consumeClick()) return // Ce clic termine un appui long ou un glisser : déjà traité
+        if (event.shiftKey && !this.props.tapToOpen) {
+            this.props.onSelectRange(this.props.task) // Maj+clic : plage depuis la dernière tâche cliquée
+            return
+        }
         if (event.metaKey || event.ctrlKey || this.props.selecting) {
             this.props.onToggleSelection(this.props.task)
             return
@@ -103,7 +111,7 @@ export class TaskRow extends React.Component<TaskRowProps, TaskRowState> {
     }
 
     onKeyDown = (event: React.KeyboardEvent<HTMLDivElement>): void => {
-        if (event.key === 'Enter' && !this.state.editing) {
+        if (event.key === 'Enter' && !this.state.editing && !this.props.selecting) {
             this.props.onOpen(this.props.task, event.currentTarget.getBoundingClientRect())
         }
     }
@@ -140,9 +148,15 @@ export class TaskRow extends React.Component<TaskRowProps, TaskRowState> {
         if (this.props.tapToOpen && event.isPrimary) this.gesture.start(event.pointerId, event.clientX, event.clientY)
     }
 
-    /** Android ouvre un menu sur un appui long : pas sur une tâche. */
+    /** Clic droit : notre menu à la place de celui du navigateur. Android ouvre un menu sur un appui long : pas sur une tâche. */
     onContextMenu = (event: React.MouseEvent<HTMLDivElement>): void => {
-        if (this.props.tapToOpen) event.preventDefault()
+        if (this.props.tapToOpen) {
+            event.preventDefault()
+            return
+        }
+        if (this.state.editing) return // Titre en cours de modification : menu du navigateur (copier, coller…)
+        event.preventDefault()
+        this.props.onOpenMenu(this.props.task, event.clientX, event.clientY, event.currentTarget.getBoundingClientRect())
     }
 
     onDragStart = (event: React.DragEvent<HTMLDivElement>): void => {
@@ -159,6 +173,7 @@ export class TaskRow extends React.Component<TaskRowProps, TaskRowState> {
         if (task.done) classes.push('done')
         if (opened) classes.push('opened')
         if (selected) classes.push('selected')
+        if (this.props.menuOpen) classes.push('menu-on')
         if (dragging) classes.push('dragging')
         if (editing) classes.push('editing')
         if (this.state.lifted) classes.push('lifted')
@@ -202,14 +217,16 @@ export class TaskRow extends React.Component<TaskRowProps, TaskRowState> {
                     {task.tags.map(tag => <span key={tag} className="card-tag">#{tag}</span>)}
                 </span>
                 <span className="row-due">
-                    {task.due_date ? <DueDate dueDate={task.due_date} done={task.done} /> : <span className="row-none">—</span>}
+                    {task.due_date ? <DueDate dueDate={task.due_date} dueTime={task.due_time} done={task.done} /> : <span className="row-none">—</span>}
                 </span>
                 <span className="row-urgency">
                     {urgency && <UrgencyPill urgency={urgency} />}
                 </span>
-                <button className="task-open" onClick={this.onOpenClick} title="Ouvrir le détail" aria-label="Ouvrir le détail">
-                    <PanelRightOpen size={14} />
-                </button>
+                {!this.props.selecting && (
+                    <button className="task-open" onClick={this.onOpenClick} title="Ouvrir le détail" aria-label="Ouvrir le détail">
+                        <PanelRightOpen size={14} />
+                    </button>
+                )}
             </div>
         )
     }

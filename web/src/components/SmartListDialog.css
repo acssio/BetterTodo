@@ -1,0 +1,117 @@
+/* Fenêtre d'une liste intelligente. Le cadre vient de SettingsDialog.css (.SettingsDialog, .settings-…) */
+
+/* Par-dessus les Paramètres */
+.SmartListDialog-backdrop {
+    z-index: 45;
+}
+
+.SmartListDialog {
+    max-width: 520px;
+}
+
+.smart-body {
+    gap: 18px;
+}
+
+/* Icône (cliquable) + nom */
+.smart-name-row {
+    display: flex;
+    align-items: flex-end;
+    gap: 12px;
+}
+
+.smart-name-row .pop-field {
+    flex: 1;
+    min-width: 0;
+}
+
+.smart-look-btn {
+    display: flex;
+    flex-shrink: 0;
+    border-radius: var(--radius);
+}
+
+.smart-look-btn .ListIcon-box {
+    width: 32px;
+    height: 32px;
+}
+
+.smart-hint {
+    margin: -10px 0 0;
+}
+
+/* Tags à choisir */
+.smart-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.smart-chip {
+    padding: 3px 8px;
+    border-radius: var(--radius-sm);
+    background: var(--tag-bg);
+    color: var(--tag-text);
+    font-size: 12px;
+}
+
+.smart-chip.on {
+    background: var(--selected);
+    color: var(--accent);
+    font-weight: 600;
+}
+
+/* Niveaux à choisir */
+.smart-levels {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.smart-level {
+    width: 100%;
+    text-align: left;
+}
+
+.smart-level:hover {
+    background: var(--hover);
+}
+
+.smart-check {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1.5px solid var(--check-border);
+    border-radius: 5px;
+    color: #FFFFFF;
+}
+
+.smart-check.on {
+    background: var(--accent);
+    border-color: var(--accent);
+}
+
+/* Pied : Supprimer à gauche, compteur, puis Annuler / Enregistrer */
+.smart-foot {
+    align-items: center;
+    gap: 8px;
+}
+
+.smart-count {
+    min-width: 0;
+    margin: 0 auto 0 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap; /* Pas de retour à la ligne : coupé avec « … » */
+}
+
+.smart-foot button {
+    flex-shrink: 0;
+}
+
+.smart-delete {
+    margin-right: 4px;
+}

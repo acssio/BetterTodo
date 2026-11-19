@@ -1,9 +1,9 @@
 import * as React from 'react'
-import { Trash2, X } from 'lucide-react'
+import { PanelRightOpen, SquareCheck, SquareMinus, Trash2, X } from 'lucide-react'
 import { api, ApiError } from '../api/ApiClient'
 import type {
-    Board as BoardData, BoardGroup, DueCounts, DueTask, Folder, Group, ListChanges, ListView, Task, TaskChanges, TodoList,
-    UrgencyLevel, User,
+    Board as BoardData, BoardGroup, DueCounts, DueTask, Folder, Group, ListChanges, ListView, SmartList, Task, TaskChanges,
+    TodoList, UrgencyLevel, User,
 } from '../api/types'
 import {
     appendTask, boardWithGroup, boardWithTask, countDoneTasks, countOpenTasks, dropAnchor, findTask, hideDoneTasks,
@@ -12,7 +12,8 @@ import {
 import { todayIso } from '../utils/dates'
 import { AUTO_SCROLL, autoScrollSpeed, computeDropIndex, sideEdge, type DragState, type DropTarget } from '../utils/dragDrop'
 import { detectMobileLayout } from '../utils/mobileLayout'
-import { isSmart, SMART_TODAY } from '../utils/smartLists'
+import { selectRange } from '../utils/selection'
+import { customSmartId, isBuiltInSmart, isSmart, smartSections, SMART_TODAY } from '../utils/smartLists'
 import { SIDEBAR, sidebarMode } from '../utils/sidebarLayout'
 import type { TaskViewActions, TaskViewProps } from './actions'
 import { Board } from './Board'
@@ -20,6 +21,7 @@ import { confirmDialog } from './confirm'
 import { ListEditPopover } from './ListEditPopover'
 import { ListHeader } from './ListHeader'
 import { type PickedPlace } from './ListGroupPicker'
+import { Menu, type MenuItem } from './Menu'
 import { MobileHome } from './MobileHome'
 import { SelectionActions, SelectionHeader } from './MobileSelection'
 import { MoveTasksSheet } from './MoveTasksSheet'
@@ -56,6 +58,17 @@ interface OpenPopover {
     anchor: DOMRect
 }
 
+/** Menu du clic droit sur une tâche (ordinateur). */
+interface TaskMenu {
+    task: Task
+    x: number         // Position de la souris
+    y: number
+    anchor: DOMRect   // La tâche, pour placer l'overlay si on choisit « Ouvrir le détail »
+}
+
+// Touche de la sélection, affichée dans le menu du clic droit
+const SELECT_KEY = /Mac|iPhone|iPad/.test(navigator.userAgent) ? '⌘ clic' : 'Ctrl+clic'
+
 /**
  * Une moitié de l'écran : la liste affichée et son contenu (null pendant le chargement).
  * listId peut aussi être une liste intelligente ('smart:today', 'smart:scheduled') :
@@ -87,12 +100,14 @@ class WorkspaceState {
     folders: Folder[] = []
     lists: TodoList[] = []
     dueCounts: DueCounts | null = null       // Compteurs « Aujourd'hui » / « Planifié »
+    smartLists: SmartList[] = []             // Listes intelligentes perso (avec leurs compteurs)
     leavingTaskIds: string[] = []            // Tâches cochées qui s'effacent d'une liste intelligente
     urgencyLevels: UrgencyLevel[] = []
     panes: Pane[] = []          // 1 liste affichée, ou 2 en vue scindée (gauche, droite)
     activePane: number = 0      // Moitié où s'ouvre une liste cliquée dans la barre latérale
     openTask: OpenPopover | null = null    // Overlay d'une tâche
-    selectedTaskIds: string[] = []         // Tâches sélectionnées (Cmd+clic / Ctrl+clic)
+    selectedTaskIds: string[] = []         // Tâches sélectionnées (Cmd+clic / Ctrl+clic, Maj+clic)
+    taskMenu: TaskMenu | null = null       // Menu du clic droit ouvert sur une tâche
     editingList: OpenPopover | null = null // Overlay « Modifier une liste »
     drag: DragState | null = null          // Glisser-déposer d'une tâche en cours
     listDrag: string | null = null         // Liste glissée depuis la barre latérale
@@ -135,6 +150,7 @@ class WorkspaceState {
  */
 export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> implements TaskViewActions {
     private confirmingDelete: boolean = false // Fenêtre « Supprimer les tâches ? » ouverte (évite de la rouvrir)
+    private selectionAnchor: string | null = null // Dernière tâche ajoutée ou retirée par un clic (départ du Maj+clic)
 
     constructor(props: WorkspaceProps) {
         super(props)
@@ -146,17 +162,21 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
         window.addEventListener('popstate', this.onPopState)
         document.addEventListener('keydown', this.onDocumentKeyDown)
         try {
-            // Les trois appels partent en même temps
-            const [folders, lists, urgencyLevels] = await Promise.all([
+            // Les quatre appels partent en même temps
+            const [folders, lists, urgencyLevels, smartLists] = await Promise.all([
                 api.getFolders(),
                 api.getLists(),
                 api.getUrgencyLevels(),
+                api.getSmartLists(),
             ])
-            this.setState({ folders, lists, urgencyLevels, loading: false })
+            this.setState({ folders, lists, urgencyLevels, smartLists, loading: false })
             void this.refreshCounts()
 
             // Rouvre les listes de la dernière visite (si elles existent encore), sinon la première
-            const saved = readSavedPanes().filter(id => isSmart(id) || lists.some(list => list.id === id))
+            const exists = (id: string): boolean => isBuiltInSmart(id)
+                || smartLists.some(smart => smart.id === customSmartId(id))
+                || lists.some(list => list.id === id)
+            const saved = readSavedPanes().filter(exists)
             const listIds = saved.length > 0 ? saved : lists.slice(0, 1).map(list => list.id)
             for (let index = 0; index < listIds.length; index++) {
                 await this.openList(listIds[index], index)
@@ -492,10 +512,16 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
         }
     }
 
-    /** Recharge une liste intelligente : « Aujourd'hui » = échéances jusqu'à aujourd'hui (date LOCALE). */
+    /**
+     * Recharge une liste intelligente : « Aujourd'hui » = échéances jusqu'à aujourd'hui (date LOCALE),
+     * « Planifié » = toutes les échéances, liste perso = ses tâches (filtrées par le serveur).
+     */
     private async reloadSmart(id: string): Promise<void> {
         try {
-            const due = await api.getDueTasks(id === SMART_TODAY ? todayIso() : undefined)
+            const customId = customSmartId(id)
+            const due = customId
+                ? await api.getSmartListTasks(customId)
+                : await api.getDueTasks(id === SMART_TODAY ? todayIso() : undefined)
             this.setState(state => ({
                 panes: state.panes.map(pane => (pane.listId === id ? { ...pane, due } : pane)),
             }))
@@ -504,9 +530,34 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
         }
     }
 
+    /**
+     * Listes intelligentes modifiées dans les Paramètres : barre latérale à jour, listes affichées
+     * rechargées (filtre changé), et une liste supprimée laisse sa place à la première vraie liste.
+     */
+    onSmartListsChanged = (smartLists: SmartList[]): void => {
+        this.setState({ smartLists })
+        this.state.panes.forEach((pane, index) => {
+            const id = customSmartId(pane.listId)
+            if (!id) return
+            if (smartLists.some(smart => smart.id === id)) {
+                void this.reloadSmart(pane.listId)
+            } else if (this.state.lists.length > 0) {
+                void this.openList(this.state.lists[0].id, index)
+            }
+        })
+    }
+
+    /** Liste intelligente perso affichée dans une moitié (undefined pour une vraie liste ou Aujourd'hui / Planifié). */
+    private findSmartList(paneId: string): SmartList | undefined {
+        const id = customSmartId(paneId)
+        return id ? this.state.smartLists.find(smart => smart.id === id) : undefined
+    }
+
+    /** Compteurs de la barre latérale : Aujourd'hui / Planifié, et listes intelligentes perso. */
     private async refreshCounts(): Promise<void> {
         try {
-            this.setState({ dueCounts: await api.getDueCounts(todayIso()) })
+            const [dueCounts, smartLists] = await Promise.all([api.getDueCounts(todayIso()), api.getSmartLists()])
+            this.setState({ dueCounts, smartLists })
         } catch (error) {
             this.handleError(error)
         }
@@ -731,11 +782,47 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
     // --- Sélection -------------------------------------------------------------
 
     toggleSelection = (task: Task): void => {
+        this.selectionAnchor = task.id
         this.setState(state => ({
             selectedTaskIds: state.selectedTaskIds.includes(task.id)
                 ? state.selectedTaskIds.filter(id => id !== task.id)
                 : [...state.selectedTaskIds, task.id],
         }))
+    }
+
+    /** Maj+clic : ajoute les tâches entre l'ancrage et la tâche cliquée (même liste, ordre de l'écran). */
+    selectRange = (task: Task): void => {
+        const order = this.visibleOrder(task.id)
+        this.setState(state => {
+            // Sélection vide : l'ancrage d'avant ne compte plus
+            const anchor = state.selectedTaskIds.length > 0 ? this.selectionAnchor : null
+            return { selectedTaskIds: selectRange(order, anchor, task.id, state.selectedTaskIds) }
+        })
+    }
+
+    /** Tâches dans l'ordre de l'écran, dans la liste (ou liste intelligente) qui contient cette tâche. */
+    private visibleOrder(taskId: string): string[] {
+        for (const pane of this.state.panes) {
+            if (pane.board && findTask(pane.board, taskId)) {
+                const board = pane.board.list.show_done ? pane.board : hideDoneTasks(pane.board)
+                return board.groups.flatMap(group => group.tasks.map(task => task.id))
+            }
+            if (pane.due && isSmart(pane.listId) && pane.due.some(task => task.id === taskId)) {
+                return smartSections(pane.listId, pane.due, this.findSmartList(pane.listId), this.state.urgencyLevels)
+                    .flatMap(section => section.tasks.map(task => task.id))
+            }
+        }
+        return []
+    }
+
+    // --- Menu du clic droit ------------------------------------------------------
+
+    openTaskMenu = (task: Task, x: number, y: number, anchor: DOMRect): void => {
+        this.setState({ taskMenu: { task, x, y, anchor } })
+    }
+
+    closeTaskMenu = (): void => {
+        this.setState({ taskMenu: null })
     }
 
     clearSelection = (): void => {
@@ -759,6 +846,10 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
 
     /** Échap → vide la sélection. Suppr / ⌫ → supprime les tâches sélectionnées (sauf dans un champ). */
     onDocumentKeyDown = (event: KeyboardEvent): void => {
+        if (this.state.taskMenu && event.key === 'Escape') {
+            this.closeTaskMenu()
+            return
+        }
         if (this.state.selectedTaskIds.length === 0 || event.defaultPrevented) return
         const target = event.target as Element
         if (target.closest('input, textarea, select, [contenteditable="true"], [data-keep-popovers]')) return
@@ -771,25 +862,30 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
         }
     }
 
-    /** Clic dans le vide d'une liste (pas sur une tâche) → vide la sélection. */
-    onPaneMouseDown = (event: React.MouseEvent<HTMLElement>, index: number): void => {
+    /**
+     * Clic dans une moitié : elle devient la moitié active.
+     * Un clic dans le vide ne vide PAS la sélection : on en sort par Échap ou en désélectionnant tout.
+     */
+    onPaneMouseDown = (index: number): void => {
         if (this.state.activePane !== index) this.setState({ activePane: index })
-        const onTask = (event.target as Element).closest('[data-task-id]') !== null
-        if (!onTask && !event.metaKey && !event.ctrlKey) this.clearSelection()
     }
 
     deleteSelection = async (): Promise<void> => {
-        const ids = this.state.selectedTaskIds
+        await this.deleteTasks(this.state.selectedTaskIds, 'Supprimer la tâche sélectionnée ?')
+    }
+
+    /** Supprime des tâches après confirmation (sélection, ou une tâche depuis le clic droit). */
+    private async deleteTasks(ids: string[], singleMessage: string): Promise<void> {
         if (ids.length === 0 || this.confirmingDelete) return
 
         this.confirmingDelete = true
-        const message = ids.length === 1 ? 'Supprimer la tâche sélectionnée ?' : `Supprimer les ${ids.length} tâches sélectionnées ?`
+        const message = ids.length === 1 ? singleMessage : `Supprimer les ${ids.length} tâches sélectionnées ?`
         const confirmed = await confirmDialog.ask(message)
         this.confirmingDelete = false
         if (!confirmed) return
 
         this.setState(state => ({
-            selectedTaskIds: [],
+            selectedTaskIds: state.selectedTaskIds.filter(id => !ids.includes(id)),
             openTask: state.openTask && ids.includes(state.openTask.id) ? null : state.openTask,
         }))
         this.updateBoards(board => ids.reduce((b, id) => removeTask(b, id), board))
@@ -1185,6 +1281,7 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
                         folders={this.state.folders}
                         lists={this.state.lists}
                         dueCounts={this.state.dueCounts}
+                        smartLists={this.state.smartLists}
                         onSelectList={this.onMobileSelectList}
                         onToggleFolder={this.onToggleFolder}
                         onCreateList={this.onCreateList}
@@ -1202,6 +1299,7 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
                     <QuickTaskSheet
                         folders={this.state.folders}
                         lists={this.state.lists}
+                        defaultDue={this.props.user.quick_task_due}
                         onLoadGroups={this.loadGroups}
                         onCreate={this.createQuickTask}
                         onClose={this.onCloseQuickTask}
@@ -1241,6 +1339,7 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
                     </div>
                 )}
                 {this.renderSelectionBar()}
+                {this.renderTaskMenu()}
                 {this.renderPopover()}
                 {this.renderListEditor()}
                 {this.state.settingsOpen && (
@@ -1249,6 +1348,7 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
                         urgencyLevels={this.state.urgencyLevels}
                         onUserChanged={this.props.onUserChanged}
                         onUrgencyLevelsChanged={urgencyLevels => this.setState({ urgencyLevels })}
+                        onSmartListsChanged={this.onSmartListsChanged}
                         onClose={this.onCloseSettings}
                     />
                 )}
@@ -1275,20 +1375,24 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
             <section
                 key={pane.listId}
                 className={classes.join(' ')}
-                onMouseDown={event => this.onPaneMouseDown(event, index)}
+                onMouseDown={() => this.onPaneMouseDown(index)}
             >
-                {isSmart(pane.listId) && (
+                {(isBuiltInSmart(pane.listId) || this.findSmartList(pane.listId)) && (
                     <SmartView
-                        kind={pane.listId}
+                        paneId={pane.listId}
+                        smartList={this.findSmartList(pane.listId)}
                         tasks={pane.due}
                         urgencyLevels={this.state.urgencyLevels}
                         openTaskId={this.state.openTask?.id ?? null}
                         selectedTaskIds={this.state.selectedTaskIds}
+                        menuTaskId={this.state.taskMenu?.task.id ?? null}
                         leavingTaskIds={this.state.leavingTaskIds}
                         onToggle={this.toggleTask}
                         onOpen={this.openTask}
                         onRename={this.renameTask}
                         onToggleSelection={this.toggleSelection}
+                        onSelectRange={this.selectRange}
+                        onOpenMenu={this.openTaskMenu}
                         onStartEditing={this.startEditing}
                         onClosePane={this.canClosePane() ? () => this.closePane(index) : undefined}
                         mobile={this.state.mobile}
@@ -1382,6 +1486,7 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
                 folders={this.state.folders}
                 lists={this.state.lists}
                 dueCounts={this.state.dueCounts}
+                smartLists={this.state.smartLists}
                 selectedListId={panes[activePane]?.listId ?? null}
                 secondaryListId={this.splitVisible() ? panes[1 - activePane]?.listId ?? null : null}
                 width={width}
@@ -1437,12 +1542,51 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
             actions: this,
             openTaskId: this.state.openTask?.id ?? null,
             selectedTaskIds: this.state.selectedTaskIds,
+            menuTaskId: this.state.taskMenu?.task.id ?? null,
             drag: this.state.drag,
             addingGroup: this.state.addingGroupListId === board.list.id,
             onAddingGroupDone: () => this.setState({ addingGroupListId: null }),
             mobile: this.state.mobile,
         }
         return board.list.default_view === 'sections' ? <SectionsView {...props} /> : <Board {...props} />
+    }
+
+    /**
+     * Menu du clic droit sur une tâche. Supprimer agit sur toute la sélection si la tâche
+     * en fait partie, sinon sur cette tâche seulement. Le clic droit ne change pas la sélection.
+     * Pendant une sélection, pas de « Ouvrir le détail » : on ne modifie pas de tâche en sélection.
+     */
+    private renderTaskMenu(): React.ReactNode {
+        const menu = this.state.taskMenu
+        if (!menu) return null
+        const task = menu.task
+        const selecting = this.state.selectedTaskIds.length > 0
+        const selected = this.state.selectedTaskIds.includes(task.id)
+        const deleteIds = selected ? this.state.selectedTaskIds : [task.id]
+
+        const items: MenuItem[] = [{
+            label: selected ? 'Retirer de la sélection' : 'Ajouter à la sélection',
+            icon: selected ? SquareMinus : SquareCheck,
+            kbd: selecting ? 'clic' : SELECT_KEY,
+            onSelect: () => this.toggleSelection(task),
+        }]
+        if (!selecting) {
+            items.push({
+                label: 'Ouvrir le détail',
+                icon: PanelRightOpen,
+                kbd: 'Entrée',
+                onSelect: () => this.openTask(task, menu.anchor),
+            })
+        }
+        items.push({
+            label: deleteIds.length > 1 ? `Supprimer les ${deleteIds.length} tâches` : 'Supprimer',
+            icon: Trash2,
+            kbd: '⌫',
+            danger: true,
+            onSelect: () => void this.deleteTasks(deleteIds, 'Supprimer cette tâche ?'),
+        })
+
+        return <Menu at={{ x: menu.x, y: menu.y }} onClose={this.closeTaskMenu} items={items} />
     }
 
     /** Barre en bas de l'écran tant que des tâches sont sélectionnées. */
@@ -1457,11 +1601,10 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
                 <span className="selection-count">
                     {count > 1 ? `${count} tâches sélectionnées` : '1 tâche sélectionnée'}
                 </span>
-                {canDrag && (
-                    <span className="selection-hint">
-                        {count > 1 ? 'Glisse-les pour les déplacer' : 'Glisse-la pour la déplacer'}
-                    </span>
-                )}
+                <span className="selection-hint">
+                    {canDrag && (count > 1 ? 'Glisse-les pour les déplacer · ' : 'Glisse-la pour la déplacer · ')}
+                    Maj+clic : plage · clic droit : menu
+                </span>
                 <button className="selection-delete" onClick={() => void this.deleteSelection()}>
                     <Trash2 size={14} />
                     Supprimer

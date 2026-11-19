@@ -6,7 +6,7 @@
     align-items: flex-start;
     justify-content: center;
     padding: 120px 16px 16px;
-    background: rgba(20, 20, 20, 0.35);
+    background: var(--backdrop);
 }
 
 .ConfirmDialog {

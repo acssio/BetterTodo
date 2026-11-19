@@ -70,6 +70,60 @@ func TestValidDate(t *testing.T) {
 	}
 }
 
+func TestValidTime(t *testing.T) {
+	cases := map[string]bool{
+		"14:30":    true,
+		"00:00":    true,
+		"23:59":    true,
+		"24:00":    false, // N'existe pas
+		"9:05":     false, // Toujours deux chiffres
+		"14:30:00": false,
+		"":         false,
+	}
+	for input, want := range cases {
+		if got := validTime(input); got != want {
+			t.Errorf("validTime(%q) = %v, attendu %v", input, got, want)
+		}
+	}
+}
+
+func TestValidQuickTaskDue(t *testing.T) {
+	for _, due := range []string{"none", "today", "tomorrow"} {
+		if !validQuickTaskDue(due) {
+			t.Errorf("validQuickTaskDue(%q) devrait être vrai", due)
+		}
+	}
+	for _, due := range []string{"", "Today", "demain", "week"} {
+		if validQuickTaskDue(due) {
+			t.Errorf("validQuickTaskDue(%q) devrait être faux", due)
+		}
+	}
+}
+
+func TestSmartListValidation(t *testing.T) {
+	if !validSmartKind("tags") || !validSmartKind("urgency") || validSmartKind("dates") {
+		t.Error("kind : seulement tags ou urgency")
+	}
+	if !validTagMatch("any") || !validTagMatch("all") || validTagMatch("some") {
+		t.Error("tag_match : seulement any ou all")
+	}
+	if missingFilter("tags", []string{}, []string{"u1"}) == "" {
+		t.Error("par tags sans tag : refusé")
+	}
+	if missingFilter("urgency", []string{"t1"}, []string{}) == "" {
+		t.Error("par urgence sans niveau : refusé")
+	}
+	if missingFilter("tags", []string{"t1"}, []string{}) != "" {
+		t.Error("par tags avec un tag : accepté")
+	}
+	if got := unique([]string{"a", "b", "a"}); len(got) != 2 || got[0] != "a" || got[1] != "b" {
+		t.Errorf("unique = %v, attendu [a b]", got)
+	}
+	if got := unique(nil); got == nil || len(got) != 0 {
+		t.Error("unique(nil) : liste vide (et non nil)")
+	}
+}
+
 func TestUpdateBuilder(t *testing.T) {
 	u := newUpdate("tasks")
 	u.set("title", "x")

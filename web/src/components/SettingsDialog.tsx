@@ -1,12 +1,19 @@
 import * as React from 'react'
-import { Check, Columns3, Copy, GripVertical, KeyRound, Plus, Rows2, Trash2, X } from 'lucide-react'
+import { Check, Columns3, Copy, GripVertical, KeyRound, Monitor, Moon, Pencil, Plus, Rows2, Sun, Trash2, X } from 'lucide-react'
 import { api, ApiError } from '../api/ApiClient'
-import type { ApiToken, Language, ListView, Tag, UrgencyLevel, User, UserChanges } from '../api/types'
+import type {
+    ApiToken, Language, ListView, QuickTaskDue, SmartList, SmartListChanges, Tag, UrgencyLevel, User, UserChanges,
+} from '../api/types'
 import { computeDropIndex } from '../utils/dragDrop'
 import { moveItem } from '../utils/moveItem'
+import { theme } from '../utils/theme'
+import type { ThemeChoice } from '../utils/theme'
 import { DismissListener } from '../utils/popover'
 import { confirmDialog } from './confirm'
 import { InlineInput } from './InlineInput'
+import { ListIcon } from './ListIcon'
+import { SMART_INFO } from './smartInfo'
+import { SmartListDialog } from './SmartListDialog'
 import { LIST_COLORS } from './listIcons'
 import './TaskPopover.css'     // .pop-tag, .pop-tag-add
 import './ListEditPopover.css' // .list-color
@@ -19,11 +26,15 @@ interface SettingsDialogProps {
     urgencyLevels: UrgencyLevel[]
     onUserChanged: (user: User) => void                    // Nom ou vue par défaut modifiés
     onUrgencyLevelsChanged: (levels: UrgencyLevel[]) => void
+    onSmartListsChanged: (lists: SmartList[]) => void      // Listes intelligentes créées, modifiées, masquées, supprimées
     onClose: () => void
 }
 
 class SettingsDialogState {
     displayName: string = ''
+    theme: ThemeChoice = 'system' // Partie « Apparence » (retenu sur cet appareil)
+    smartLists: SmartList[] = []  // Partie « Listes intelligentes »
+    editingSmart: SmartList | 'new' | null = null // Fenêtre SmartListDialog ouverte
     levels: UrgencyLevel[] = []
     tags: Tag[] = []
     tagsLoaded: boolean = false
@@ -48,7 +59,7 @@ class SettingsDialogState {
 }
 
 /**
- * Écran Paramètres (écran 6 de la maquette) : compte, niveaux d'urgence, tags, vue par défaut,
+ * Écran Paramètres (écran 6 de la maquette) : apparence (clair / sombre), listes intelligentes, compte, échéance de la Quick task, niveaux d'urgence, tags, vue par défaut,
  * jetons d'accès (pour Claude via MCP).
  *
  * Exception à la règle « seul Workspace parle à l'API » : c'est un écran à part,
@@ -63,14 +74,19 @@ export class SettingsDialog extends React.Component<SettingsDialogProps, Setting
 
     constructor(props: SettingsDialogProps) {
         super(props)
-        this.state = { ...new SettingsDialogState(), displayName: props.user.display_name, levels: props.urgencyLevels }
+        this.state = {
+            ...new SettingsDialogState(),
+            displayName: props.user.display_name,
+            levels: props.urgencyLevels,
+            theme: theme.choice,
+        }
     }
 
     async componentDidMount(): Promise<void> {
         this.dismiss.start()
         try {
-            const [tags, tokens] = await Promise.all([api.getTags(), api.getApiTokens()])
-            this.setState({ tags, tagsLoaded: true, tokens, tokensLoaded: true })
+            const [tags, tokens, smartLists] = await Promise.all([api.getTags(), api.getApiTokens(), api.getSmartLists()])
+            this.setState({ tags, tagsLoaded: true, tokens, tokensLoaded: true, smartLists })
         } catch (error) {
             this.showError(error)
         }
@@ -82,6 +98,60 @@ export class SettingsDialog extends React.Component<SettingsDialogProps, Setting
 
     private showError(error: unknown): void {
         this.setState({ error: error instanceof ApiError ? error.message : 'Impossible de joindre le serveur.' })
+    }
+
+    // =========================================================================
+    // Apparence (pas d'API : retenu dans le navigateur, par appareil)
+    // =========================================================================
+
+    onThemeClick = (choice: ThemeChoice): void => {
+        theme.setChoice(choice)
+        this.setState({ theme: choice })
+    }
+
+    // =========================================================================
+    // Listes intelligentes (Aujourd'hui / Planifié : réglages du compte ; listes perso : /smart-lists)
+    // =========================================================================
+
+    /** Nouvelle liste des listes intelligentes : gardée ici et envoyée à Workspace (barre latérale). */
+    private setSmartLists(smartLists: SmartList[]): void {
+        this.setState({ smartLists })
+        this.props.onSmartListsChanged(smartLists)
+    }
+
+    onSmartVisibleChange = async (list: SmartList, visible: boolean): Promise<void> => {
+        try {
+            const saved = await api.updateSmartList(list.id, { visible })
+            this.setSmartLists(this.state.smartLists.map(l => (l.id === saved.id ? saved : l)))
+        } catch (error) {
+            this.showError(error)
+        }
+    }
+
+    /** Enregistre la fenêtre (création ou modification). Une erreur remonte à la fenêtre, qui l'affiche. */
+    saveSmartList = async (changes: SmartListChanges): Promise<void> => {
+        const editing = this.state.editingSmart
+        if (editing === 'new') {
+            const created = await api.createSmartList(changes)
+            this.setSmartLists([...this.state.smartLists, created])
+        } else if (editing) {
+            const saved = await api.updateSmartList(editing.id, changes)
+            this.setSmartLists(this.state.smartLists.map(l => (l.id === saved.id ? saved : l)))
+        }
+        this.setState({ editingSmart: null })
+    }
+
+    deleteSmartList = async (): Promise<void> => {
+        const editing = this.state.editingSmart
+        if (!editing || editing === 'new') return
+        try {
+            await api.deleteSmartList(editing.id)
+            this.setSmartLists(this.state.smartLists.filter(l => l.id !== editing.id))
+            this.setState({ editingSmart: null })
+        } catch (error) {
+            this.setState({ editingSmart: null })
+            this.showError(error)
+        }
     }
 
     // =========================================================================
@@ -102,6 +172,12 @@ export class SettingsDialog extends React.Component<SettingsDialogProps, Setting
             this.setState({ displayName: this.props.user.display_name }) // Nom vide refusé
         } else if (name !== this.props.user.display_name) {
             void this.updateUser({ display_name: name })
+        }
+    }
+
+    onQuickTaskDueClick = (due: QuickTaskDue): void => {
+        if (due !== this.props.user.quick_task_due) {
+            void this.updateUser({ quick_task_due: due })
         }
     }
 
@@ -299,10 +375,13 @@ export class SettingsDialog extends React.Component<SettingsDialogProps, Setting
                                 <button onClick={() => this.setState({ error: '' })}>OK</button>
                             </div>
                         )}
+                        {this.renderAppearance()}
+                        {this.renderSmartLists()}
                         {this.renderAccount()}
                         {this.renderPassword()}
                         {this.renderLevels()}
                         {this.renderTags()}
+                        {this.renderQuickTask()}
                         {this.renderDefaultView()}
                         {this.renderTokens()}
                     </div>
@@ -311,7 +390,91 @@ export class SettingsDialog extends React.Component<SettingsDialogProps, Setting
                         <button className="btn-ghost" onClick={this.props.onClose}>Fermer</button>
                     </footer>
                 </div>
+                {this.state.editingSmart && (
+                    <SmartListDialog
+                        list={this.state.editingSmart === 'new' ? null : this.state.editingSmart}
+                        tags={this.state.tags}
+                        urgencyLevels={this.state.levels}
+                        onSave={this.saveSmartList}
+                        onDelete={this.deleteSmartList}
+                        onClose={() => this.setState({ editingSmart: null })}
+                    />
+                )}
             </div>
+        )
+    }
+
+    private renderSmartLists(): React.ReactNode {
+        const user = this.props.user
+        const today = SMART_INFO['smart:today']
+        const scheduled = SMART_INFO['smart:scheduled']
+        return (
+            <section>
+                <h3>Listes intelligentes</h3>
+                <p className="settings-desc">Affichées en haut de la barre latérale et sur l'accueil mobile.</p>
+                <div className="settings-levels">
+                    {this.renderSmartRow('today', <today.icon size={16} color={today.color} />, today.title, '',
+                        user.show_today, visible => void this.updateUser({ show_today: visible }))}
+                    {this.renderSmartRow('scheduled', <scheduled.icon size={16} color={scheduled.color} />, scheduled.title, '',
+                        user.show_scheduled, visible => void this.updateUser({ show_scheduled: visible }))}
+                    {this.state.smartLists.map(list => this.renderSmartRow(
+                        list.id, <ListIcon icon={list.icon} color={list.color} />, list.name, list.labels.join(', '),
+                        list.visible, visible => void this.onSmartVisibleChange(list, visible), list,
+                    ))}
+                </div>
+                <button className="settings-add" onClick={() => this.setState({ editingSmart: 'new' })}>
+                    <Plus size={14} />Nouvelle liste intelligente
+                </button>
+            </section>
+        )
+    }
+
+    /** Une ligne : icône, nom, rappel du filtre, crayon (listes perso), interrupteur afficher / masquer. */
+    private renderSmartRow(
+        key: string, icon: React.ReactNode, name: string, hint: string,
+        visible: boolean, onVisible: (visible: boolean) => void, list?: SmartList,
+    ): React.ReactNode {
+        return (
+            <div key={key} className="settings-level">
+                {icon}
+                <span className="settings-smart-name">
+                    {name}{hint && <span className="settings-smart-hint"> · {hint}</span>}
+                </span>
+                {list && (
+                    <button className="icon-btn" aria-label={`Modifier ${name}`} title="Modifier" onClick={() => this.setState({ editingSmart: list })}>
+                        <Pencil size={15} />
+                    </button>
+                )}
+                <input
+                    type="checkbox"
+                    className="settings-switch"
+                    role="switch"
+                    aria-label={`Afficher ${name}`}
+                    checked={visible}
+                    onChange={event => onVisible(event.target.checked)}
+                />
+            </div>
+        )
+    }
+
+    private renderAppearance(): React.ReactNode {
+        const choice = this.state.theme
+        return (
+            <section>
+                <h3>Apparence</h3>
+                <p className="settings-desc">Système : suit le mode clair ou sombre de l'appareil. Retenu sur cet appareil.</p>
+                <div className="header-views settings-views">
+                    <button className={choice === 'system' ? 'on' : ''} onClick={() => this.onThemeClick('system')}>
+                        <Monitor size={14} />Système
+                    </button>
+                    <button className={choice === 'light' ? 'on' : ''} onClick={() => this.onThemeClick('light')}>
+                        <Sun size={14} />Clair
+                    </button>
+                    <button className={choice === 'dark' ? 'on' : ''} onClick={() => this.onThemeClick('dark')}>
+                        <Moon size={14} />Sombre
+                    </button>
+                </div>
+            </section>
         )
     }
 
@@ -539,6 +702,28 @@ export class SettingsDialog extends React.Component<SettingsDialogProps, Setting
                             <Plus size={11} />Nouveau tag
                         </button>
                     )}
+                </div>
+            </section>
+        )
+    }
+
+    private renderQuickTask(): React.ReactNode {
+        const due = this.props.user.quick_task_due
+        const choices: { value: QuickTaskDue, label: string }[] = [
+            { value: 'none', label: 'Aucune' },
+            { value: 'today', label: "Aujourd'hui" },
+            { value: 'tomorrow', label: 'Demain' },
+        ]
+        return (
+            <section>
+                <h3>Quick task</h3>
+                <p className="settings-desc">Échéance proposée quand on ouvre la Quick task (on peut la changer à chaque fois).</p>
+                <div className="header-views settings-views">
+                    {choices.map(choice => (
+                        <button key={choice.value} className={due === choice.value ? 'on' : ''} onClick={() => this.onQuickTaskDueClick(choice.value)}>
+                            {choice.label}
+                        </button>
+                    ))}
                 </div>
             </section>
         )

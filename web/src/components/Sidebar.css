@@ -30,6 +30,7 @@
     height: 24px;
     border-radius: 7px;
     background: var(--text);
+    color: var(--bg);
     display: flex;
     align-items: center;
     justify-content: center;

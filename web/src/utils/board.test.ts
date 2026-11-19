@@ -8,7 +8,7 @@ import {
 /** Crée une tâche minimale pour les tests. */
 function task(id: string, groupId: string, done = false): Task {
     return {
-        id, group_id: groupId, title: id, notes: '', due_date: null, urgency_id: null,
+        id, group_id: groupId, title: id, notes: '', due_date: null, due_time: null, urgency_id: null,
         done, done_at: null, position: 0, tags: [], created_at: '', updated_at: '',
     }
 }

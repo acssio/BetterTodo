@@ -29,6 +29,7 @@ type apiTask struct {
 	Title     string   `json:"title"`
 	Notes     string   `json:"notes"`
 	DueDate   *string  `json:"due_date"`
+	DueTime   *string  `json:"due_time"`
 	UrgencyID *string  `json:"urgency_id"`
 	Done      bool     `json:"done"`
 	Tags      []string `json:"tags"`

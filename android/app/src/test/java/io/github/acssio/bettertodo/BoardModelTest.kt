@@ -1,0 +1,118 @@
+package io.github.acssio.bettertodo
+
+import io.github.acssio.bettertodo.api.Board
+import io.github.acssio.bettertodo.api.BoardGroup
+import io.github.acssio.bettertodo.api.Task
+import io.github.acssio.bettertodo.api.TodoList
+import io.github.acssio.bettertodo.ui.BoardModel
+import io.github.acssio.bettertodo.ui.TaskStore
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
+import org.junit.Test
+
+class BoardModelTest {
+    private val todo = Task(id = "a", groupId = "g", title = "À faire", position = 0)
+    private val done = Task(id = "b", groupId = "g", title = "Faite", position = 1, done = true)
+
+    @Test
+    fun tachesFaitesMasquees() {
+        assertEquals(listOf(todo), BoardModel.visibleTasks(listOf(todo, done), showDone = false, leaving = emptySet()))
+    }
+
+    @Test
+    fun tachesFaitesAffichees() {
+        assertEquals(listOf(todo, done), BoardModel.visibleTasks(listOf(todo, done), showDone = true, leaving = emptySet()))
+    }
+
+    @Test
+    fun tacheQuiVientDEtreCocheeResteVisible() {
+        assertEquals(listOf(todo, done), BoardModel.visibleTasks(listOf(todo, done), showDone = false, leaving = setOf("b")))
+    }
+
+    private val list = TodoList(id = "l", name = "Liste", color = "#2F6FEB", icon = "list", position = 0)
+    private val other = Task(id = "c", groupId = "g2", title = "Autre groupe", position = 0)
+    private val board = Board(list, listOf(BoardGroup("g", "Tâches", 0, listOf(todo, done)), BoardGroup("g2", "Plus tard", 1, listOf(other))))
+
+    private fun titles(board: Board) = board.groups.map { group -> group.tasks.map { it.title } }
+
+    @Test
+    fun remplacerUneTache() {
+        val updated = BoardModel.applyTask(board, todo.copy(done = true))
+        assertEquals(listOf(true, true), updated.groups[0].tasks.map { it.done })
+        assertEquals(listOf(false, true), board.groups[0].tasks.map { it.done }) // L'original n'a pas changé
+    }
+
+    @Test
+    fun changerDeGroupeMetALaFin() {
+        val updated = BoardModel.applyTask(board, todo.copy(groupId = "g2"))
+        assertEquals(listOf(listOf("Faite"), listOf("Autre groupe", "À faire")), titles(updated))
+    }
+
+    @Test
+    fun nouvelleTacheALaFin() {
+        val created = Task(id = "n", groupId = "g", title = "Nouvelle", position = 2)
+        assertEquals(listOf(listOf("À faire", "Faite", "Nouvelle"), listOf("Autre groupe")), titles(BoardModel.applyTask(board, created)))
+    }
+
+    @Test
+    fun supprimerUneTache() {
+        assertEquals(listOf(listOf("Faite"), listOf("Autre groupe")), titles(BoardModel.removeTask(board, "a")))
+    }
+
+    @Test
+    fun nettoyerUnTag() {
+        assertEquals("Courses", TaskStore.cleanTag("  #Courses "))
+        assertEquals("bio", TaskStore.cleanTag("bio"))
+        assertNull(TaskStore.cleanTag(" # "))
+    }
+
+    @Test
+    fun selection() {
+        assertEquals(setOf("a", "b"), TaskStore.toggle(setOf("a"), "b"))
+        assertEquals(setOf("a"), TaskStore.toggle(setOf("a", "b"), "b"))
+    }
+
+    @Test
+    fun selectionDansLOrdreDeLEcran() {
+        // Sélectionnées dans le désordre ; « c » n'est plus affichée
+        assertEquals(listOf("a", "d"), TaskStore.inDisplayOrder(listOf("a", "b", "d"), setOf("d", "c", "a")))
+    }
+
+    @Test
+    fun deplacerPlusieursTachesALaFinDansLOrdre() {
+        // Comme confirmMove : une tâche après l'autre, dans l'ordre de l'écran
+        val moved = listOf(todo, done).fold(board) { current, task -> BoardModel.applyTask(current, task.copy(groupId = "g2")) }
+        assertEquals(listOf(emptyList(), listOf("Autre groupe", "À faire", "Faite")), titles(moved))
+    }
+
+    @Test
+    fun reordonnerDansLeGroupe() {
+        // Remonter « Faite » avant « À faire »
+        assertEquals(listOf(listOf("Faite", "À faire"), listOf("Autre groupe")), titles(BoardModel.reorder(board, listOf("b"), "g", "a")))
+    }
+
+    @Test
+    fun deposerPlusieursTachesDansUnAutreGroupe() {
+        // a et b avant c, dans g2 : elles gardent leur ordre
+        assertEquals(listOf(emptyList(), listOf("À faire", "Faite", "Autre groupe")), titles(BoardModel.reorder(board, listOf("a", "b"), "g2", "c")))
+    }
+
+    @Test
+    fun deposerALaPlaceDOrigineNeChangeRien() {
+        assertEquals(board, BoardModel.reorder(board, listOf("a"), "g", "b"))
+    }
+
+    @Test
+    fun viderLesTachesFaites() {
+        assertEquals(listOf(listOf("À faire"), listOf("Autre groupe")), titles(BoardModel.withoutDone(board)))
+    }
+
+    @Test
+    fun messagesDeConfirmation() {
+        assertEquals("Supprimer le groupe « Plus tard » et sa tâche ?", BoardModel.deleteGroupMessage(board.groups[1]))
+        assertEquals("Supprimer le groupe « Tâches » et ses 2 tâches ?", BoardModel.deleteGroupMessage(board.groups[0]))
+        assertEquals("Supprimer le groupe « Vide » ?", BoardModel.deleteGroupMessage(BoardGroup("v", "Vide", 2)))
+        assertEquals("Supprimer définitivement la tâche faite de « Courses » ?", BoardModel.clearDoneMessage("Courses", 1))
+        assertEquals("Supprimer définitivement les 3 tâches faites de « Courses » ?", BoardModel.clearDoneMessage("Courses", 3))
+    }
+}
