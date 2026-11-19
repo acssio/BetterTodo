@@ -3,7 +3,7 @@ package io.github.acssio.bettertodo.ui
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import io.github.acssio.bettertodo.api.ApiClient
+import io.github.acssio.bettertodo.api.TodoApi
 import io.github.acssio.bettertodo.api.ApiError
 import io.github.acssio.bettertodo.api.Board
 import io.github.acssio.bettertodo.api.ListChanges
@@ -21,7 +21,7 @@ import kotlinx.coroutines.launch
  * @param list la liste touchée sur l'accueil : affichée tout de suite (nom, icône) pendant le chargement
  */
 class BoardModel(
-    api: ApiClient,
+    api: TodoApi,
     val list: TodoList,
     scope: CoroutineScope,
     onUnauthorized: () -> Unit,

@@ -71,6 +71,7 @@ func main() {
 	adminHandler := handlers.NewAdminHandler(pool)
 	tokenHandler := handlers.NewTokenHandler(pool)
 	smartListHandler := handlers.NewSmartListHandler(pool)
+	syncHandler := handlers.NewSyncHandler(pool)
 
 	// Routes -------------------------------------------------------------------
 	mux := http.NewServeMux()
@@ -136,6 +137,9 @@ func main() {
 	private("PATCH /api/v1/smart-lists/{id}", smartListHandler.Update)
 	private("DELETE /api/v1/smart-lists/{id}", smartListHandler.Delete)
 	private("GET /api/v1/smart-lists/{id}/tasks", smartListHandler.Tasks)
+
+	// Synchronisation de l'app Android « local d'abord » (8-4)
+	private("GET /api/v1/sync", syncHandler.Get)
 
 	private("GET /api/v1/tags", tagHandler.List)
 	private("POST /api/v1/tags", tagHandler.Create)

@@ -101,6 +101,7 @@ func (h *SmartListHandler) List(w http.ResponseWriter, r *http.Request) {
 }
 
 type createSmartListRequest struct {
+	ID         *string  `json:"id"` // Facultatif : id choisi par l'app (création hors ligne, 8-4)
 	Name       string   `json:"name"`
 	Color      *string  `json:"color"`
 	Icon       *string  `json:"icon"`
@@ -161,16 +162,30 @@ func (h *SmartListHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
 	userID := userOf(r)
-	var created smartList
 
+	replay, ok := checkClientID(w, r, h.pool, "smart_lists", sqlOwnsSmartList, req.ID)
+	if !ok {
+		return
+	}
+	if replay {
+		existing, err := scanSmartList(h.pool.QueryRow(ctx, smartListSelect+` WHERE s.id = $1`, *req.ID))
+		if err != nil {
+			httpjson.ServerError(w, err)
+			return
+		}
+		httpjson.Write(w, http.StatusOK, existing)
+		return
+	}
+
+	var created smartList
 	err := pgx.BeginFunc(ctx, h.pool, func(tx pgx.Tx) error {
 		var id string
 		err := tx.QueryRow(ctx,
-			`INSERT INTO smart_lists (user_id, name, color, icon, kind, tag_match, tag_ids, urgency_ids, visible, position)
-			 VALUES ($1, $2, $3, $4, $5, $6, $7::uuid[], $8::uuid[], $9,
+			`INSERT INTO smart_lists (id, user_id, name, color, icon, kind, tag_match, tag_ids, urgency_ids, visible, position)
+			 VALUES (COALESCE($10::uuid, gen_random_uuid()), $1, $2, $3, $4, $5, $6, $7::uuid[], $8::uuid[], $9,
 			         (SELECT COALESCE(MAX(position) + 1, 0) FROM smart_lists WHERE user_id = $1))
 			 RETURNING id`,
-			userID, name, color, icon, req.Kind, tagMatch, tagIDs, urgencyIDs, visible).Scan(&id)
+			userID, name, color, icon, req.Kind, tagMatch, tagIDs, urgencyIDs, visible, req.ID).Scan(&id)
 		if err != nil {
 			return err
 		}
@@ -318,7 +333,7 @@ func (h *SmartListHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	if !requireOwned(w, r, h.pool, sqlOwnsSmartList, id) {
 		return
 	}
-	if _, err := h.pool.Exec(r.Context(), `DELETE FROM smart_lists WHERE id = $1`, id); err != nil {
+	if err := deleteRecorded(r.Context(), h.pool, `DELETE FROM smart_lists WHERE id = $1`, entitySmartList, id); err != nil {
 		httpjson.ServerError(w, err)
 		return
 	}

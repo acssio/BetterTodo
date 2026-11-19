@@ -115,7 +115,7 @@ fun TaskItem(
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     origin?.let { ListOrigin(it) }
                     task.tags.forEach { tag -> TagChip(tag) }
-                    task.dueDate?.let { DueDate(it, task.done) }
+                    task.dueDate?.let { DueDate(it, task.dueTime, task.done) }
                     urgency?.let { UrgencyPill(it) }
                 }
             }
@@ -168,12 +168,12 @@ private fun TagChip(tag: String) {
 
 /** Échéance, en rouge si c'est aujourd'hui ou en retard (sauf si la tâche est faite). */
 @Composable
-private fun DueDate(iso: String, done: Boolean) {
+private fun DueDate(iso: String, time: String?, done: Boolean) {
     val late = !done && DueDates.isDueOrLate(iso)
     val color = if (late) Palette.danger else Palette.muted
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
         Icon(painterResource(R.drawable.lucide_ic_calendar), contentDescription = null, tint = color, modifier = Modifier.size(12.dp))
-        Text(DueDates.format(iso), fontSize = 12.sp, color = color, fontWeight = if (late) FontWeight.SemiBold else null)
+        Text(DueDates.format(iso, time), fontSize = 12.sp, color = color, fontWeight = if (late) FontWeight.SemiBold else null)
     }
 }
 

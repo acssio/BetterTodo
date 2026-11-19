@@ -13,3 +13,8 @@
 .externalNativeBuild
 .cxx
 local.properties
+
+# Clé de signature de la version release : ne jamais la mettre dans Git
+keystore.properties
+*.jks
+*.keystore

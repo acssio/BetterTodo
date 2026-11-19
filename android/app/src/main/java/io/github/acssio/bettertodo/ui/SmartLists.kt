@@ -2,6 +2,9 @@ package io.github.acssio.bettertodo.ui
 
 import com.composables.icons.lucide.R // Icônes de la bibliothèque icons-lucide-android
 import io.github.acssio.bettertodo.api.DueTask
+import io.github.acssio.bettertodo.api.SmartList
+import io.github.acssio.bettertodo.api.UrgencyLevel
+import io.github.acssio.bettertodo.local.SmartMatch
 import io.github.acssio.bettertodo.api.Task
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -16,8 +19,8 @@ enum class SmartKind(val title: String, val icon: Int, val color: String, val em
     SCHEDULED("Planifié", R.drawable.lucide_ic_calendar_days, "#2F6FEB", "Aucune tâche avec une échéance."),
 }
 
-/** Une section de la vue : un titre (en rouge si late) et ses tâches. */
-data class DueSection(val key: String, val title: String, val late: Boolean, val tasks: List<DueTask>)
+/** Une section de la vue : un titre (en rouge si late, ou dans la couleur du niveau d'urgence) et ses tâches. */
+data class DueSection(val key: String, val title: String, val late: Boolean, val tasks: List<DueTask>, val color: String? = null)
 
 object SmartLists {
     private val dayTitle = DateTimeFormatter.ofPattern("EEE d MMM", Locale.FRENCH)          // "mar. 25 nov."
@@ -41,7 +44,7 @@ object SmartLists {
      */
     fun sections(tasks: List<DueTask>, kind: SmartKind, today: LocalDate = LocalDate.now()): List<DueSection> {
         val sections = linkedMapOf<String, DueSection>() // Garde l'ordre d'arrivée, donc l'ordre des dates
-        for (due in tasks.filter { it.task.dueDate != null }.sortedBy { it.task.dueDate }) {
+        for (due in tasks.filter { it.task.dueDate != null }.sortedWith(compareBy({ it.task.dueDate }, { it.task.dueTime ?: "99:99" }))) {
             val iso = due.task.dueDate!!
             val days = DueDates.daysFromToday(iso, today)
             val key = when {
@@ -66,5 +69,31 @@ object SmartLists {
                 date.format(if (date.year == today.year) dayTitle else dayTitleYear)
             }
         }
+    }
+
+    // --- Listes intelligentes personnalisées (8-6), comme groupSmartTasks du site ---
+
+    /**
+     * Par tags : une seule section « À faire ». Par urgence : une section par niveau, dans l'ordre
+     * des tâches (déjà triées du plus urgent au moins urgent), « Sans urgence » en dernier.
+     */
+    fun customSections(tasks: List<DueTask>, list: SmartList, levels: Map<String, UrgencyLevel>): List<DueSection> {
+        if (tasks.isEmpty()) return emptyList()
+        if (list.kind == SmartList.KIND_TAGS) return listOf(DueSection("all", "À faire", late = false, tasks = tasks))
+        val sections = linkedMapOf<String, DueSection>()
+        for (due in tasks) {
+            val key = due.task.urgencyId ?: "none"
+            val level = levels[key]
+            val section = sections[key] ?: DueSection(key, level?.name ?: "Sans urgence", late = false, tasks = emptyList(), color = level?.color)
+            sections[key] = section.copy(tasks = section.tasks + due)
+        }
+        return sections.values.toList()
+    }
+
+    /** La tâche a-t-elle encore sa place dans la liste perso ? (à faire, et elle correspond au filtre) */
+    fun belongsCustom(task: Task, list: SmartList): Boolean {
+        if (task.done) return false
+        val tagNames = list.labels.map { it.removePrefix("#") }.toSet() // Les tâches donnent leurs tags par nom
+        return SmartMatch.matches(list.kind, list.tagMatch, tagNames, list.urgencyIds.toSet(), task.tags.toSet(), task.urgencyId)
     }
 }

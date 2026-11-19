@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -32,6 +33,7 @@ import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -42,6 +44,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -143,6 +146,7 @@ fun TaskSheet(model: TaskStore, task: Task, onClose: () -> Unit) {
             }
 
             Field("Échéance") { DueDateChips(task.dueDate, onChange = { model.setDueDate(task, it) }) }
+            Field("Heure") { DueTimeField(task, onChange = { model.setDueTime(task, it) }) }
             Field("Groupe") { GroupPicker(model, task) }
             Field("Urgence") { UrgencyChips(model, task) }
             Field("Tags") { TagsEditor(model, task) }
@@ -233,6 +237,56 @@ fun DueDateChips(dueDate: String?, onChange: (String?) -> Unit) {
             DatePicker(state)
         }
     }
+}
+
+/**
+ * Heure facultative, **tapée** (pas de liste d'heures, maquette v3) : "14:30", "1430", "14h30"…
+ * (DueDates.parseTime). Enregistrée à ↵, en quittant le champ ou à la fermeture du panneau,
+ * **jamais à chaque frappe** : sur le site, la réponse du serveur réécrivait le champ pendant la saisie (bug 7-3).
+ * Champ vidé = plus d'heure ; heure incomprise = on remet l'ancienne. Grisé sans échéance.
+ */
+@Composable
+private fun DueTimeField(task: Task, onChange: (String?) -> Unit) {
+    var text by rememberSaveable(task.id, task.dueTime) { mutableStateOf(task.dueTime ?: "") }
+    var focused by remember { mutableStateOf(false) }
+    val focusManager = LocalFocusManager.current // Appelé dans le panneau : c'est bien son focus à lui
+    val current by rememberUpdatedState(task)
+
+    fun save() {
+        if (text.isBlank()) {
+            text = ""
+            onChange(null)
+            return
+        }
+        val time = DueDates.parseTime(text)
+        if (time == null) {
+            text = current.dueTime ?: "" // Pas comprise : on remet l'ancienne
+        } else {
+            text = time
+            onChange(time)
+        }
+    }
+
+    // Panneau fermé pendant la frappe : on enregistre quand même
+    val saveOnClose by rememberUpdatedState({ if (focused) save() })
+    DisposableEffect(Unit) {
+        onDispose { saveOnClose() }
+    }
+
+    OutlinedTextField(
+        value = text,
+        onValueChange = { text = it },
+        enabled = task.dueDate != null,
+        placeholder = { Text(if (task.dueDate == null) "Choisir d'abord une échéance" else "HH:MM") },
+        singleLine = true,
+        // Clavier de chiffres : « 1430 » suffit, parseTime le comprend
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
+        keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }), // → onFocusChanged → save
+        modifier = Modifier.width(if (task.dueDate == null) 260.dp else 140.dp).onFocusChanged { state ->
+            if (focused && !state.isFocused) save()
+            focused = state.isFocused
+        },
+    )
 }
 
 /**

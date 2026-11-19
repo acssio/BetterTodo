@@ -22,6 +22,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -29,6 +30,9 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberUpdatedState
@@ -36,6 +40,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -46,11 +51,18 @@ import androidx.compose.ui.unit.sp
 import com.composables.icons.lucide.R // Icônes de la bibliothèque icons-lucide-android
 import io.github.acssio.bettertodo.api.ApiClient
 import io.github.acssio.bettertodo.api.ApiError
+import io.github.acssio.bettertodo.api.SmartList
+import io.github.acssio.bettertodo.api.SmartListChanges
 import io.github.acssio.bettertodo.api.Tag
+import io.github.acssio.bettertodo.api.TodoApi
 import io.github.acssio.bettertodo.api.TodoList
 import io.github.acssio.bettertodo.api.UrgencyLevel
 import io.github.acssio.bettertodo.api.User
+import io.github.acssio.bettertodo.data.AppearanceStore
+import io.github.acssio.bettertodo.sync.SyncEngine
+import io.github.acssio.bettertodo.sync.SyncStatus
 import io.github.acssio.bettertodo.ui.theme.Palette
+import io.github.acssio.bettertodo.ui.theme.ThemeMode
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -60,10 +72,14 @@ import kotlinx.coroutines.launch
  * Données de l'écran Paramètres : le compte et le mot de passe (6-7a), les niveaux d'urgence et les tags (6-7b).
  * Comme BoardModel, ce n'est pas un ViewModel : HomeViewModel en crée un à chaque ouverture.
  *
+ * Sans serveur (8-3) : pas de mot de passe ni d'email, mais une partie « Serveur » pour en ajouter un.
+ *
  * @param onUserChanged le compte a changé : AppViewModel le garde (nom affiché ailleurs dans l'app)
  */
 class SettingsModel(
-    private val api: ApiClient,
+    private val api: TodoApi,
+    private val server: ApiClient?, // Le serveur (mot de passe), ou null sans serveur
+    val sync: SyncEngine?,          // La synchronisation avec ce serveur (8-5), ou null
     user: User,
     private val scope: CoroutineScope,
     private val onUnauthorized: () -> Unit,
@@ -71,6 +87,18 @@ class SettingsModel(
 ) {
     var user by mutableStateOf(user)
         private set
+
+    /** Vrai avec un serveur : mot de passe et email affichés. */
+    val hasServer: Boolean get() = server != null
+
+    /** L'adresse du serveur relié ("" sans serveur). */
+    val serverUrl: String get() = server?.serverUrl ?: ""
+
+    /** « Synchroniser maintenant ». */
+    fun syncNow() {
+        val engine = sync ?: return
+        scope.launch { engine.syncNow() }
+    }
     var error by mutableStateOf<String?>(null) // Erreur du compte (nom, langue, vue)
         private set
 
@@ -87,6 +115,18 @@ class SettingsModel(
     var tags by mutableStateOf<List<Tag>>(emptyList())
         private set
 
+    // --- Listes intelligentes (8-6) ---
+    var smartLists by mutableStateOf<List<SmartList>>(emptyList())
+        private set
+
+    /** Panneau « Nouvelle liste intelligente » / « Modifier » ouvert (null = fermé). */
+    var smartForm by mutableStateOf<SmartListForm?>(null)
+        private set
+    var smartError by mutableStateOf<String?>(null) // Refus affiché dans le panneau
+        private set
+    var smartToDelete by mutableStateOf<SmartListForm?>(null) // Suppression qui attend sa confirmation
+        private set
+
     /** Boîte ouverte (nom, couleur ou confirmation), null = aucune. */
     var dialog by mutableStateOf<SettingsDialog?>(null)
         private set
@@ -97,8 +137,10 @@ class SettingsModel(
                 coroutineScope { // Obligatoire autour des async (étape 6-1)
                     val levelsCall = async { api.urgencyLevels() }
                     val tagsCall = async { api.tags() }
+                    val smartCall = async { api.smartLists() }
                     levels = levelsCall.await().sortedBy { it.rank }
                     tags = tagsCall.await()
+                    smartLists = smartCall.await()
                 }
             } catch (e: ApiError) {
                 failed(e)
@@ -237,6 +279,87 @@ class SettingsModel(
         if (view != user.defaultView) updateMe(user.copy(defaultView = view)) { api.updateMe(defaultView = view) }
     }
 
+    // --- Listes intelligentes (8-6) ----------------------------------------------
+
+    /** Interrupteur « Aujourd'hui » / « Planifié » : tuile affichée ou non sur l'accueil (réglage du compte). */
+    fun setShowToday(show: Boolean) {
+        updateMe(user.copy(showToday = show)) { api.updateMe(showToday = show) }
+    }
+
+    fun setShowScheduled(show: Boolean) {
+        updateMe(user.copy(showScheduled = show)) { api.updateMe(showScheduled = show) }
+    }
+
+    /** Interrupteur d'une liste perso : l'écran d'abord, puis la base. */
+    fun setSmartVisible(list: SmartList, visible: Boolean) {
+        val before = smartLists
+        smartLists = smartLists.map { if (it.id == list.id) it.copy(visible = visible) else it }
+        scope.launch {
+            try {
+                api.updateSmartList(list.id, SmartListChanges().visible(visible))
+            } catch (e: ApiError) {
+                smartLists = before
+                failed(e)
+            }
+        }
+    }
+
+    /** Crayon (list) ou « Nouvelle liste intelligente » (null). */
+    fun openSmartForm(list: SmartList?) {
+        smartError = null
+        smartForm = list?.let { SmartListForm.of(it) } ?: SmartListForm()
+    }
+
+    fun editSmartForm(form: SmartListForm) {
+        smartForm = form
+    }
+
+    fun closeSmartForm() {
+        smartForm = null
+    }
+
+    /** « Créer » / « Enregistrer » : le panneau se ferme si la base accepte, sinon le refus s'affiche dedans. */
+    fun saveSmartForm() {
+        val form = smartForm ?: return
+        if (!form.canSave) return
+        scope.launch {
+            try {
+                if (form.id == null) api.createSmartList(form.toChanges()) else api.updateSmartList(form.id, form.toChanges())
+                smartLists = api.smartLists()
+                smartForm = null
+            } catch (e: ApiError) {
+                if (e.status == 401) onUnauthorized() else smartError = e.message
+            }
+        }
+    }
+
+    fun askDeleteSmart() {
+        smartToDelete = smartForm
+    }
+
+    fun cancelDeleteSmart() {
+        smartToDelete = null
+    }
+
+    fun confirmDeleteSmart() {
+        val id = smartToDelete?.id ?: return
+        smartToDelete = null
+        smartForm = null
+        scope.launch {
+            try {
+                api.deleteSmartList(id)
+                smartLists = api.smartLists()
+            } catch (e: ApiError) {
+                failed(e)
+            }
+        }
+    }
+
+    /** @param due "none", "today" ou "tomorrow" */
+    fun setQuickTaskDue(due: String) {
+        if (due != user.quickTaskDue) updateMe(user.copy(quickTaskDue = due)) { api.updateMe(quickTaskDue = due) }
+    }
+
     /** L'écran d'abord, puis l'API ; en cas d'erreur, le compte d'avant et un message. */
     private fun updateMe(after: User, call: suspend () -> User) {
         val before = user
@@ -267,7 +390,7 @@ class SettingsModel(
         passwordError = null
         scope.launch {
             try {
-                user = api.changePassword(current, new)
+                user = (server ?: return@launch).changePassword(current, new)
                 passwordDone = true
                 onSuccess()
             } catch (e: ApiError) {
@@ -319,7 +442,7 @@ fun deleteTagMessage(tag: Tag): String {
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(model: SettingsModel, onBack: () -> Unit) {
+fun SettingsScreen(model: SettingsModel, onBack: () -> Unit, onConnectServer: () -> Unit) {
     val user = model.user
     val focusManager = LocalFocusManager.current
     var name by rememberSaveable { mutableStateOf(user.displayName) }
@@ -353,9 +476,35 @@ fun SettingsScreen(model: SettingsModel, onBack: () -> Unit) {
         ) {
             model.error?.let { Notice(it) }
 
+            // --- Apparence (8-1) : par téléphone, pas sur le serveur ---
+            SectionTitle("Apparence")
+            AppearanceSection()
+
+            HorizontalDivider(color = Palette.border)
+
+            // --- Listes intelligentes (8-6) ---
+            SectionTitle("Listes intelligentes")
+            SmartListsSection(model)
+
+            HorizontalDivider(color = Palette.border)
+
+            // --- Serveur : sans serveur, on peut en ajouter un (8-3) ; avec, l'état de la synchronisation (8-5) ---
+            SectionTitle("Serveur")
+            if (!model.hasServer) {
+                Text(
+                    "Tes listes sont sur ce téléphone, sans serveur. Avec un serveur BetterTodo, tu les retrouves aussi sur le site.",
+                    color = Palette.muted,
+                    fontSize = 14.sp,
+                )
+                OutlinedButton(onClick = onConnectServer) { Text("Se connecter à un serveur") }
+            } else {
+                model.sync?.let { SyncSection(model, it) }
+            }
+            HorizontalDivider(color = Palette.border)
+
             // --- Compte ---
             SectionTitle("Compte")
-            Text(user.email, color = Palette.muted)
+            if (model.hasServer) Text(user.email, color = Palette.muted)
             OutlinedTextField(
                 value = name,
                 onValueChange = { name = it },
@@ -378,11 +527,13 @@ fun SettingsScreen(model: SettingsModel, onBack: () -> Unit) {
 
             HorizontalDivider(color = Palette.border)
 
-            // --- Mot de passe ---
-            SectionTitle("Mot de passe")
-            PasswordSection(model)
+            // --- Mot de passe (avec un serveur seulement) ---
+            if (model.hasServer) {
+                SectionTitle("Mot de passe")
+                PasswordSection(model)
 
-            HorizontalDivider(color = Palette.border)
+                HorizontalDivider(color = Palette.border)
+            }
 
             // --- Niveaux d'urgence (6-7b) ---
             SectionTitle("Niveaux d'urgence")
@@ -403,11 +554,38 @@ fun SettingsScreen(model: SettingsModel, onBack: () -> Unit) {
                 FilterChip(user.defaultView == TodoList.VIEW_COLUMNS, onClick = { model.setDefaultView(TodoList.VIEW_COLUMNS) }, label = { Text("Colonnes") })
                 FilterChip(user.defaultView == TodoList.VIEW_SECTIONS, onClick = { model.setDefaultView(TodoList.VIEW_SECTIONS) }, label = { Text("Sections") })
             }
+
+            HorizontalDivider(color = Palette.border)
+
+            // --- Quick task (8-2) : réglage du compte, comme sur le site ---
+            SectionTitle("Quick task")
+            Text("Échéance proposée quand on ouvre la Quick task.", color = Palette.muted, fontSize = 14.sp)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(user.quickTaskDue == User.QUICK_DUE_NONE, onClick = { model.setQuickTaskDue(User.QUICK_DUE_NONE) }, label = { Text("Aucune") })
+                FilterChip(user.quickTaskDue == User.QUICK_DUE_TODAY, onClick = { model.setQuickTaskDue(User.QUICK_DUE_TODAY) }, label = { Text("Aujourd'hui") })
+                FilterChip(user.quickTaskDue == User.QUICK_DUE_TOMORROW, onClick = { model.setQuickTaskDue(User.QUICK_DUE_TOMORROW) }, label = { Text("Demain") })
+            }
+
+            HorizontalDivider(color = Palette.border)
+
+            // --- Notifications (8-7) : par téléphone ---
+            SectionTitle("Notifications")
+            NotificationSettingsSection()
             Box(Modifier.height(24.dp))
         }
     }
 
     SettingsDialogs(model) // Boîtes de nom, de couleur et confirmations (6-7b)
+    model.smartForm?.let { SmartListSheet(model, it) } // Nouvelle liste intelligente / Modifier (8-6)
+    model.smartToDelete?.let { form ->
+        ConfirmDialog(
+            "Supprimer la liste intelligente ?",
+            "Supprimer la liste intelligente « ${form.name} » ? Les tâches ne sont pas supprimées.", // Texte du site
+            "Supprimer",
+            onConfirm = model::confirmDeleteSmart,
+            onDismiss = model::cancelDeleteSmart,
+        )
+    }
 }
 
 /** Changer son mot de passe : actuel, nouveau, confirmation ; erreurs et confirmation sous le formulaire. */
@@ -438,6 +616,34 @@ private fun PasswordSection(model: SettingsModel) {
             } else {
                 Text("Changer le mot de passe")
             }
+        }
+    }
+}
+
+/** Adresse du serveur, dernière synchronisation, modifications en attente, erreur, « Synchroniser maintenant ». */
+@Composable
+private fun SyncSection(model: SettingsModel, sync: SyncEngine) {
+    Text(model.serverUrl, color = Palette.muted, fontSize = 14.sp)
+    Text(SyncStatus.describe(sync.syncing, sync.lastSync, sync.pending), fontSize = 14.sp)
+    sync.error?.let { Text("Dernière tentative : $it", color = Palette.danger, fontSize = 14.sp) }
+    OutlinedButton(onClick = model::syncNow, enabled = !sync.syncing) { Text("Synchroniser maintenant") }
+}
+
+/**
+ * Système / Clair / Sombre. Retenu par téléphone dans AppearanceStore (comme bettertodo.theme sur le site) :
+ * MainActivity suit ce réglage et redessine toute l'app dès qu'il change.
+ */
+@Composable
+private fun AppearanceSection() {
+    val context = LocalContext.current
+    val store = remember { AppearanceStore(context) }
+    val scope = rememberCoroutineScope()
+    val mode by store.mode.collectAsState(initial = ThemeMode.SYSTEM)
+
+    Text("Système : suit le mode clair ou sombre du téléphone.", color = Palette.muted, fontSize = 14.sp)
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        ThemeMode.entries.forEach { choice ->
+            FilterChip(mode == choice, onClick = { scope.launch { store.save(choice) } }, label = { Text(choice.label) })
         }
     }
 }

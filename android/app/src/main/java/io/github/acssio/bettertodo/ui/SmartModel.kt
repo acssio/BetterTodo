@@ -3,14 +3,16 @@ package io.github.acssio.bettertodo.ui
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import io.github.acssio.bettertodo.api.ApiClient
+import io.github.acssio.bettertodo.api.TodoApi
 import io.github.acssio.bettertodo.api.BoardGroup
 import io.github.acssio.bettertodo.api.DueTask
+import io.github.acssio.bettertodo.api.SmartList
 import io.github.acssio.bettertodo.api.Task
 import kotlinx.coroutines.CoroutineScope
 
 /**
- * « Aujourd'hui » ou « Planifié » ouvert : les tâches à faire avec une échéance, de toutes les listes.
+ * « Aujourd'hui », « Planifié » ou une liste intelligente perso (8-6) ouverte :
+ * les tâches à faire de toutes les listes (avec une échéance, ou qui correspondent au filtre).
  * Le chargement, la tâche ouverte et les modifications sont dans TaskStore.
  *
  * Une tâche modifiée reste dans `tasks` (le panneau ouvert la retrouve) ; c'est `visible` qui
@@ -18,11 +20,18 @@ import kotlinx.coroutines.CoroutineScope
  * dans « Aujourd'hui », elle quitte la vue.
  */
 class SmartModel(
-    api: ApiClient,
-    val kind: SmartKind,
+    api: TodoApi,
+    val kind: SmartKind?,      // Aujourd'hui / Planifié…
+    val custom: SmartList?,    // …ou une liste perso (exactement l'un des deux)
     scope: CoroutineScope,
     onUnauthorized: () -> Unit,
 ) : TaskStore(api, scope, onUnauthorized) {
+
+    // Ce qu'affiche l'en-tête, selon le cas
+    val title: String get() = custom?.name ?: kind!!.title
+    val icon: Int get() = custom?.let { ListIcons.drawable(it.icon) } ?: kind!!.icon
+    val color: String get() = custom?.color ?: kind!!.color
+    val empty: String get() = if (custom != null) "Aucune tâche à faire ne correspond." else kind!!.empty
 
     var tasks by mutableStateOf<List<DueTask>>(emptyList())
         private set
@@ -38,11 +47,21 @@ class SmartModel(
 
     /** Sections à afficher (la date du jour est celle du téléphone). */
     val sections: List<DueSection>
-        get() = SmartLists.sections(visible(tasks, kind, leavingIds), kind)
+        get() {
+            val shown = visible(tasks, leavingIds, ::belongs)
+            return if (custom != null) SmartLists.customSections(shown, custom, urgencies) else SmartLists.sections(shown, kind!!)
+        }
+
+    /** La tâche est-elle encore à sa place ? (cochée, repoussée, ou un tag enlevé : elle quitte la vue) */
+    private fun belongs(task: Task): Boolean =
+        if (custom != null) SmartLists.belongsCustom(task, custom) else SmartLists.belongs(task, kind!!)
 
     override suspend fun loadData() {
-        // La date du jour est envoyée par l'app : c'est elle qui connaît le fuseau horaire
-        tasks = api.dueTasks(until = if (kind == SmartKind.TODAY) DueDates.todayIso() else null)
+        tasks = when {
+            custom != null -> api.smartTasks(custom.id)
+            // La date du jour est envoyée par l'app : c'est elle qui connaît le fuseau horaire
+            else -> api.dueTasks(until = if (kind == SmartKind.TODAY) DueDates.todayIso() else null)
+        }
     }
 
     override fun applyLocal(task: Task) {
@@ -76,9 +95,9 @@ class SmartModel(
     }
 
     companion object {
-        /** Les tâches encore à leur place dans la vue, plus celles qui viennent d'être cochées. */
-        fun visible(tasks: List<DueTask>, kind: SmartKind, leaving: Set<String>): List<DueTask> {
-            return tasks.filter { SmartLists.belongs(it.task, kind) || it.task.id in leaving }
+        /** Les tâches encore à leur place dans la vue (belongs), plus celles qui viennent d'être cochées. */
+        fun visible(tasks: List<DueTask>, leaving: Set<String>, belongs: (Task) -> Boolean): List<DueTask> {
+            return tasks.filter { belongs(it.task) || it.task.id in leaving }
         }
     }
 }

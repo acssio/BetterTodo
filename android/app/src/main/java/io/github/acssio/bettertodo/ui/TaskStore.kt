@@ -3,7 +3,7 @@ package io.github.acssio.bettertodo.ui
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import io.github.acssio.bettertodo.api.ApiClient
+import io.github.acssio.bettertodo.api.TodoApi
 import io.github.acssio.bettertodo.api.ApiError
 import io.github.acssio.bettertodo.api.BoardGroup
 import io.github.acssio.bettertodo.api.Task
@@ -34,7 +34,7 @@ import kotlinx.coroutines.launch
  * @param onUnauthorized appelé sur un 401 (session expirée)
  */
 abstract class TaskStore(
-    protected val api: ApiClient,
+    protected val api: TodoApi,
     protected val scope: CoroutineScope,
     private val onUnauthorized: () -> Unit,
 ) {
@@ -106,9 +106,20 @@ abstract class TaskStore(
         fetch()
     }
 
+    /** Avant de recharger en tirant vers le bas : la synchronisation avec le serveur (8-5), ou rien. */
+    var beforeRefresh: (suspend () -> Unit)? = null
+
     fun refresh() {
         refreshing = true
-        fetch()
+        scope.launch {
+            beforeRefresh?.invoke()
+            fetch()
+        }
+    }
+
+    /** Relit les données sans indicateur (après une synchronisation), si l'écran est déjà affiché. */
+    fun reloadQuietly() {
+        if (state == LoadState.Ready) fetch()
     }
 
     /**
@@ -281,10 +292,22 @@ abstract class TaskStore(
         }
     }
 
-    /** @param dueDate "2026-11-18", ou null pour enlever l'échéance */
+    /**
+     * @param dueDate "2026-11-18", ou null pour enlever l'échéance.
+     * Sans échéance, plus d'heure non plus : le serveur l'enlève de lui-même, on fait pareil à l'écran.
+     */
     fun setDueDate(task: Task, dueDate: String?) {
         if (dueDate != task.dueDate) {
-            updateTask(task, task.copy(dueDate = dueDate), TaskChanges().dueDate(dueDate))
+            val after = if (dueDate == null) task.copy(dueDate = null, dueTime = null) else task.copy(dueDate = dueDate)
+            updateTask(task, after, TaskChanges().dueDate(dueDate))
+        }
+    }
+
+    /** @param dueTime "14:30", ou null pour enlever l'heure. Ignoré sans échéance (pas d'heure sans date). */
+    fun setDueTime(task: Task, dueTime: String?) {
+        if (task.dueDate == null) return
+        if (dueTime != task.dueTime) {
+            updateTask(task, task.copy(dueTime = dueTime), TaskChanges().dueTime(dueTime))
         }
     }
 

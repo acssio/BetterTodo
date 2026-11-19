@@ -73,6 +73,7 @@ func (h *TaskHandler) get(ctx context.Context, q querier, id string) (task, erro
 }
 
 type createTaskRequest struct {
+	ID        *string  `json:"id"` // Facultatif : id choisi par l'app (création hors ligne, 8-4)
 	Title     string   `json:"title"`
 	Notes     string   `json:"notes"`
 	DueDate   *string  `json:"due_date"`
@@ -129,15 +130,30 @@ func (h *TaskHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := r.Context()
-	var created task
 
+	replay, ok := checkClientID(w, r, h.pool, "tasks", sqlOwnsTask, req.ID)
+	if !ok {
+		return
+	}
+	if replay {
+		existing, err := h.get(ctx, h.pool, *req.ID)
+		if err != nil {
+			httpjson.ServerError(w, err)
+			return
+		}
+		httpjson.Write(w, http.StatusOK, existing)
+		return
+	}
+
+	var created task
 	err := pgx.BeginFunc(ctx, h.pool, func(tx pgx.Tx) error {
 		var id string
 		err := tx.QueryRow(ctx,
-			`INSERT INTO tasks (group_id, title, notes, due_date, due_time, urgency_id, position)
-			 VALUES ($1, $2, $3, $4, $5, $6, (SELECT COALESCE(MAX(position) + 1, 0) FROM tasks WHERE group_id = $1))
+			`INSERT INTO tasks (id, group_id, title, notes, due_date, due_time, urgency_id, position)
+			 VALUES (COALESCE($7::uuid, gen_random_uuid()), $1, $2, $3, $4, $5, $6,
+			         (SELECT COALESCE(MAX(position) + 1, 0) FROM tasks WHERE group_id = $1))
 			 RETURNING id`,
-			groupID, title, req.Notes, req.DueDate, req.DueTime, req.UrgencyID).Scan(&id)
+			groupID, title, req.Notes, req.DueDate, req.DueTime, req.UrgencyID, req.ID).Scan(&id)
 		if err != nil {
 			return err
 		}
@@ -337,7 +353,7 @@ func (h *TaskHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if _, err := h.pool.Exec(r.Context(), `DELETE FROM tasks WHERE id = $1`, id); err != nil {
+	if err := deleteRecorded(r.Context(), h.pool, `DELETE FROM tasks WHERE id = $1`, entityTask, id); err != nil {
 		httpjson.ServerError(w, err)
 		return
 	}

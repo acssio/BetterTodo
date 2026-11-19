@@ -25,6 +25,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -50,6 +51,7 @@ import io.github.acssio.bettertodo.ui.theme.Palette
  *
  * @param message information affichée au-dessus du formulaire (ex. session expirée), ou null
  * @param error erreur de la dernière tentative, affichée sous le formulaire, ou null
+ * @param onUseLocal « Utiliser l'app sans serveur » : les données restent sur le téléphone (8-3)
  */
 @Composable
 fun LoginScreen(
@@ -58,6 +60,7 @@ fun LoginScreen(
     busy: Boolean,
     error: String?,
     onLogin: (server: String, email: String, password: String) -> Unit,
+    onUseLocal: () -> Unit,
 ) {
     var server by rememberSaveable { mutableStateOf(serverUrl) }
     var email by rememberSaveable { mutableStateOf("") }
@@ -76,10 +79,10 @@ fun LoginScreen(
         ) {
             // Logo : coche blanche sur carré foncé, comme le site
             Box(
-                Modifier.size(44.dp).background(Palette.text, RoundedCornerShape(12.dp)),
+                Modifier.size(44.dp).background(Palette.primaryBg, RoundedCornerShape(12.dp)),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(painterResource(R.drawable.lucide_ic_check), contentDescription = null, tint = Color.White)
+                Icon(painterResource(R.drawable.lucide_ic_check), contentDescription = null, tint = Palette.primaryText)
             }
             Text("BetterTodo", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
             Text("Connecte-toi à ton serveur", color = Palette.muted)
@@ -136,6 +139,9 @@ fun LoginScreen(
                 } else {
                     Text("Se connecter")
                 }
+            }
+            TextButton(onClick = onUseLocal, modifier = Modifier.fillMaxWidth()) {
+                Text("Utiliser l'app sans serveur")
             }
         }
     }

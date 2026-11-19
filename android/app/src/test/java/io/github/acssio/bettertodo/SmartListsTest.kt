@@ -16,8 +16,16 @@ class SmartListsTest {
     private val today = LocalDate.of(2026, 11, 17) // Un mardi
     private val list = ListRef("l", "Maison", "#E8A33D", "house")
 
-    private fun due(id: String, date: String?, done: Boolean = false) =
-        DueTask(Task(id = id, groupId = "g", title = id, position = 0, dueDate = date, done = done), list, "À faire")
+    private fun due(id: String, date: String?, done: Boolean = false, time: String? = null) =
+        DueTask(Task(id = id, groupId = "g", title = id, position = 0, dueDate = date, dueTime = time, done = done), list, "À faire")
+
+    @Test
+    fun memeJourParHeureSansHeureEnDernier() {
+        assertEquals(
+            listOf("Aujourd'hui" to listOf("b", "c", "a")),
+            shape(SmartKind.TODAY, due("a", "2026-11-17"), due("c", "2026-11-17", time = "14:30"), due("b", "2026-11-17", time = "09:00")),
+        )
+    }
 
     /** Titres des sections et ids de leurs tâches, pour comparer facilement. */
     private fun shape(kind: SmartKind, vararg tasks: DueTask) =
@@ -68,7 +76,7 @@ class SmartListsTest {
     @Test
     fun tacheCocheeEncoreVisibleUnInstant() {
         val checked = due("a", "2027-11-17", done = true) // Date lointaine : la vue « Planifié » ne dépend pas d'aujourd'hui
-        assertEquals(emptyList<DueTask>(), SmartModel.visible(listOf(checked), SmartKind.SCHEDULED, emptySet()))
-        assertEquals(listOf(checked), SmartModel.visible(listOf(checked), SmartKind.SCHEDULED, setOf("a")))
+        assertEquals(emptyList<DueTask>(), SmartModel.visible(listOf(checked), emptySet()) { SmartLists.belongs(it, SmartKind.SCHEDULED) })
+        assertEquals(listOf(checked), SmartModel.visible(listOf(checked), setOf("a")) { SmartLists.belongs(it, SmartKind.SCHEDULED) })
     }
 }

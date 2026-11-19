@@ -95,7 +95,7 @@ fun ListScreen(model: BoardModel, lists: List<TodoList>, folders: List<Folder>, 
                     }
                 },
                 actions = { ListMenu(model) },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Palette.background),
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Palette.header), // Grise, pas teintée par la liste
             )
         },
         bottomBar = {
@@ -194,7 +194,7 @@ private fun ColumnsView(model: BoardModel, groups: List<BoardGroup>, drag: TaskD
         PrimaryScrollableTabRow(
             selectedTabIndex = pager.currentPage.coerceIn(0, groups.size - 1),
             edgePadding = 12.dp,
-            containerColor = Palette.background,
+            containerColor = Palette.surface, // Onglets sur fond blanc, sous la barre grise (.board-tabs du site)
             divider = { HorizontalDivider(color = Palette.border) },
         ) {
             groups.forEachIndexed { index, group ->

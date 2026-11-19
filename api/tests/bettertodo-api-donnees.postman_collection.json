@@ -1,6 +1,6 @@
 {
   "info": {
-    "name": "BetterTodo API – données (étapes 2b, 3c-2b et 3e)",
+    "name": "BetterTodo API – données (étapes 2b, 3c-2b, 3e et 8-4)",
     "description": "Listes, groupes, tâches, tags, niveaux d'urgence, ordre et isolation entre utilisateurs. À lancer dans l'ordre, avec --env-var adminEmail=… --env-var adminPassword=… (voir docs/etapes/02b-api-donnees.md et 03e-admin-et-icones.md).",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
@@ -3451,7 +3451,909 @@
       ]
     },
     {
-      "name": "113 Admin supprime le compte A",
+      "name": "113 Synchro complète (sans curseur)",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/sync",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ]
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200', () => pm.response.to.have.status(200));",
+              "const b = pm.response.json();",
+              "pm.test('curseur, compte et tout le reste', () => {",
+              "  pm.expect(b.cursor).to.be.a('string');",
+              "  pm.expect(b.user.id).to.eql(pm.collectionVariables.get('tokenId'));",
+              "  ['folders', 'lists', 'groups', 'tasks', 'urgency_levels', 'tags', 'smart_lists', 'deleted'].forEach(k => pm.expect(b[k]).to.be.an('array'));",
+              "});",
+              "pm.collectionVariables.set('cursor1', b.cursor);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "114 Curseur invalide",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/sync?since=hier",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ]
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('400', () => pm.response.to.have.status(400));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "115 Groupe de listes avec un id choisi par l'app",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/folders",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"id\": \"{{syncFolder}}\",\n  \"name\": \"Synchro\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('201', () => pm.response.to.have.status(201));",
+              "const b = pm.response.json();",
+              "pm.test('id gardé', () => pm.expect(b.id).to.eql(pm.collectionVariables.get('syncFolder')));"
+            ]
+          }
+        },
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.collectionVariables.set('syncFolder', pm.variables.replaceIn('{{$guid}}'));",
+              "pm.collectionVariables.set('syncList', pm.variables.replaceIn('{{$guid}}'));",
+              "pm.collectionVariables.set('syncGroup', pm.variables.replaceIn('{{$guid}}'));",
+              "pm.collectionVariables.set('syncTask', pm.variables.replaceIn('{{$guid}}'));",
+              "pm.collectionVariables.set('syncDone', pm.variables.replaceIn('{{$guid}}'));",
+              "pm.collectionVariables.set('syncTag', pm.variables.replaceIn('{{$guid}}'));",
+              "pm.collectionVariables.set('syncUrgency', pm.variables.replaceIn('{{$guid}}'));",
+              "pm.collectionVariables.set('syncSmart', pm.variables.replaceIn('{{$guid}}'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "116 Rejeu de la même création : l'existant, sans doublon",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/folders",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"id\": \"{{syncFolder}}\",\n  \"name\": \"Synchro\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200', () => pm.response.to.have.status(200));",
+              "const b = pm.response.json();",
+              "pm.test('même id', () => pm.expect(b.id).to.eql(pm.collectionVariables.get('syncFolder')));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "117 Il n'y a qu'un groupe de listes Synchro",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/folders",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ]
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200', () => pm.response.to.have.status(200));",
+              "const b = pm.response.json();",
+              "pm.test('un seul', () => pm.expect(b.filter(f => f.name === 'Synchro').length).to.eql(1));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "118 id qui n'est pas un UUID",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/folders",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"id\": \"abc\",\n  \"name\": \"X\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('400', () => pm.response.to.have.status(400));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "119 B ne peut pas réutiliser l'id de A",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/folders",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{tokenB}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"id\": \"{{syncFolder}}\",\n  \"name\": \"X\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('409', () => pm.response.to.have.status(409));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "120 Liste avec id et id de son groupe par défaut",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/lists",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"id\": \"{{syncList}}\",\n  \"default_group_id\": \"{{syncGroup}}\",\n  \"name\": \"Synchro\",\n  \"folder_id\": \"{{syncFolder}}\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('201', () => pm.response.to.have.status(201));",
+              "const b = pm.response.json();",
+              "pm.test('id gardé', () => pm.expect(b.id).to.eql(pm.collectionVariables.get('syncList')));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "121 Le groupe par défaut a l'id choisi",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/lists/{{syncList}}/board",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ]
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200', () => pm.response.to.have.status(200));",
+              "const b = pm.response.json();",
+              "pm.test('un groupe, avec cet id', () => pm.expect(b.groups.map(g => g.id)).to.eql([pm.collectionVariables.get('syncGroup')]));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "122 Rejeu de la liste",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/lists",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"id\": \"{{syncList}}\",\n  \"default_group_id\": \"{{syncGroup}}\",\n  \"name\": \"Synchro\",\n  \"folder_id\": \"{{syncFolder}}\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200', () => pm.response.to.have.status(200));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "123 Toujours un seul groupe (pas de second groupe par défaut)",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/lists/{{syncList}}/board",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ]
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200', () => pm.response.to.have.status(200));",
+              "const b = pm.response.json();",
+              "pm.test('un groupe', () => pm.expect(b.groups.length).to.eql(1));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "124 Tâche avec id",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/groups/{{syncGroup}}/tasks",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"id\": \"{{syncTask}}\",\n  \"title\": \"Hors ligne\",\n  \"due_date\": \"2026-11-19\",\n  \"due_time\": \"09:30\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('201', () => pm.response.to.have.status(201));",
+              "const b = pm.response.json();",
+              "pm.test('id gardé', () => pm.expect(b.id).to.eql(pm.collectionVariables.get('syncTask')));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "125 Rejeu de la tâche",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/groups/{{syncGroup}}/tasks",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"id\": \"{{syncTask}}\",\n  \"title\": \"Hors ligne\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200', () => pm.response.to.have.status(200));",
+              "const b = pm.response.json();",
+              "pm.test('la tâche existante (heure gardée)', () => pm.expect(b.due_time).to.eql('09:30'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "126 Tâche faite, avec id",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/groups/{{syncGroup}}/tasks",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"id\": \"{{syncDone}}\",\n  \"title\": \"Faite\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('201', () => pm.response.to.have.status(201));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "127 La cocher",
+      "request": {
+        "method": "PATCH",
+        "url": "{{baseUrl}}/tasks/{{syncDone}}",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"done\": true\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200', () => pm.response.to.have.status(200));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "128 Tag avec id",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/tags",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"id\": \"{{syncTag}}\",\n  \"name\": \"synchro\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('201', () => pm.response.to.have.status(201));",
+              "const b = pm.response.json();",
+              "pm.test('id gardé', () => pm.expect(b.id).to.eql(pm.collectionVariables.get('syncTag')));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "129 Rejeu du tag",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/tags",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"id\": \"{{syncTag}}\",\n  \"name\": \"synchro\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200', () => pm.response.to.have.status(200));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "130 Niveau d'urgence avec id",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/urgency-levels",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"id\": \"{{syncUrgency}}\",\n  \"name\": \"Synchro\",\n  \"color\": \"#2F6FEB\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('201', () => pm.response.to.have.status(201));",
+              "const b = pm.response.json();",
+              "pm.test('id gardé', () => pm.expect(b.id).to.eql(pm.collectionVariables.get('syncUrgency')));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "131 Liste intelligente avec id",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/smart-lists",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"id\": \"{{syncSmart}}\",\n  \"name\": \"Synchro\",\n  \"kind\": \"tags\",\n  \"tag_ids\": [\n    \"{{syncTag}}\"\n  ]\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('201', () => pm.response.to.have.status(201));",
+              "const b = pm.response.json();",
+              "pm.test('id gardé', () => pm.expect(b.id).to.eql(pm.collectionVariables.get('syncSmart')));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "132 Synchro depuis le curseur : ce qui vient d'être créé",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/sync?since={{cursor1}}",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ]
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200', () => pm.response.to.have.status(200));",
+              "const b = pm.response.json();",
+              "const v = k => pm.collectionVariables.get(k);",
+              "pm.test('tout est là', () => {",
+              "  pm.expect(b.folders.map(x => x.id)).to.include(v('syncFolder'));",
+              "  pm.expect(b.lists.map(x => x.id)).to.include(v('syncList'));",
+              "  pm.expect(b.groups.map(x => x.id)).to.include(v('syncGroup'));",
+              "  pm.expect(b.tasks.map(x => x.id)).to.include.members([v('syncTask'), v('syncDone')]);",
+              "  pm.expect(b.tags.map(x => x.id)).to.include(v('syncTag'));",
+              "  pm.expect(b.urgency_levels.map(x => x.id)).to.include(v('syncUrgency'));",
+              "  pm.expect(b.smart_lists.map(x => x.id)).to.include(v('syncSmart'));",
+              "});",
+              "pm.test('le groupe donne sa liste', () => pm.expect(b.groups.find(g => g.id === v('syncGroup')).list_id).to.eql(v('syncList')));",
+              "pm.collectionVariables.set('cursor2', b.cursor);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "133 Vider les tâches faites",
+      "request": {
+        "method": "DELETE",
+        "url": "{{baseUrl}}/lists/{{syncList}}/done-tasks",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ]
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200', () => pm.response.to.have.status(200));",
+              "const b = pm.response.json();",
+              "pm.test('1 supprimée', () => pm.expect(b.deleted).to.eql(1));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "134 Supprimer la tâche",
+      "request": {
+        "method": "DELETE",
+        "url": "{{baseUrl}}/tasks/{{syncTask}}",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ]
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('204', () => pm.response.to.have.status(204));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "135 Supprimer la liste intelligente",
+      "request": {
+        "method": "DELETE",
+        "url": "{{baseUrl}}/smart-lists/{{syncSmart}}",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ]
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('204', () => pm.response.to.have.status(204));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "136 Supprimer le tag",
+      "request": {
+        "method": "DELETE",
+        "url": "{{baseUrl}}/tags/{{syncTag}}",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ]
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('204', () => pm.response.to.have.status(204));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "137 Supprimer le niveau d'urgence",
+      "request": {
+        "method": "DELETE",
+        "url": "{{baseUrl}}/urgency-levels/{{syncUrgency}}",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ]
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('204', () => pm.response.to.have.status(204));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "138 Supprimer la liste",
+      "request": {
+        "method": "DELETE",
+        "url": "{{baseUrl}}/lists/{{syncList}}",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ]
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('204', () => pm.response.to.have.status(204));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "139 Supprimer le groupe de listes",
+      "request": {
+        "method": "DELETE",
+        "url": "{{baseUrl}}/folders/{{syncFolder}}",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ]
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('204', () => pm.response.to.have.status(204));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "140 Rejeu d'une suppression : 404 (déjà fait)",
+      "request": {
+        "method": "DELETE",
+        "url": "{{baseUrl}}/tasks/{{syncTask}}",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ]
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('404', () => pm.response.to.have.status(404));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "141 Synchro : les suppressions",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/sync?since={{cursor2}}",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ]
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200', () => pm.response.to.have.status(200));",
+              "const b = pm.response.json();",
+              "const v = k => pm.collectionVariables.get(k);",
+              "const deleted = b.deleted.map(d => d.type + ':' + d.id);",
+              "pm.test('chaque suppression est notée', () => pm.expect(deleted).to.include.members([",
+              "  'task:' + v('syncDone'), 'task:' + v('syncTask'), 'smart_list:' + v('syncSmart'), 'tag:' + v('syncTag'),",
+              "  'urgency_level:' + v('syncUrgency'), 'list:' + v('syncList'), 'folder:' + v('syncFolder')]));",
+              "pm.test('liste supprimée absente', () => pm.expect(b.lists.map(x => x.id)).to.not.include(v('syncList')));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "142 B ne voit pas les suppressions de A",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/sync",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{tokenB}}"
+          }
+        ]
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200', () => pm.response.to.have.status(200));",
+              "const b = pm.response.json();",
+              "pm.test('aucune', () => pm.expect(b.deleted.map(d => d.id)).to.not.include(pm.collectionVariables.get('syncList')));",
+              "pm.test('son propre compte', () => pm.expect(b.user.id).to.eql(pm.collectionVariables.get('tokenBId')));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "143 Admin supprime le compte A",
       "request": {
         "method": "DELETE",
         "url": "{{baseUrl}}/admin/users/{{tokenId}}",
@@ -3475,7 +4377,7 @@
       ]
     },
     {
-      "name": "114 Admin supprime le compte B",
+      "name": "144 Admin supprime le compte B",
       "request": {
         "method": "DELETE",
         "url": "{{baseUrl}}/admin/users/{{tokenBId}}",
@@ -3499,7 +4401,7 @@
       ]
     },
     {
-      "name": "115 La session de B ne marche plus",
+      "name": "145 La session de B ne marche plus",
       "request": {
         "method": "GET",
         "url": "{{baseUrl}}/lists",

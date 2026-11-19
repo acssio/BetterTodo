@@ -17,7 +17,17 @@ data class User(
     @SerialName("default_view") val defaultView: String = "columns",              // Vue des nouvelles listes
     @SerialName("is_admin") val isAdmin: Boolean = false,
     @SerialName("must_change_password") val mustChangePassword: Boolean = false, // Mot de passe donné par l'admin
-)
+    @SerialName("quick_task_due") val quickTaskDue: String = QUICK_DUE_TODAY,       // Échéance proposée par la Quick task
+    @SerialName("show_today") val showToday: Boolean = true,                        // Tuile « Aujourd'hui » affichée
+    @SerialName("show_scheduled") val showScheduled: Boolean = true,                // Tuile « Planifié » affichée
+) {
+    companion object {
+        // Valeurs de quick_task_due
+        const val QUICK_DUE_NONE = "none"
+        const val QUICK_DUE_TODAY = "today"
+        const val QUICK_DUE_TOMORROW = "tomorrow"
+    }
+}
 
 /** Réponse de POST /auth/login : le jeton est à envoyer ensuite en "Authorization: Bearer". */
 @Serializable
@@ -63,6 +73,7 @@ data class Task(
     val title: String,
     val notes: String = "",
     @SerialName("due_date") val dueDate: String? = null,     // "2026-11-18", ou null
+    @SerialName("due_time") val dueTime: String? = null,     // "14:30", ou null (jamais d'heure sans date)
     @SerialName("urgency_id") val urgencyId: String? = null, // null = pas d'urgence
     val done: Boolean = false,
     val position: Int,
@@ -129,6 +140,68 @@ data class DueTask(val task: Task, val list: ListRef, val groupName: String)
 data class DueCounts(
     val today: Int = 0,     // Échéance aujourd'hui ou en retard
     val scheduled: Int = 0, // Toutes les tâches avec une échéance
+)
+
+/**
+ * Une liste intelligente personnalisée (7-5 sur le site, 8-6 dans l'app) : les tâches à faire
+ * de toutes les listes, filtrées par tags (au moins un / tous) ou par niveaux d'urgence.
+ */
+@Serializable
+data class SmartList(
+    val id: String,
+    val name: String,
+    val color: String,
+    val icon: String,
+    val kind: String,                                                  // KIND_TAGS ou KIND_URGENCY
+    @SerialName("tag_match") val tagMatch: String = MATCH_ANY,         // MATCH_ANY ou MATCH_ALL
+    @SerialName("tag_ids") val tagIds: List<String> = emptyList(),     // Tags qui existent encore, par nom
+    @SerialName("urgency_ids") val urgencyIds: List<String> = emptyList(), // Du plus urgent au moins urgent
+    val labels: List<String> = emptyList(),                            // « #boulot »… ou « Haute »…
+    val visible: Boolean = true,                                       // Tuile affichée sur l'accueil
+    val position: Int = 0,
+    @SerialName("open_tasks") val openTasks: Int = 0,                  // Tâches à faire qui correspondent
+) {
+    /** « urgence Haute ou Moyenne », « #boulot et #réunion » (comme smartListSummary du site). */
+    val summary: String
+        get() = if (kind == KIND_URGENCY) "urgence " + labels.joinToString(" ou ")
+        else labels.joinToString(if (tagMatch == MATCH_ALL) " et " else " ou ")
+
+    companion object {
+        const val KIND_TAGS = "tags"
+        const val KIND_URGENCY = "urgency"
+        const val MATCH_ANY = "any"
+        const val MATCH_ALL = "all"
+    }
+}
+
+// --- Synchronisation (8-5) ------------------------------------------------------------
+
+/** Un groupe dans GET /sync : avec sa liste (list_id), qui n'est pas dans BoardGroup. */
+@Serializable
+data class SyncGroup(
+    val id: String,
+    @SerialName("list_id") val listId: String,
+    val name: String,
+    val position: Int,
+)
+
+/** Un élément supprimé sur le serveur. type : folder, list, group, task, urgency_level, tag, smart_list */
+@Serializable
+data class SyncDeletion(val type: String, val id: String)
+
+/** Réponse de GET /sync?since= : ce qui a changé ou disparu depuis le curseur (tout, sans curseur). */
+@Serializable
+data class SyncData(
+    val cursor: String,
+    val user: User,
+    val folders: List<Folder> = emptyList(),
+    val lists: List<TodoList> = emptyList(),
+    val groups: List<SyncGroup> = emptyList(),
+    val tasks: List<Task> = emptyList(),
+    @SerialName("urgency_levels") val urgencyLevels: List<UrgencyLevel> = emptyList(),
+    val tags: List<Tag> = emptyList(),
+    @SerialName("smart_lists") val smartLists: List<SmartList> = emptyList(),
+    val deleted: List<SyncDeletion> = emptyList(),
 )
 
 // --- Corps de requête et petites réponses ----------------------------------------
