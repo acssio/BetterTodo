@@ -22,6 +22,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -51,6 +52,7 @@ import com.composables.icons.lucide.R // Icônes de la bibliothèque icons-lucid
 import io.github.acssio.bettertodo.api.ApiClient
 import io.github.acssio.bettertodo.api.ApiError
 import io.github.acssio.bettertodo.api.Tag
+import io.github.acssio.bettertodo.api.TodoApi
 import io.github.acssio.bettertodo.api.TodoList
 import io.github.acssio.bettertodo.api.UrgencyLevel
 import io.github.acssio.bettertodo.api.User
@@ -66,10 +68,13 @@ import kotlinx.coroutines.launch
  * Données de l'écran Paramètres : le compte et le mot de passe (6-7a), les niveaux d'urgence et les tags (6-7b).
  * Comme BoardModel, ce n'est pas un ViewModel : HomeViewModel en crée un à chaque ouverture.
  *
+ * Sans serveur (8-3) : pas de mot de passe ni d'email, mais une partie « Serveur » pour en ajouter un.
+ *
  * @param onUserChanged le compte a changé : AppViewModel le garde (nom affiché ailleurs dans l'app)
  */
 class SettingsModel(
-    private val api: ApiClient,
+    private val api: TodoApi,
+    private val server: ApiClient?, // Le serveur (mot de passe), ou null sans serveur
     user: User,
     private val scope: CoroutineScope,
     private val onUnauthorized: () -> Unit,
@@ -77,6 +82,9 @@ class SettingsModel(
 ) {
     var user by mutableStateOf(user)
         private set
+
+    /** Vrai avec un serveur : mot de passe et email affichés. */
+    val hasServer: Boolean get() = server != null
     var error by mutableStateOf<String?>(null) // Erreur du compte (nom, langue, vue)
         private set
 
@@ -278,7 +286,7 @@ class SettingsModel(
         passwordError = null
         scope.launch {
             try {
-                user = api.changePassword(current, new)
+                user = (server ?: return@launch).changePassword(current, new)
                 passwordDone = true
                 onSuccess()
             } catch (e: ApiError) {
@@ -330,7 +338,7 @@ fun deleteTagMessage(tag: Tag): String {
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(model: SettingsModel, onBack: () -> Unit) {
+fun SettingsScreen(model: SettingsModel, onBack: () -> Unit, onConnectServer: () -> Unit) {
     val user = model.user
     val focusManager = LocalFocusManager.current
     var name by rememberSaveable { mutableStateOf(user.displayName) }
@@ -370,9 +378,22 @@ fun SettingsScreen(model: SettingsModel, onBack: () -> Unit) {
 
             HorizontalDivider(color = Palette.border)
 
+            // --- Serveur (8-3) : sans serveur, on peut en ajouter un ---
+            if (!model.hasServer) {
+                SectionTitle("Serveur")
+                Text(
+                    "Tes listes sont sur ce téléphone, sans serveur. Avec un serveur BetterTodo, tu les retrouves aussi sur le site.",
+                    color = Palette.muted,
+                    fontSize = 14.sp,
+                )
+                OutlinedButton(onClick = onConnectServer) { Text("Se connecter à un serveur") }
+
+                HorizontalDivider(color = Palette.border)
+            }
+
             // --- Compte ---
             SectionTitle("Compte")
-            Text(user.email, color = Palette.muted)
+            if (model.hasServer) Text(user.email, color = Palette.muted)
             OutlinedTextField(
                 value = name,
                 onValueChange = { name = it },
@@ -395,11 +416,13 @@ fun SettingsScreen(model: SettingsModel, onBack: () -> Unit) {
 
             HorizontalDivider(color = Palette.border)
 
-            // --- Mot de passe ---
-            SectionTitle("Mot de passe")
-            PasswordSection(model)
+            // --- Mot de passe (avec un serveur seulement) ---
+            if (model.hasServer) {
+                SectionTitle("Mot de passe")
+                PasswordSection(model)
 
-            HorizontalDivider(color = Palette.border)
+                HorizontalDivider(color = Palette.border)
+            }
 
             // --- Niveaux d'urgence (6-7b) ---
             SectionTitle("Niveaux d'urgence")

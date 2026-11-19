@@ -64,6 +64,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.composables.icons.lucide.R // Icônes de la bibliothèque icons-lucide-android
 import io.github.acssio.bettertodo.api.ApiClient
+import io.github.acssio.bettertodo.api.TodoApi
 import io.github.acssio.bettertodo.api.ApiError
 import io.github.acssio.bettertodo.api.Folder
 import io.github.acssio.bettertodo.api.TodoList
@@ -114,7 +115,7 @@ fun deleteFolderMessage(folder: Folder): String {
  * Seuls AppViewModel et HomeViewModel (avec ses BoardModel, SmartModel et QuickTaskModel)
  * parlent à l'API, comme App et Workspace sur le site.
  */
-class HomeViewModel(private val api: ApiClient, private val quickTaskMemory: QuickTaskMemory) : ViewModel() {
+class HomeViewModel(private val api: TodoApi, private val quickTaskMemory: QuickTaskMemory) : ViewModel() {
     var page by mutableStateOf<HomePage>(HomePage.Home)
         private set
 
@@ -291,8 +292,8 @@ class HomeViewModel(private val api: ApiClient, private val quickTaskMemory: Qui
     }
 
     /** Engrenage de l'en-tête : les Paramètres. */
-    fun openSettings(user: User, onUserChanged: (User) -> Unit) {
-        page = HomePage.Settings(SettingsModel(api, user, viewModelScope, onUnauthorized = { sessionExpired = true }, onUserChanged))
+    fun openSettings(server: ApiClient?, user: User, onUserChanged: (User) -> Unit) {
+        page = HomePage.Settings(SettingsModel(api, server, user, viewModelScope, onUnauthorized = { sessionExpired = true }, onUserChanged))
     }
 
     /** Toucher « Aujourd'hui » ou « Planifié ». */
@@ -371,15 +372,19 @@ class HomeViewModel(private val api: ApiClient, private val quickTaskMemory: Qui
  * Écran d'accueil : les listes hors groupe, puis chaque groupe de listes (repliable) avec ses listes.
  * Même disposition que l'accueil mobile du site (MobileHome).
  *
- * @param sessionKey le jeton : un nouveau HomeViewModel est créé à chaque connexion
+ * @param server le serveur (pour le mot de passe), ou null sans serveur : pas de bouton de déconnexion
+ * @param sessionKey change à chaque connexion : un nouveau HomeViewModel est créé
+ * @param onConnectServer Paramètres › Se connecter à un serveur (sans serveur seulement)
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
-    api: ApiClient,
+    api: TodoApi,
+    server: ApiClient?,
     user: User,
     sessionKey: String,
     onLogout: () -> Unit,
+    onConnectServer: () -> Unit,
     onSessionExpired: () -> Unit,
     onUserChanged: (User) -> Unit,
 ) {
@@ -415,7 +420,7 @@ fun HomeScreen(
         }
         is HomePage.Settings -> {
             BackHandler(onBack = model::closeList)
-            SettingsScreen(page.settings, onBack = model::closeList)
+            SettingsScreen(page.settings, onBack = model::closeList, onConnectServer = onConnectServer)
             return
         }
         HomePage.Home -> {}
@@ -435,11 +440,13 @@ fun HomeScreen(
                 },
                 actions = {
                     NewMenu(onNewList = { model.askNewList(null) }, onNewFolder = model::askNewFolder)
-                    IconButton(onClick = { model.openSettings(user, onUserChanged) }) {
+                    IconButton(onClick = { model.openSettings(server, user, onUserChanged) }) {
                         Icon(painterResource(R.drawable.lucide_ic_settings), contentDescription = "Paramètres", modifier = Modifier.size(20.dp))
                     }
-                    IconButton(onClick = onLogout) {
-                        Icon(painterResource(R.drawable.lucide_ic_log_out), contentDescription = "Se déconnecter (${user.displayName})", modifier = Modifier.size(20.dp))
+                    if (server != null) { // Sans serveur : rien à déconnecter
+                        IconButton(onClick = onLogout) {
+                            Icon(painterResource(R.drawable.lucide_ic_log_out), contentDescription = "Se déconnecter (${user.displayName})", modifier = Modifier.size(20.dp))
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Palette.background),

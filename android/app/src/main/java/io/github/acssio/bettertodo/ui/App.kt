@@ -25,18 +25,31 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.acssio.bettertodo.api.ApiClient
 import io.github.acssio.bettertodo.api.ApiError
 import io.github.acssio.bettertodo.api.ServerUrl
+import io.github.acssio.bettertodo.api.TodoApi
 import io.github.acssio.bettertodo.api.User
+import io.github.acssio.bettertodo.data.MODE_LOCAL
 import io.github.acssio.bettertodo.data.SessionStore
+import io.github.acssio.bettertodo.local.LocalApi
+import io.github.acssio.bettertodo.local.LocalDatabase
 import kotlinx.coroutines.launch
 
 /**
  * L'écran affiché : la machine d'état de l'app.
  *
- *   Loading ──(jeton valide)──────────→ Home (ou MustChangePassword)
- *      │ ──(pas de jeton / 401)───────→ Login ──(connexion)──→ Home (ou MustChangePassword)
- *      └──(serveur injoignable)───────→ Unreachable ──(réessayer)──→ Loading
+ *   Loading ──(premier lancement)────────→ Welcome ──(Commencer)──────────→ Home sans serveur
+ *      │                                       └──(J'ai un serveur)──→ Login
+ *      │ ──(mode sans serveur)───────────→ Home sans serveur
+ *      │ ──(mode serveur, jeton valide)──→ Home (ou MustChangePassword)
+ *      │ ──(mode serveur, pas de jeton / 401)──→ Login ──(connexion)──→ Home (ou MustChangePassword)
+ *      └──(serveur injoignable)─────────→ Unreachable ──(réessayer)──→ Loading
+ *   Login ──(Utiliser sans serveur)──────→ Home sans serveur
+ *   Home sans serveur ──(Paramètres › Se connecter à un serveur)──→ Login
  *   MustChangePassword ──(nouveau mot de passe enregistré)──→ Home
  *   Home ──(déconnexion / 401)────────→ Login
+ *
+ * Sans serveur (8-3), les données sont dans la base du téléphone (LocalApi) ;
+ * avec un serveur, pour l'instant, elles viennent directement de lui (ApiClient). La synchronisation
+ * des deux arrive à la 8-5.
  *
  * MustChangePassword : mot de passe donné par l'admin (must_change_password), à changer avant
  * d'ouvrir les listes, comme ChangePasswordPage sur le site.
@@ -44,6 +57,9 @@ import kotlinx.coroutines.launch
 sealed class Screen {
     /** Au lancement : on vérifie le jeton enregistré. */
     data object Loading : Screen()
+
+    /** Tout premier lancement : sans serveur, ou se connecter à un serveur. */
+    data object Welcome : Screen()
 
     /** @param message affiché au-dessus du formulaire (ex. « Session expirée »), ou null */
     data class Login(val serverUrl: String, val message: String? = null) : Screen()
@@ -54,8 +70,13 @@ sealed class Screen {
     /** Connecté, mais le mot de passe provisoire doit d'abord être changé. */
     data class MustChangePassword(val api: ApiClient, val user: User, val token: String) : Screen()
 
-    /** Connecté. api envoie le jeton à chaque requête. */
-    data class Home(val api: ApiClient, val user: User, val token: String) : Screen()
+    /**
+     * Les listes.
+     * @param api les données : LocalApi (sans serveur) ou ApiClient (serveur, avec le jeton)
+     * @param server le serveur, pour ce qui n'existe qu'avec lui (mot de passe) ; null sans serveur
+     * @param sessionKey change à chaque connexion : un nouveau HomeViewModel est créé
+     */
+    data class Home(val api: TodoApi, val user: User, val server: ApiClient?, val sessionKey: String) : Screen()
 }
 
 /**
@@ -64,6 +85,7 @@ sealed class Screen {
  */
 class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val store = SessionStore(application)
+    private val local = LocalApi(LocalDatabase.get(application)) // Les données du mode sans serveur
 
     var screen by mutableStateOf<Screen>(Screen.Loading)
         private set
@@ -89,6 +111,14 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         screen = Screen.Loading
         viewModelScope.launch {
             val saved = store.load()
+            if (saved.mode == "") {
+                screen = Screen.Welcome
+                return@launch
+            }
+            if (saved.mode == MODE_LOCAL) {
+                openLocal()
+                return@launch
+            }
             if (saved.token == null || saved.serverUrl.isEmpty()) {
                 screen = Screen.Login(saved.serverUrl)
                 return@launch
@@ -133,7 +163,29 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     /** Après connexion : l'accueil, ou d'abord l'écran du mot de passe provisoire. */
     private fun connected(api: ApiClient, user: User, token: String): Screen {
-        return if (user.mustChangePassword) Screen.MustChangePassword(api, user, token) else Screen.Home(api, user, token)
+        return if (user.mustChangePassword) Screen.MustChangePassword(api, user, token) else Screen.Home(api, user, api, token)
+    }
+
+    /** « Commencer » (premier lancement) ou « Utiliser l'app sans serveur » (connexion). */
+    fun useLocal() {
+        viewModelScope.launch {
+            store.useLocal()
+            openLocal()
+        }
+    }
+
+    /** Les listes du téléphone. */
+    private suspend fun openLocal() {
+        // Clé neuve à chaque ouverture : sinon on retrouvait l'accueil d'avant la connexion (page Paramètres ouverte)
+        screen = Screen.Home(local, local.me(), server = null, sessionKey = "$MODE_LOCAL-${System.nanoTime()}")
+    }
+
+    /** « J'ai un serveur » (premier lancement) ou Paramètres › Se connecter à un serveur (sans serveur). */
+    fun showLogin() {
+        loginError = null
+        viewModelScope.launch {
+            screen = Screen.Login(store.load().serverUrl)
+        }
     }
 
     /** « Enregistrer » sur l'écran du mot de passe obligatoire. */
@@ -148,7 +200,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             try {
                 val user = screenNow.api.changePassword(current, new) // Les autres sessions sont fermées, pas celle-ci
-                screen = Screen.Home(screenNow.api, user, screenNow.token)
+                screen = Screen.Home(screenNow.api, user, screenNow.api, screenNow.token)
             } catch (e: ApiError) {
                 if (e.status == 401) onSessionExpired() else passwordError = e.message
             }
@@ -179,7 +231,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     /** Bouton de déconnexion de l'accueil. */
     fun logout() {
         val api = when (val current = screen) {
-            is Screen.Home -> current.api
+            is Screen.Home -> current.server ?: return // Sans serveur : pas de déconnexion
             is Screen.MustChangePassword -> current.api
             else -> return
         }
@@ -218,12 +270,14 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 fun App(app: AppViewModel = viewModel()) {
     when (val screen = app.screen) {
         is Screen.Loading -> LoadingScreen()
+        is Screen.Welcome -> WelcomeScreen(onStartLocal = app::useLocal, onConnect = app::showLogin)
         is Screen.Login -> LoginScreen(
             serverUrl = screen.serverUrl,
             message = screen.message,
             busy = app.loginBusy,
             error = app.loginError,
             onLogin = app::login,
+            onUseLocal = app::useLocal,
         )
         is Screen.Unreachable -> UnreachableScreen(
             message = screen.message,
@@ -239,9 +293,11 @@ fun App(app: AppViewModel = viewModel()) {
         )
         is Screen.Home -> HomeScreen(
             api = screen.api,
+            server = screen.server,
             user = screen.user,
-            sessionKey = screen.token,
+            sessionKey = screen.sessionKey,
             onLogout = app::logout,
+            onConnectServer = app::showLogin,
             onSessionExpired = app::onSessionExpired,
             onUserChanged = app::updateUser,
         )

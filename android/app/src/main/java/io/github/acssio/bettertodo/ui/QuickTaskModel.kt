@@ -3,7 +3,7 @@ package io.github.acssio.bettertodo.ui
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import io.github.acssio.bettertodo.api.ApiClient
+import io.github.acssio.bettertodo.api.TodoApi
 import io.github.acssio.bettertodo.api.ApiError
 import io.github.acssio.bettertodo.api.TodoList
 import io.github.acssio.bettertodo.api.User
@@ -25,7 +25,7 @@ import java.time.LocalDate
  * @param onCreated appelé après une création réussie, avec « Liste › Groupe » pour le message
  */
 class QuickTaskModel(
-    private val api: ApiClient,
+    private val api: TodoApi,
     lists: List<TodoList>,
     defaultDue: String,
     private val memory: QuickTaskMemory,

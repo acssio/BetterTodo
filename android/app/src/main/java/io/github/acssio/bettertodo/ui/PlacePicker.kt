@@ -10,7 +10,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import io.github.acssio.bettertodo.api.ApiClient
+import io.github.acssio.bettertodo.api.TodoApi
 import io.github.acssio.bettertodo.api.ApiError
 import io.github.acssio.bettertodo.api.BoardGroup
 import io.github.acssio.bettertodo.api.TodoList
@@ -25,7 +25,7 @@ import kotlinx.coroutines.launch
  * @param lists les listes proposées, dans l'ordre de l'accueil
  */
 class PlacePicker(
-    private val api: ApiClient,
+    private val api: TodoApi,
     val lists: List<TodoList>,
     private val scope: CoroutineScope,
     private val onUnauthorized: () -> Unit,

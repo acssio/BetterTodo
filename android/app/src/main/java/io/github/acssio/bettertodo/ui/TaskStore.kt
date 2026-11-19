@@ -3,7 +3,7 @@ package io.github.acssio.bettertodo.ui
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import io.github.acssio.bettertodo.api.ApiClient
+import io.github.acssio.bettertodo.api.TodoApi
 import io.github.acssio.bettertodo.api.ApiError
 import io.github.acssio.bettertodo.api.BoardGroup
 import io.github.acssio.bettertodo.api.Task
@@ -34,7 +34,7 @@ import kotlinx.coroutines.launch
  * @param onUnauthorized appelé sur un 401 (session expirée)
  */
 abstract class TaskStore(
-    protected val api: ApiClient,
+    protected val api: TodoApi,
     protected val scope: CoroutineScope,
     private val onUnauthorized: () -> Unit,
 ) {

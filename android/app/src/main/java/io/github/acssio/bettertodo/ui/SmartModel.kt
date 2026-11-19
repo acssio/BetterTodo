@@ -3,7 +3,7 @@ package io.github.acssio.bettertodo.ui
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import io.github.acssio.bettertodo.api.ApiClient
+import io.github.acssio.bettertodo.api.TodoApi
 import io.github.acssio.bettertodo.api.BoardGroup
 import io.github.acssio.bettertodo.api.DueTask
 import io.github.acssio.bettertodo.api.Task
@@ -18,7 +18,7 @@ import kotlinx.coroutines.CoroutineScope
  * dans « Aujourd'hui », elle quitte la vue.
  */
 class SmartModel(
-    api: ApiClient,
+    api: TodoApi,
     val kind: SmartKind,
     scope: CoroutineScope,
     onUnauthorized: () -> Unit,
