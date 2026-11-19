@@ -530,6 +530,23 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
         }
     }
 
+    /**
+     * Listes intelligentes modifiées dans les Paramètres : barre latérale à jour, listes affichées
+     * rechargées (filtre changé), et une liste supprimée laisse sa place à la première vraie liste.
+     */
+    onSmartListsChanged = (smartLists: SmartList[]): void => {
+        this.setState({ smartLists })
+        this.state.panes.forEach((pane, index) => {
+            const id = customSmartId(pane.listId)
+            if (!id) return
+            if (smartLists.some(smart => smart.id === id)) {
+                void this.reloadSmart(pane.listId)
+            } else if (this.state.lists.length > 0) {
+                void this.openList(this.state.lists[0].id, index)
+            }
+        })
+    }
+
     /** Liste intelligente perso affichée dans une moitié (undefined pour une vraie liste ou Aujourd'hui / Planifié). */
     private findSmartList(paneId: string): SmartList | undefined {
         const id = customSmartId(paneId)
@@ -1331,6 +1348,7 @@ export class Workspace extends React.Component<WorkspaceProps, WorkspaceState> i
                         urgencyLevels={this.state.urgencyLevels}
                         onUserChanged={this.props.onUserChanged}
                         onUrgencyLevelsChanged={urgencyLevels => this.setState({ urgencyLevels })}
+                        onSmartListsChanged={this.onSmartListsChanged}
                         onClose={this.onCloseSettings}
                     />
                 )}

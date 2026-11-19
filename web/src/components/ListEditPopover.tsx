@@ -1,10 +1,10 @@
 import * as React from 'react'
-import { ChevronDown, Search, Trash2, X } from 'lucide-react'
+import { ChevronDown, Trash2, X } from 'lucide-react'
 import type { Folder, ListChanges, TodoList } from '../api/types'
 import { DismissListener, popoverPosition } from '../utils/popover'
 import { confirmDialog } from './confirm'
 import { ListIcon } from './ListIcon'
-import { LIST_COLORS, LIST_ICONS } from './listIcons'
+import { ListLookPicker } from './ListLookPicker'
 import './TaskPopover.css'
 import './ListEditPopover.css'
 
@@ -20,13 +20,12 @@ interface ListEditPopoverProps {
 }
 
 class ListEditPopoverState {
-    name: string = ''      // Modifié localement, envoyé en quittant le champ
-    iconQuery: string = '' // Recherche dans les icônes
+    name: string = '' // Modifié localement, envoyé en quittant le champ
 }
 
 /**
  * Overlay « Modifier une liste » (écran 7 de la maquette) : nom, groupe de listes,
- * couleur, icône, supprimer. Comme l'overlay d'une tâche, tout s'enregistre seul.
+ * couleur et icône (ListLookPicker), supprimer. Comme l'overlay d'une tâche, tout s'enregistre seul.
  */
 export class ListEditPopover extends React.Component<ListEditPopoverProps, ListEditPopoverState> {
     private rootRef = React.createRef<HTMLDivElement>()
@@ -69,17 +68,8 @@ export class ListEditPopover extends React.Component<ListEditPopoverProps, ListE
         }
     }
 
-    /** Icônes dont le nom (anglais) ou le libellé (français) contient la recherche. */
-    private filteredIcons(): string[] {
-        const query = this.state.iconQuery.trim().toLowerCase()
-        return Object.entries(LIST_ICONS)
-            .filter(([name, { label }]) => query === '' || name.includes(query) || label.includes(query))
-            .map(([name]) => name)
-    }
-
     render(): React.ReactNode {
         const { list, folders } = this.props
-        const icons = this.filteredIcons()
 
         return (
             <div
@@ -117,50 +107,12 @@ export class ListEditPopover extends React.Component<ListEditPopoverProps, ListE
                     </span>
                 </label>
 
-                <div className="pop-field">
-                    <span className="pop-label">Couleur</span>
-                    <div className="list-colors">
-                        {LIST_COLORS.map(color => (
-                            <button
-                                key={color}
-                                className={color === list.color ? 'list-color on' : 'list-color'}
-                                style={{ background: color, color }}
-                                aria-label={`Couleur ${color}`}
-                                onClick={() => this.props.onUpdate({ color })}
-                            />
-                        ))}
-                    </div>
-                </div>
-
-                <div className="pop-field">
-                    <span className="pop-label">Icône</span>
-                    <span className="pop-input">
-                        <Search size={14} />
-                        <input
-                            value={this.state.iconQuery}
-                            placeholder="Rechercher une icône…"
-                            onChange={event => this.setState({ iconQuery: event.target.value })}
-                        />
-                    </span>
-                    <div className="list-icons">
-                        {icons.map(name => {
-                            const Icon = LIST_ICONS[name].icon
-                            const selected = name === list.icon
-                            return (
-                                <button
-                                    key={name}
-                                    className={selected ? 'list-icon on' : 'list-icon'}
-                                    style={selected ? { borderColor: list.color, background: list.color + '1A' } : undefined}
-                                    title={LIST_ICONS[name].label}
-                                    onClick={() => this.props.onUpdate({ icon: name })}
-                                >
-                                    <Icon size={18} color={selected ? list.color : 'currentColor'} />
-                                </button>
-                            )
-                        })}
-                        {icons.length === 0 && <span className="pop-status">Aucune icône trouvée</span>}
-                    </div>
-                </div>
+                <ListLookPicker
+                    color={list.color}
+                    icon={list.icon}
+                    onColor={color => this.props.onUpdate({ color })}
+                    onIcon={icon => this.props.onUpdate({ icon })}
+                />
 
                 <div className="pop-foot">
                     <button className="pop-delete" onClick={this.onDeleteClick}>

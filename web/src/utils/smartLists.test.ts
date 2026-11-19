@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { DueTask, SmartList, UrgencyLevel } from '../api/types'
 import { todayIso } from './dates'
 import {
-    customSmartId, groupDueTasks, groupSmartTasks, isBuiltInSmart, isSmart, smartListSummary, smartPaneId,
+    canSaveSmartList, customSmartId, groupDueTasks, groupSmartTasks, isBuiltInSmart, isSmart, smartListSummary, smartPaneId,
     SMART_SCHEDULED, SMART_TODAY,
 } from './smartLists'
 
@@ -88,5 +88,15 @@ describe('listes intelligentes perso', () => {
         expect(smartListSummary(smartList('urgency', ['Haute', 'Moyenne']))).toBe('urgence Haute ou Moyenne')
         expect(smartListSummary(smartList('tags', ['#boulot', '#réunion']))).toBe('#boulot ou #réunion')
         expect(smartListSummary(smartList('tags', ['#boulot', '#réunion'], 'all'))).toBe('#boulot et #réunion')
+    })
+})
+
+describe('canSaveSmartList', () => {
+    it('demande un nom et au moins un tag ou un niveau, selon le type', () => {
+        expect(canSaveSmartList('Travail', 'tags', ['t1'], [])).toBe(true)
+        expect(canSaveSmartList('Urgent', 'urgency', [], ['u1'])).toBe(true)
+        expect(canSaveSmartList('   ', 'tags', ['t1'], [])).toBe(false)
+        expect(canSaveSmartList('Travail', 'tags', [], ['u1'])).toBe(false)
+        expect(canSaveSmartList('Urgent', 'urgency', ['t1'], [])).toBe(false)
     })
 })

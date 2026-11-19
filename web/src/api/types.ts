@@ -177,6 +177,22 @@ export interface SmartList {
     open_tasks: number       // Tâches à faire qui correspondent
 }
 
+/**
+ * Ce qu'on envoie pour créer ou modifier une liste intelligente (POST /smart-lists, PATCH /smart-lists/{id}).
+ * Changer de type demande d'envoyer aussi ses ids ; une liste d'ids envoyée ne peut pas être vide.
+ */
+export interface SmartListChanges {
+    name?: string
+    color?: string
+    icon?: string
+    kind?: 'tags' | 'urgency'
+    tag_match?: 'any' | 'all'
+    tag_ids?: string[]
+    urgency_ids?: string[]
+    visible?: boolean
+    position?: number
+}
+
 /** Compteurs des listes intelligentes (GET /tasks/due/counts). */
 export interface DueCounts {
     today: number     // Échéance aujourd'hui ou en retard

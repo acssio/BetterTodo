@@ -116,3 +116,9 @@ export function smartListSummary(list: SmartList): string {
     if (list.kind === 'urgency') return 'urgence ' + list.labels.join(' ou ')
     return list.labels.join(list.tag_match === 'all' ? ' et ' : ' ou ')
 }
+
+/** Le formulaire d'une liste intelligente peut-il être enregistré ? (mêmes règles que l'API) */
+export function canSaveSmartList(name: string, kind: 'tags' | 'urgency', tagIds: string[], urgencyIds: string[]): boolean {
+    if (name.trim() === '') return false
+    return kind === 'tags' ? tagIds.length > 0 : urgencyIds.length > 0
+}

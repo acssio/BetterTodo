@@ -1,5 +1,5 @@
 import type {
-    ApiToken, Board, CreatedApiToken, DueCounts, DueTask, Folder, Group, ListChanges, NewUser, Session, SmartList, Tag,
+    ApiToken, Board, CreatedApiToken, DueCounts, DueTask, Folder, Group, ListChanges, NewUser, Session, SmartList, SmartListChanges, Tag,
     Task, TaskChanges, TodoList, UrgencyChanges, UrgencyLevel, User, UserChanges,
 } from './types'
 
@@ -182,6 +182,18 @@ export class ApiClient {
     /** Tâches à faire d'une liste intelligente personnalisée (même format que getDueTasks). */
     getSmartListTasks(id: string): Promise<DueTask[]> {
         return this.request('GET', `/smart-lists/${id}/tasks`)
+    }
+
+    createSmartList(list: SmartListChanges): Promise<SmartList> {
+        return this.request('POST', '/smart-lists', list)
+    }
+
+    updateSmartList(id: string, changes: SmartListChanges): Promise<SmartList> {
+        return this.request('PATCH', `/smart-lists/${id}`, changes)
+    }
+
+    deleteSmartList(id: string): Promise<void> {
+        return this.request('DELETE', `/smart-lists/${id}`)
     }
 
     getUrgencyLevels(): Promise<UrgencyLevel[]> {
