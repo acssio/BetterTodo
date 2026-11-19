@@ -59,9 +59,10 @@ func (h *UrgencyHandler) List(w http.ResponseWriter, r *http.Request) {
 }
 
 type createUrgencyRequest struct {
-	Name  string `json:"name"`
-	Color string `json:"color"`
-	Rank  *int   `json:"rank"` // Facultatif : le plus urgent (à la fin) par défaut
+	ID    *string `json:"id"` // Facultatif : id choisi par l'app (création hors ligne, 8-4)
+	Name  string  `json:"name"`
+	Color string  `json:"color"`
+	Rank  *int    `json:"rank"` // Facultatif : le plus urgent (à la fin) par défaut
 }
 
 // Create : POST /api/v1/urgency-levels
@@ -83,14 +84,29 @@ func (h *UrgencyHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
 	userID := userOf(r)
-	var created urgencyLevel
 
+	replay, ok := checkClientID(w, r, h.pool, "urgency_levels", sqlOwnsUrgency, req.ID)
+	if !ok {
+		return
+	}
+	if replay {
+		existing, err := scanUrgency(h.pool.QueryRow(ctx, urgencySelect+` WHERE id = $1`, *req.ID))
+		if err != nil {
+			httpjson.ServerError(w, err)
+			return
+		}
+		httpjson.Write(w, http.StatusOK, existing)
+		return
+	}
+
+	var created urgencyLevel
 	err := pgx.BeginFunc(ctx, h.pool, func(tx pgx.Tx) error {
 		var id string
 		err := tx.QueryRow(ctx,
-			`INSERT INTO urgency_levels (user_id, name, color, rank)
-			 VALUES ($1, $2, $3, (SELECT COALESCE(MAX(rank) + 1, 0) FROM urgency_levels WHERE user_id = $1))
-			 RETURNING id`, userID, name, req.Color).Scan(&id)
+			`INSERT INTO urgency_levels (id, user_id, name, color, rank)
+			 VALUES (COALESCE($4::uuid, gen_random_uuid()), $1, $2, $3,
+			         (SELECT COALESCE(MAX(rank) + 1, 0) FROM urgency_levels WHERE user_id = $1))
+			 RETURNING id`, userID, name, req.Color, req.ID).Scan(&id)
 		if err != nil {
 			return err
 		}
@@ -184,14 +200,11 @@ func (h *UrgencyHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := h.pool.Exec(r.Context(),
-		`DELETE FROM urgency_levels WHERE id = $1 AND user_id = $2`, id, userOf(r))
-	if err != nil {
-		httpjson.ServerError(w, err)
+	if !requireOwned(w, r, h.pool, sqlOwnsUrgency, id) {
 		return
 	}
-	if result.RowsAffected() == 0 {
-		notFound(w)
+	if err := deleteRecorded(r.Context(), h.pool, `DELETE FROM urgency_levels WHERE id = $1`, entityUrgencyLevel, id); err != nil {
+		httpjson.ServerError(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

@@ -44,8 +44,9 @@ func scanGroup(row pgx.Row) (group, error) {
 }
 
 type createGroupRequest struct {
-	Name     string `json:"name"`
-	Position *int   `json:"position"`
+	ID       *string `json:"id"` // Facultatif : id choisi par l'app (création hors ligne, 8-4)
+	Name     string  `json:"name"`
+	Position *int    `json:"position"`
 }
 
 // Create : POST /api/v1/lists/{id}/groups
@@ -70,14 +71,29 @@ func (h *GroupHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := r.Context()
-	var created group
 
+	replay, ok := checkClientID(w, r, h.pool, "task_groups", sqlOwnsGroup, req.ID)
+	if !ok {
+		return
+	}
+	if replay {
+		existing, err := scanGroup(h.pool.QueryRow(ctx, groupSelect+` WHERE id = $1`, *req.ID))
+		if err != nil {
+			httpjson.ServerError(w, err)
+			return
+		}
+		httpjson.Write(w, http.StatusOK, existing)
+		return
+	}
+
+	var created group
 	err := pgx.BeginFunc(ctx, h.pool, func(tx pgx.Tx) error {
 		var id string
 		err := tx.QueryRow(ctx,
-			`INSERT INTO task_groups (list_id, name, position)
-			 VALUES ($1, $2, (SELECT COALESCE(MAX(position) + 1, 0) FROM task_groups WHERE list_id = $1))
-			 RETURNING id`, listID, name).Scan(&id)
+			`INSERT INTO task_groups (id, list_id, name, position)
+			 VALUES (COALESCE($3::uuid, gen_random_uuid()), $1, $2,
+			         (SELECT COALESCE(MAX(position) + 1, 0) FROM task_groups WHERE list_id = $1))
+			 RETURNING id`, listID, name, req.ID).Scan(&id)
 		if err != nil {
 			return err
 		}
@@ -170,7 +186,7 @@ func (h *GroupHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if _, err := h.pool.Exec(r.Context(), `DELETE FROM task_groups WHERE id = $1`, id); err != nil {
+	if err := deleteRecorded(r.Context(), h.pool, `DELETE FROM task_groups WHERE id = $1`, entityGroup, id); err != nil {
 		httpjson.ServerError(w, err)
 		return
 	}

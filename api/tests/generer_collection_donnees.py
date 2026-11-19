@@ -1,5 +1,5 @@
 """
-Génère la collection Postman des données (étape 2b, complétée en 3c-2b, 3e, 7-3 et 7-5).
+Génère la collection Postman des données (étape 2b, complétée en 3c-2b, 3e, 7-3, 7-5 et 8-4).
 
 Usage, depuis la racine du projet :
     python3 api/tests/generer_collection_donnees.py api/tests/bettertodo-api-donnees.postman_collection.json
@@ -350,6 +350,87 @@ req("Supprimer la liste", "DELETE", "/lists/{{listId}}", tests=[status(204)])
 req("La liste n'existe plus", "GET", "/lists/{{listId}}/board", tests=[status(404)])
 req("Lait (dans Administratif) est supprimé avec la liste", "GET", "/tasks/{{task2}}", tests=[status(404)])
 
+# --- Synchronisation de l'app Android (étape 8-4) ----------------------------------
+# L'app crée hors ligne avec ses propres UUID, rejoue ses requêtes, puis demande GET /sync?since=…
+def new_ids(*names):
+    return [f"pm.collectionVariables.set('{n}', pm.variables.replaceIn('{{{{$guid}}}}'));" for n in names]
+
+
+req("Synchro complète (sans curseur)", "GET", "/sync", tests=[
+    status(200), J,
+    "pm.test('curseur, compte et tout le reste', () => {",
+    "  pm.expect(b.cursor).to.be.a('string');",
+    "  pm.expect(b.user.id).to.eql(pm.collectionVariables.get('tokenId'));",
+    "  ['folders', 'lists', 'groups', 'tasks', 'urgency_levels', 'tags', 'smart_lists', 'deleted'].forEach(k => pm.expect(b[k]).to.be.an('array'));",
+    "});",
+    "pm.collectionVariables.set('cursor1', b.cursor);"])
+req("Curseur invalide", "GET", "/sync?since=hier", tests=[status(400)])
+req("Groupe de listes avec un id choisi par l'app", "POST", "/folders", body={"id": "{{syncFolder}}", "name": "Synchro"},
+    pre=new_ids("syncFolder", "syncList", "syncGroup", "syncTask", "syncDone", "syncTag", "syncUrgency", "syncSmart"),
+    tests=[status(201), J, "pm.test('id gardé', () => pm.expect(b.id).to.eql(pm.collectionVariables.get('syncFolder')));"])
+req("Rejeu de la même création : l'existant, sans doublon", "POST", "/folders", body={"id": "{{syncFolder}}", "name": "Synchro"}, tests=[
+    status(200), J, "pm.test('même id', () => pm.expect(b.id).to.eql(pm.collectionVariables.get('syncFolder')));"])
+req("Il n'y a qu'un groupe de listes Synchro", "GET", "/folders", tests=[
+    status(200), J, "pm.test('un seul', () => pm.expect(b.filter(f => f.name === 'Synchro').length).to.eql(1));"])
+req("id qui n'est pas un UUID", "POST", "/folders", body={"id": "abc", "name": "X"}, tests=[status(400)])
+req("B ne peut pas réutiliser l'id de A", "POST", "/folders", token="tokenB", body={"id": "{{syncFolder}}", "name": "X"}, tests=[status(409)])
+req("Liste avec id et id de son groupe par défaut", "POST", "/lists",
+    body={"id": "{{syncList}}", "default_group_id": "{{syncGroup}}", "name": "Synchro", "folder_id": "{{syncFolder}}"},
+    tests=[status(201), J, "pm.test('id gardé', () => pm.expect(b.id).to.eql(pm.collectionVariables.get('syncList')));"])
+req("Le groupe par défaut a l'id choisi", "GET", "/lists/{{syncList}}/board", tests=[
+    status(200), J, "pm.test('un groupe, avec cet id', () => pm.expect(b.groups.map(g => g.id)).to.eql([pm.collectionVariables.get('syncGroup')]));"])
+req("Rejeu de la liste", "POST", "/lists",
+    body={"id": "{{syncList}}", "default_group_id": "{{syncGroup}}", "name": "Synchro", "folder_id": "{{syncFolder}}"},
+    tests=[status(200)])
+req("Toujours un seul groupe (pas de second groupe par défaut)", "GET", "/lists/{{syncList}}/board", tests=[
+    status(200), J, "pm.test('un groupe', () => pm.expect(b.groups.length).to.eql(1));"])
+req("Tâche avec id", "POST", "/groups/{{syncGroup}}/tasks", body={"id": "{{syncTask}}", "title": "Hors ligne", "due_date": "2026-11-19", "due_time": "09:30"},
+    tests=[status(201), J, "pm.test('id gardé', () => pm.expect(b.id).to.eql(pm.collectionVariables.get('syncTask')));"])
+req("Rejeu de la tâche", "POST", "/groups/{{syncGroup}}/tasks", body={"id": "{{syncTask}}", "title": "Hors ligne"}, tests=[
+    status(200), J, "pm.test('la tâche existante (heure gardée)', () => pm.expect(b.due_time).to.eql('09:30'));"])
+req("Tâche faite, avec id", "POST", "/groups/{{syncGroup}}/tasks", body={"id": "{{syncDone}}", "title": "Faite"}, tests=[status(201)])
+req("La cocher", "PATCH", "/tasks/{{syncDone}}", body={"done": True}, tests=[status(200)])
+req("Tag avec id", "POST", "/tags", body={"id": "{{syncTag}}", "name": "synchro"}, tests=[
+    status(201), J, "pm.test('id gardé', () => pm.expect(b.id).to.eql(pm.collectionVariables.get('syncTag')));"])
+req("Rejeu du tag", "POST", "/tags", body={"id": "{{syncTag}}", "name": "synchro"}, tests=[status(200)])
+req("Niveau d'urgence avec id", "POST", "/urgency-levels", body={"id": "{{syncUrgency}}", "name": "Synchro", "color": "#2F6FEB"}, tests=[
+    status(201), J, "pm.test('id gardé', () => pm.expect(b.id).to.eql(pm.collectionVariables.get('syncUrgency')));"])
+req("Liste intelligente avec id", "POST", "/smart-lists", body={"id": "{{syncSmart}}", "name": "Synchro", "kind": "tags", "tag_ids": ["{{syncTag}}"]}, tests=[
+    status(201), J, "pm.test('id gardé', () => pm.expect(b.id).to.eql(pm.collectionVariables.get('syncSmart')));"])
+req("Synchro depuis le curseur : ce qui vient d'être créé", "GET", "/sync?since={{cursor1}}", tests=[
+    status(200), J,
+    "const v = k => pm.collectionVariables.get(k);",
+    "pm.test('tout est là', () => {",
+    "  pm.expect(b.folders.map(x => x.id)).to.include(v('syncFolder'));",
+    "  pm.expect(b.lists.map(x => x.id)).to.include(v('syncList'));",
+    "  pm.expect(b.groups.map(x => x.id)).to.include(v('syncGroup'));",
+    "  pm.expect(b.tasks.map(x => x.id)).to.include.members([v('syncTask'), v('syncDone')]);",
+    "  pm.expect(b.tags.map(x => x.id)).to.include(v('syncTag'));",
+    "  pm.expect(b.urgency_levels.map(x => x.id)).to.include(v('syncUrgency'));",
+    "  pm.expect(b.smart_lists.map(x => x.id)).to.include(v('syncSmart'));",
+    "});",
+    "pm.test('le groupe donne sa liste', () => pm.expect(b.groups.find(g => g.id === v('syncGroup')).list_id).to.eql(v('syncList')));",
+    "pm.collectionVariables.set('cursor2', b.cursor);"])
+req("Vider les tâches faites", "DELETE", "/lists/{{syncList}}/done-tasks", tests=[
+    status(200), J, "pm.test('1 supprimée', () => pm.expect(b.deleted).to.eql(1));"])
+for name, path in (("la tâche", "/tasks/{{syncTask}}"), ("la liste intelligente", "/smart-lists/{{syncSmart}}"),
+                   ("le tag", "/tags/{{syncTag}}"), ("le niveau d'urgence", "/urgency-levels/{{syncUrgency}}"),
+                   ("la liste", "/lists/{{syncList}}"), ("le groupe de listes", "/folders/{{syncFolder}}")):
+    req(f"Supprimer {name}", "DELETE", path, tests=[status(204)])
+req("Rejeu d'une suppression : 404 (déjà fait)", "DELETE", "/tasks/{{syncTask}}", tests=[status(404)])
+req("Synchro : les suppressions", "GET", "/sync?since={{cursor2}}", tests=[
+    status(200), J,
+    "const v = k => pm.collectionVariables.get(k);",
+    "const deleted = b.deleted.map(d => d.type + ':' + d.id);",
+    "pm.test('chaque suppression est notée', () => pm.expect(deleted).to.include.members([",
+    "  'task:' + v('syncDone'), 'task:' + v('syncTask'), 'smart_list:' + v('syncSmart'), 'tag:' + v('syncTag'),",
+    "  'urgency_level:' + v('syncUrgency'), 'list:' + v('syncList'), 'folder:' + v('syncFolder')]));",
+    "pm.test('liste supprimée absente', () => pm.expect(b.lists.map(x => x.id)).to.not.include(v('syncList')));"])
+req("B ne voit pas les suppressions de A", "GET", "/sync", token="tokenB", tests=[
+    status(200), J,
+    "pm.test('aucune', () => pm.expect(b.deleted.map(d => d.id)).to.not.include(pm.collectionVariables.get('syncList')));",
+    "pm.test('son propre compte', () => pm.expect(b.user.id).to.eql(pm.collectionVariables.get('tokenBId')));"])
+
 # --- Ménage : l'admin supprime les deux comptes de test (et toutes leurs données) ---
 req("Admin supprime le compte A", "DELETE", "/admin/users/{{tokenId}}", token="adminToken", tests=[status(204)])
 req("Admin supprime le compte B", "DELETE", "/admin/users/{{tokenBId}}", token="adminToken", tests=[status(204)])
@@ -357,7 +438,7 @@ req("La session de B ne marche plus", "GET", "/lists", token="tokenB", tests=[st
 
 collection = {
     "info": {
-        "name": "BetterTodo API – données (étapes 2b, 3c-2b et 3e)",
+        "name": "BetterTodo API – données (étapes 2b, 3c-2b, 3e et 8-4)",
         "description": "Listes, groupes, tâches, tags, niveaux d'urgence, ordre et isolation entre utilisateurs. "
                        "À lancer dans l'ordre, avec --env-var adminEmail=… --env-var adminPassword=… "
                        "(voir docs/etapes/02b-api-donnees.md et 03e-admin-et-icones.md).",

@@ -88,12 +88,14 @@ func (h *ListHandler) List(w http.ResponseWriter, r *http.Request) {
 }
 
 type createListRequest struct {
-	Name        string  `json:"name"`
-	FolderID    *string `json:"folder_id"`
-	Color       *string `json:"color"`
-	Icon        *string `json:"icon"`
-	DefaultView *string `json:"default_view"`
-	Position    *int    `json:"position"`
+	ID             *string `json:"id"`               // Facultatif : id choisi par l'app (création hors ligne, 8-4)
+	DefaultGroupID *string `json:"default_group_id"` // Facultatif : id du groupe créé avec la liste (8-4)
+	Name           string  `json:"name"`
+	FolderID       *string `json:"folder_id"`
+	Color          *string `json:"color"`
+	Icon           *string `json:"icon"`
+	DefaultView    *string `json:"default_view"`
+	Position       *int    `json:"position"`
 }
 
 // Create : POST /api/v1/lists
@@ -133,18 +135,43 @@ func (h *ListHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
 	userID := auth.UserID(ctx)
+
+	replay, ok := checkClientID(w, r, h.pool, "lists", sqlOwnsList, req.ID)
+	if !ok {
+		return
+	}
+	if replay {
+		existing, err := scanList(h.pool.QueryRow(ctx, listSelect+` WHERE l.id = $1`, *req.ID))
+		if err != nil {
+			httpjson.ServerError(w, err)
+			return
+		}
+		httpjson.Write(w, http.StatusOK, existing)
+		return
+	}
+	if req.DefaultGroupID != nil {
+		groupReplay, ok := checkClientID(w, r, h.pool, "task_groups", sqlOwnsGroup, req.DefaultGroupID)
+		if !ok {
+			return
+		}
+		if groupReplay { // Le groupe existe déjà, mais pas la liste : id réutilisé par erreur
+			httpjson.Error(w, http.StatusConflict, "Cet id de groupe est déjà utilisé")
+			return
+		}
+	}
+
 	var created list
 
 	err := pgx.BeginFunc(ctx, h.pool, func(tx pgx.Tx) error {
 		var id string
 		err := tx.QueryRow(ctx,
-			`INSERT INTO lists (user_id, folder_id, name, color, icon, default_view, position)
-			 VALUES ($1, $2, $3, $4, $5,
+			`INSERT INTO lists (id, user_id, folder_id, name, color, icon, default_view, position)
+			 VALUES (COALESCE($7::uuid, gen_random_uuid()), $1, $2, $3, $4, $5,
 			         COALESCE($6, (SELECT default_view FROM users WHERE id = $1)),
 			         (SELECT COALESCE(MAX(position) + 1, 0) FROM lists
 			          WHERE user_id = $1 AND folder_id IS NOT DISTINCT FROM $2))
 			 RETURNING id`,
-			userID, req.FolderID, name, color, icon, req.DefaultView).Scan(&id)
+			userID, req.FolderID, name, color, icon, req.DefaultView, req.ID).Scan(&id)
 		if err != nil {
 			return err
 		}
@@ -154,8 +181,9 @@ func (h *ListHandler) Create(w http.ResponseWriter, r *http.Request) {
 		if err := tx.QueryRow(ctx, `SELECT language FROM users WHERE id = $1`, userID).Scan(&language); err != nil {
 			return err
 		}
-		_, err = tx.Exec(ctx, `INSERT INTO task_groups (list_id, name, position) VALUES ($1, $2, 0)`,
-			id, defaultGroupName[language])
+		_, err = tx.Exec(ctx,
+			`INSERT INTO task_groups (id, list_id, name, position) VALUES (COALESCE($3::uuid, gen_random_uuid()), $1, $2, 0)`,
+			id, defaultGroupName[language], req.DefaultGroupID)
 		if err != nil {
 			return err
 		}
@@ -292,13 +320,22 @@ func (h *ListHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := h.pool.Exec(r.Context(),
-		`DELETE FROM lists WHERE id = $1 AND user_id = $2`, id, auth.UserID(r.Context()))
+	ctx := r.Context()
+	userID := auth.UserID(ctx)
+	found := false
+	err := pgx.BeginFunc(ctx, h.pool, func(tx pgx.Tx) error {
+		result, err := tx.Exec(ctx, `DELETE FROM lists WHERE id = $1 AND user_id = $2`, id, userID)
+		if err != nil || result.RowsAffected() == 0 {
+			return err
+		}
+		found = true
+		return recordDeletion(ctx, tx, userID, entityList, id) // Groupes et tâches : en cascade aussi sur le téléphone
+	})
 	if err != nil {
 		httpjson.ServerError(w, err)
 		return
 	}
-	if result.RowsAffected() == 0 {
+	if !found {
 		notFound(w)
 		return
 	}
@@ -316,13 +353,32 @@ func (h *ListHandler) ClearDone(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := h.pool.Exec(r.Context(),
-		`DELETE FROM tasks WHERE done AND group_id IN (SELECT id FROM task_groups WHERE list_id = $1)`, id)
+	ctx := r.Context()
+	var deleted int64
+	err := pgx.BeginFunc(ctx, h.pool, func(tx pgx.Tx) error {
+		// Chaque tâche supprimée est notée, pour les autres appareils (8-4)
+		rows, err := tx.Query(ctx,
+			`DELETE FROM tasks WHERE done AND group_id IN (SELECT id FROM task_groups WHERE list_id = $1) RETURNING id`, id)
+		if err != nil {
+			return err
+		}
+		ids, err := pgx.CollectRows(rows, pgx.RowTo[string])
+		if err != nil {
+			return err
+		}
+		for _, taskID := range ids {
+			if err := recordDeletion(ctx, tx, auth.UserID(ctx), entityTask, taskID); err != nil {
+				return err
+			}
+		}
+		deleted = int64(len(ids))
+		return nil
+	})
 	if err != nil {
 		httpjson.ServerError(w, err)
 		return
 	}
-	httpjson.Write(w, http.StatusOK, map[string]int64{"deleted": result.RowsAffected()})
+	httpjson.Write(w, http.StatusOK, map[string]int64{"deleted": deleted})
 }
 
 // board : tout ce qu'il faut pour afficher une liste, en un seul appel.

@@ -53,7 +53,8 @@ func (h *TagHandler) List(w http.ResponseWriter, r *http.Request) {
 }
 
 type tagRequest struct {
-	Name string `json:"name"`
+	ID   *string `json:"id"` // Facultatif, à la création : id choisi par l'app (création hors ligne, 8-4)
+	Name string  `json:"name"`
 }
 
 // Create : POST /api/v1/tags
@@ -69,9 +70,25 @@ func (h *TagHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	ctx := r.Context()
+	replay, ok := checkClientID(w, r, h.pool, "tags", sqlOwnsTag, req.ID)
+	if !ok {
+		return
+	}
+	if replay {
+		existing, err := scanTag(h.pool.QueryRow(ctx, tagSelect+` WHERE t.id = $1`, *req.ID))
+		if err != nil {
+			httpjson.ServerError(w, err)
+			return
+		}
+		httpjson.Write(w, http.StatusOK, existing)
+		return
+	}
+
 	var id string
-	err := h.pool.QueryRow(r.Context(),
-		`INSERT INTO tags (user_id, name) VALUES ($1, $2) RETURNING id`, userOf(r), name).Scan(&id)
+	err := h.pool.QueryRow(ctx,
+		`INSERT INTO tags (id, user_id, name) VALUES (COALESCE($3::uuid, gen_random_uuid()), $1, $2) RETURNING id`,
+		userOf(r), name, req.ID).Scan(&id)
 	if isUniqueViolation(err) {
 		httpjson.Error(w, http.StatusConflict, "Ce tag existe déjà")
 		return
@@ -135,13 +152,11 @@ func (h *TagHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := h.pool.Exec(r.Context(), `DELETE FROM tags WHERE id = $1 AND user_id = $2`, id, userOf(r))
-	if err != nil {
-		httpjson.ServerError(w, err)
+	if !requireOwned(w, r, h.pool, sqlOwnsTag, id) {
 		return
 	}
-	if result.RowsAffected() == 0 {
-		notFound(w)
+	if err := deleteRecorded(r.Context(), h.pool, `DELETE FROM tags WHERE id = $1`, entityTag, id); err != nil {
+		httpjson.ServerError(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

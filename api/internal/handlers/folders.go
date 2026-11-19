@@ -61,8 +61,9 @@ func (h *FolderHandler) List(w http.ResponseWriter, r *http.Request) {
 }
 
 type createFolderRequest struct {
-	Name     string `json:"name"`
-	Position *int   `json:"position"` // Facultatif : à la fin par défaut
+	ID       *string `json:"id"` // Facultatif : id choisi par l'app (création hors ligne, 8-4)
+	Name     string  `json:"name"`
+	Position *int    `json:"position"` // Facultatif : à la fin par défaut
 }
 
 // Create : POST /api/v1/folders
@@ -80,14 +81,29 @@ func (h *FolderHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
 	userID := auth.UserID(ctx)
-	var created folder
 
+	replay, ok := checkClientID(w, r, h.pool, "list_folders", sqlOwnsFolder, req.ID)
+	if !ok {
+		return
+	}
+	if replay {
+		existing, err := scanFolder(h.pool.QueryRow(ctx, folderSelect+` WHERE id = $1`, *req.ID))
+		if err != nil {
+			httpjson.ServerError(w, err)
+			return
+		}
+		httpjson.Write(w, http.StatusOK, existing)
+		return
+	}
+
+	var created folder
 	err := pgx.BeginFunc(ctx, h.pool, func(tx pgx.Tx) error {
 		var id string
 		err := tx.QueryRow(ctx,
-			`INSERT INTO list_folders (user_id, name, position)
-			 VALUES ($1, $2, (SELECT COALESCE(MAX(position) + 1, 0) FROM list_folders WHERE user_id = $1))
-			 RETURNING id`, userID, name).Scan(&id)
+			`INSERT INTO list_folders (id, user_id, name, position)
+			 VALUES (COALESCE($3::uuid, gen_random_uuid()), $1, $2,
+			         (SELECT COALESCE(MAX(position) + 1, 0) FROM list_folders WHERE user_id = $1))
+			 RETURNING id`, userID, name, req.ID).Scan(&id)
 		if err != nil {
 			return err
 		}
@@ -183,13 +199,22 @@ func (h *FolderHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := h.pool.Exec(r.Context(),
-		`DELETE FROM list_folders WHERE id = $1 AND user_id = $2`, id, auth.UserID(r.Context()))
+	ctx := r.Context()
+	userID := auth.UserID(ctx)
+	found := false
+	err := pgx.BeginFunc(ctx, h.pool, func(tx pgx.Tx) error {
+		result, err := tx.Exec(ctx, `DELETE FROM list_folders WHERE id = $1 AND user_id = $2`, id, userID)
+		if err != nil || result.RowsAffected() == 0 {
+			return err
+		}
+		found = true
+		return recordDeletion(ctx, tx, userID, entityFolder, id) // Pour les autres appareils (8-4)
+	})
 	if err != nil {
 		httpjson.ServerError(w, err)
 		return
 	}
-	if result.RowsAffected() == 0 {
+	if !found {
 		notFound(w)
 		return
 	}
