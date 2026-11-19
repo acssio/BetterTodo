@@ -66,9 +66,9 @@
     min-width: 0;
 }
 
-/* Champ « Heure » : étroit, à côté de l'échéance */
+/* Champ « Heure » : étroit, à côté de l'échéance (assez large pour « 23:59 » et l'icône d'horloge) */
 .pop-row .pop-field.pop-time {
-    flex: 0 0 84px;
+    flex: 0 0 104px;
 }
 
 .pop-time input:disabled {
