@@ -71,8 +71,8 @@ fun ChangePasswordScreen(
             Modifier.widthIn(max = 420.dp).fillMaxWidth().padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Box(Modifier.size(44.dp).background(Palette.text, RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) {
-                Icon(painterResource(R.drawable.lucide_ic_check), contentDescription = null, tint = Color.White)
+            Box(Modifier.size(44.dp).background(Palette.primaryBg, RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) {
+                Icon(painterResource(R.drawable.lucide_ic_check), contentDescription = null, tint = Palette.primaryText)
             }
             Text("Choisis ton mot de passe", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
             Text(

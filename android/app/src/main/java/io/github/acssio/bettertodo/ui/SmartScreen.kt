@@ -66,7 +66,7 @@ fun SmartScreen(model: SmartModel, lists: List<TodoList>, onBack: () -> Unit) {
                         Text(model.kind.title, fontWeight = FontWeight.SemiBold)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Palette.background),
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Palette.header), // Grise, comme une liste
             )
         },
         bottomBar = {

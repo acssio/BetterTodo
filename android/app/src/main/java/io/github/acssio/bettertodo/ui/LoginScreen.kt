@@ -76,10 +76,10 @@ fun LoginScreen(
         ) {
             // Logo : coche blanche sur carré foncé, comme le site
             Box(
-                Modifier.size(44.dp).background(Palette.text, RoundedCornerShape(12.dp)),
+                Modifier.size(44.dp).background(Palette.primaryBg, RoundedCornerShape(12.dp)),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(painterResource(R.drawable.lucide_ic_check), contentDescription = null, tint = Color.White)
+                Icon(painterResource(R.drawable.lucide_ic_check), contentDescription = null, tint = Palette.primaryText)
             }
             Text("BetterTodo", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
             Text("Connecte-toi à ton serveur", color = Palette.muted)

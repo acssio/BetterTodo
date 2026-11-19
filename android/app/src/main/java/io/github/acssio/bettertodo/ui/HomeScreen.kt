@@ -426,10 +426,10 @@ fun HomeScreen(
                 title = { Text("BetterTodo", fontWeight = FontWeight.SemiBold) },
                 navigationIcon = {
                     Box(
-                        Modifier.padding(start = 16.dp, end = 4.dp).size(28.dp).background(Palette.text, RoundedCornerShape(8.dp)),
+                        Modifier.padding(start = 16.dp, end = 4.dp).size(28.dp).background(Palette.primaryBg, RoundedCornerShape(8.dp)),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Icon(painterResource(R.drawable.lucide_ic_check), contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                        Icon(painterResource(R.drawable.lucide_ic_check), contentDescription = null, tint = Palette.primaryText, modifier = Modifier.size(16.dp))
                     }
                 },
                 actions = {
@@ -452,8 +452,8 @@ fun HomeScreen(
                     onClick = model::openQuickTask,
                     icon = { Icon(painterResource(R.drawable.lucide_ic_plus), contentDescription = null, modifier = Modifier.size(20.dp)) },
                     text = { Text("Quick task", fontWeight = FontWeight.SemiBold) },
-                    containerColor = Palette.text,
-                    contentColor = Color.White,
+                    containerColor = Palette.primaryBg,
+                    contentColor = Palette.primaryText,
                     // Le texte du bouton n'arrivait pas aux services d'accessibilité (vu avec uiautomator) :
                     // on le donne explicitement, pour TalkBack
                     modifier = Modifier.semantics { contentDescription = "Quick task" },

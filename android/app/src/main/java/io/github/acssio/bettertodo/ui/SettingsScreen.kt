@@ -29,6 +29,9 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberUpdatedState
@@ -36,6 +39,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -50,7 +54,9 @@ import io.github.acssio.bettertodo.api.Tag
 import io.github.acssio.bettertodo.api.TodoList
 import io.github.acssio.bettertodo.api.UrgencyLevel
 import io.github.acssio.bettertodo.api.User
+import io.github.acssio.bettertodo.data.AppearanceStore
 import io.github.acssio.bettertodo.ui.theme.Palette
+import io.github.acssio.bettertodo.ui.theme.ThemeMode
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -353,6 +359,12 @@ fun SettingsScreen(model: SettingsModel, onBack: () -> Unit) {
         ) {
             model.error?.let { Notice(it) }
 
+            // --- Apparence (8-1) : par téléphone, pas sur le serveur ---
+            SectionTitle("Apparence")
+            AppearanceSection()
+
+            HorizontalDivider(color = Palette.border)
+
             // --- Compte ---
             SectionTitle("Compte")
             Text(user.email, color = Palette.muted)
@@ -438,6 +450,25 @@ private fun PasswordSection(model: SettingsModel) {
             } else {
                 Text("Changer le mot de passe")
             }
+        }
+    }
+}
+
+/**
+ * Système / Clair / Sombre. Retenu par téléphone dans AppearanceStore (comme bettertodo.theme sur le site) :
+ * MainActivity suit ce réglage et redessine toute l'app dès qu'il change.
+ */
+@Composable
+private fun AppearanceSection() {
+    val context = LocalContext.current
+    val store = remember { AppearanceStore(context) }
+    val scope = rememberCoroutineScope()
+    val mode by store.mode.collectAsState(initial = ThemeMode.SYSTEM)
+
+    Text("Système : suit le mode clair ou sombre du téléphone.", color = Palette.muted, fontSize = 14.sp)
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        ThemeMode.entries.forEach { choice ->
+            FilterChip(mode == choice, onClick = { scope.launch { store.save(choice) } }, label = { Text(choice.label) })
         }
     }
 }

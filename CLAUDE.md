@@ -17,6 +17,7 @@ Application de todo list **self-hosted**, **cross-platform** et **open source**,
 - **Un README par étape.** L'utilisateur aime programmer et apprendre, et veut pouvoir déboguer seul. Chaque étape livre un fichier `docs/etapes/NN-nom-de-l-etape.md` qui explique : ce qui a été fait et pourquoi, comment le code est organisé, comment le lancer et le tester, et où regarder en cas de problème.
 - **Communiquer en français.** Commentaires du code en français.
 - Consigner les décisions validées dans la section « Décisions » ci-dessous.
+- **Depuis le 2026-11-19 (étape 8) : Claude enchaîne les morceaux sans attendre de validation** (accord de l'utilisateur). Pour chaque morceau : plan noté dans le README, code, **tests** (tests unitaires + vrais appuis sur l'émulateur, `go test` + Postman côté serveur), README, commit sur la branche `etape-8`, puis le suivant. Claude s'arrête seulement pour une décision qui change le produit, ou pour une action hors du dépôt local (push, fusion dans `main`, serveur distant de l'utilisateur).
 
 ## Style de code de l'utilisateur
 
@@ -180,8 +181,17 @@ Observé dans ses autres projets (C++ embarqué, React/TypeScript). Écrire du c
   - **7-5** (2026-11-19) : table `smart_lists` (migration 011 : `kind` tags / urgency, `tag_match` any / all, `tag_ids` / `urgency_ids` en **tableaux d'UUID**, `visible`, `position`) + `users.show_today` / `show_scheduled` ; `SmartListHandler` (`/smart-lists` CRUD + `/{id}/tasks`, format de `/tasks/due`, seulement les tâches à faire) ; **un seul filtre SQL `sqlSmartMatch`** pour le compteur et les tâches. Web : moitié `smart:<id>` (`smartPaneId` / `customSmartId` / `isBuiltInSmart`), tout le reste commun avec Aujourd'hui / Planifié ; sections `smartSections` (tags : une section ; urgence : une par niveau) ; barre latérale et tuiles mobiles. Création / réglages : 7-6.
   - **7-6** (2026-11-19) : Paramètres › Listes intelligentes (interrupteurs `.settings-switch` : Aujourd'hui / Planifié via `PATCH /me`, listes perso via `visible` ; crayon ; « Nouvelle liste intelligente ») ; fenêtre `SmartListDialog` (formulaire seul, `SettingsDialog` enregistre, `data-keep-popovers` + Échap avec `preventDefault`) ; palette commune `ListLookPicker` (sortie de `ListEditPopover`) ; `Workspace.onSmartListsChanged` (recharge les moitiés, remplace une liste supprimée). Pas de compteur en direct ni de réordonnancement (plus tard). **Tout `ModifBetterTodo.md` est fait côté site**, restent : notifications et mise à jour de l'app Android.
   - **2026-11-19 – Accueil mobile** : pied compact sur une ligne (nom, puis console admin, Paramètres et déconnexion en **icônes seules**), demande de l'utilisateur pour gagner de la place. « Déplacer… » sur ordinateur : pas fait (possible plus tard avec `MoveTasksSheet`).
+- **2026-11-19 – Étape 8 : app Android à jour et « local d'abord »** (demande du 2026-11-19 : l'app marche **sans serveur** ; si on ajoute un serveur dans les Paramètres, elle s'y synchronise). Morceaux, dans cet ordre, chacun avec son commit et son README `docs/etapes/08-…` :
+  - **8-1** barre du haut grise + mode sombre (Système / Clair / Sombre, par téléphone) ;
+  - **8-2** heure facultative sur une tâche + échéance par défaut de la Quick task ;
+  - **8-3** base locale **Room** : l'app lit et écrit toujours sa base, **mode sans serveur** au premier lancement ; la logique du serveur utile hors ligne (groupe par défaut, positions, échéances, 3 niveaux d'urgence de départ) est refaite dans l'app ;
+  - **8-4** serveur : synchro (ids fournis par l'app à la création, traces des suppressions, `GET /sync?since=`, fusion au premier lien) ;
+  - **8-5** synchro Android : chaque modification locale est aussi notée dans une **file d'attente** (la requête REST qui aurait été envoyée), rejouée dans l'ordre quand le serveur répond, puis récupération des changements (`WorkManager`) ; **le serveur reste l'arbitre** (positions renumérotées, dernière modification gagne, champ par champ) ; ajouter / retirer le serveur dans les Paramètres (les données locales sont gardées) ;
+  - **8-6** listes intelligentes perso (affichage + réglages), calculées sur la base locale ;
+  - **8-7** notifications, programmées **sur le téléphone** depuis la base locale (`AlarmManager`, pas de push serveur) : à l'heure / 15 min / 1 h avant, boutons Fait / Dans 1 h (rappel local) / Demain ; tâches sans heure : résumé du matin (9:00 par défaut) ; réglages par téléphone.
+  - Site web et MCP inchangés (ils parlent toujours au serveur). Console admin, jetons d'accès et mot de passe : seulement avec un serveur.
 - **2026-11-13 – Maquette web validée** (Figma, page « Web – Maquette v2 »).
 
 ## Questions ouvertes
 
-- Synchronisation entre appareils (fonctionnement hors ligne ?).
+- Site web hors ligne : pas prévu (seule l'app Android est « local d'abord »).
